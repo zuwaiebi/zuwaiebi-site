@@ -1,0 +1,466 @@
+@font-face {
+  font-family: "HG行書体";
+  src: local("HGRGY");
+}
+
+@font-face {
+  font-family: "HG正楷書体";
+  src: local("HGRSGU");
+}
+
+@font-face {
+  font-family: "BIZ UD明朝";
+  src: local("BIZ-UDMinchoM");
+}
+
+:root {
+  color-scheme: dark;
+  --bg: #0e1116;
+  --panel: rgba(255,255,255,0.08);
+  --panel-strong: rgba(255,255,255,0.16);
+  --text: #f6f6f6;
+  --muted: #c8c8c8;
+  --accent: #4db5f7;
+  --accent-strong: #f05b60;
+  --accent-low: #3a6f96;
+  --success: #f6a33d;
+  --danger: #e04c44;
+  --border: rgba(255,255,255,0.14);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  min-height: 100%;
+  background: radial-gradient(circle at top, rgba(255,255,255,0.06), transparent 36%),
+              linear-gradient(180deg, #12151b 0%, #0b0d11 100%);
+  color: var(--text);
+  font-family: 'Yu Gothic Medium', 'Hiragino Kaku Gothic Pro', Meiryo, sans-serif;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: center;
+  min-height: 100vh;
+  padding: 24px;
+}
+
+.app-shell {
+  width: min(980px, 100%);
+}
+
+.page-footer {
+  width: min(980px, 100%);
+  padding: 16px 14px;
+  color: rgba(246,246,246,0.72);
+  font-size: 0.78rem;
+  line-height: 1.6;
+  text-align: center;
+  font-family: 'Yu Gothic Medium', 'Hiragino Kaku Gothic Pro', Meiryo, sans-serif;
+}
+
+.page-footer p {
+  margin: 0;
+}
+
+.screen {
+  display: none;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.screen.active {
+  display: flex;
+}
+
+.header-title {
+  text-align: center;
+}
+
+.screen--title .header-title h1 {
+  margin: 0;
+  font-size: clamp(2rem, 5vw, 3.8rem);
+  font-family: "HG正楷書体";
+  letter-spacing: 0.1em;
+  color: #fce54f;
+  text-shadow: 0 4px 20px rgba(255,255,255,0.12);
+}
+
+.screen--ginko .header-title h1 {
+  margin: 0;
+  font-size: clamp(2rem, 5vw, 3.8rem);
+  font-family: "HG行書体";
+  letter-spacing: 0.1em;
+  color: #fce54f;
+  text-shadow: 0 4px 20px rgba(255,255,255,0.12);
+}
+
+.title-panel,
+.quiz-header,
+.result-header {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.result-header h2 {
+  font-family: "HG正楷書体";
+  text-align: center;
+  margin: 0;
+  font-size: clamp(2rem, 5vw, 3.8rem);
+  letter-spacing: 0.1em;
+  color: #fce54f;
+  text-shadow: 0 4px 20px rgba(255,255,255,0.12);
+}
+
+.title-subtitle {
+  text-align: center;
+  font-size: clamp(1rem, 2vw, 1.4rem);
+  color: var(--muted);
+}
+
+.flavor-card {
+  position: relative;
+  overflow: hidden;
+  border-radius: 24px;
+  background: rgba(255,255,255,0.88);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.14);
+  min-height: 220px;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.flavor-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  opacity: 0.30;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  filter: blur(0.5px);
+}
+
+.flavor-card--title::before,
+.flavor-card--ginko::before,
+.result-item::before {
+  background-image: var(--flavor-background);
+}
+
+.flavor-card__text {
+  position: relative;
+  z-index: 1;
+  font-size: clamp(1rem, 2vw, 1.5rem);
+  font-family: "BIZ UD明朝";
+  line-height: 1.6;
+  text-align: center;
+  white-space: pre-wrap;
+  max-width: 100%;
+  color: #111;
+}
+
+.flavor-card__footer {
+  position: relative;
+  z-index: 1;
+  margin-top: 16px;
+  text-align: right;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.flavor-card__name,
+.flavor-card__code {
+  color: #111;
+}
+
+.flavor-card__name {
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.flavor-card__code {
+  font-size: 0.82rem;
+  position: relative;
+  z-index: 1;
+  margin-top: 16px;
+  text-align: right;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.flavor-card__name {
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.flavor-card__code {
+  font-size: 0.82rem;
+  color: rgba(30, 30, 30, 0.85);
+}
+
+.title-actions,
+.title-actions--ginko,
+.result-actions,
+.quiz-action {
+  display: grid;
+  gap: 12px;
+}
+
+.main-button,
+.small-button {
+  border: none;
+  border-radius: 18px;
+  padding: 16px 20px;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.18s ease, background-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.main-button {
+  background: var(--accent-strong);
+  color: #fff;
+  min-height: 56px;
+}
+
+.main-button--secondary {
+  background: var(--accent);
+}
+
+.main-button--disabled {
+  background: rgba(255,255,255,0.2);
+  color: rgba(255,255,255,0.65);
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.small-button {
+  align-self: flex-start;
+  background: rgba(255,255,255,0.08);
+  color: var(--text);
+  padding: 10px 16px;
+}
+
+.main-button:hover:not(.main-button--disabled),
+.small-button:hover {
+  transform: translateY(-1px);
+}
+
+.quiz-header {
+  gap: 8px;
+}
+
+.quiz-status {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  background: var(--panel);
+  padding: 16px;
+  border-radius: 22px;
+}
+
+.quiz-status div {
+  text-align: center;
+  font-size: 0.98rem;
+}
+
+.quiz-correct {
+  color: #78bf8d;
+}
+
+.screen--quiz {
+  position: relative;
+}
+
+.quiz-question {
+  display: flex;
+  justify-content: center;
+}
+
+.question-box {
+  width: 100%;
+  background: rgba(255,255,255,0.95);
+  border-radius: 24px;
+  padding: 24px;
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,0.06);
+}
+
+.question-text {
+  font-size: clamp(1rem, 2vw, 1.6rem);
+  font-family: "BIZ UD明朝";
+  color: #121212;
+  line-height: 1.8;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.feedback-message {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0.96);
+  min-width: min(90vw, 320px);
+  max-width: 460px;
+  padding: 20px 22px;
+  border-radius: 22px;
+  text-align: center;
+  white-space: pre-line;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.7);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.25);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.18s ease, transform 0.18s ease;
+  z-index: 20;
+}
+
+.feedback-message.visible {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
+}
+
+.feedback-message.correct {
+  background: rgba(120, 191, 141, 0.95);
+}
+
+.feedback-message.incorrect {
+  background: rgba(224, 76, 68, 0.95);
+}
+
+.choices-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.choice-item {
+  border: 2px solid rgba(77,181,247,0.48);
+  border-radius: 24px;
+  overflow: hidden;
+  background: rgba(255,255,255,0.08);
+  transition: border-color 0.18s ease, transform 0.18s ease;
+  cursor: pointer;
+}
+
+.choice-item:hover {
+  transform: translateY(-2px);
+}
+
+.choice-item.selected {
+  border-color: var(--danger);
+  box-shadow: 0 0 0 4px rgba(224,76,68,0.16);
+}
+
+.choice-image {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  background: #111;
+}
+
+.choice-details {
+  padding: 14px 12px 16px;
+}
+
+.choice-name {
+  font-weight: 700;
+  margin-bottom: 8px;
+  line-height: 1.35;
+}
+
+.choice-code {
+  font-size: 0.85rem;
+  color: rgba(255,255,255,0.76);
+}
+
+.feedback-message {
+  min-height: 32px;
+  text-align: center;
+  font-size: 1.05rem;
+  color: var(--text);
+  white-space: pre-wrap;
+}
+
+.result-header {
+  align-items: center;
+  text-align: center;
+}
+
+.result-header h2 {
+  margin: 0;
+  font-size: clamp(2.2rem, 5vw, 3.4rem);
+}
+
+.result-score {
+  margin-top: 12px;
+  font-size: clamp(1.2rem, 2vw, 1.8rem);
+  color: #fff;
+}
+
+.result-list {
+  display: grid;
+  gap: 16px;
+}
+
+.result-item {
+  position: relative;
+  overflow: hidden;
+  border-radius: 24px;
+  background: rgba(255,255,255,0.92);
+  padding: 20px;
+}
+
+.result-item::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  opacity: 0.12;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  filter: blur(0.5px);
+}
+
+.result-item .result-entry {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 10px;
+}
+
+.result-meta {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  color: rgba(20,20,20,0.85);
+  font-weight: 700;
+}
+
+.result-meta .result-status {
+  color: var(--success);
+}
+
+.result-meta .result-status.incorrect {
+  color: var(--danger);
+}
+
+@media (max-width: 720px) {
+  body {
+    padding: 16px;
+  }
+  .quiz-status {
+    grid-template-columns: 1fr;
+  }
+}
