@@ -1,0 +1,905 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<title>My Sketch</title>
+    
+    <!-- Load the Processing.js library -->
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/processing.js/1.6.0/processing.min.js"></script>
+	</head>
+	<body>
+		<script type="application/processing">
+			int scene = -1;
+PImage title;
+PImage screen;
+PImage titlebg;
+PImage titlelogo;
+PImage fukidashi;
+PImage ranking;
+PImage cursor;
+int[][] tile = new int[8][9]; //0=空 1=黒 2=白 3=空中黒 4=空中白
+int[][] check = new int[8][9];
+int[][] space = new int[8][9];
+int[] next = new int[8];
+int[] high = new int[8];
+int[] fall = new int[8];
+int [] cursorxy ={430,350};
+PImage [] shacch = new PImage[30];
+PImage [] serif = new PImage[7];
+String[] rankName = {"ASA","KKN","SRC","ISU","WCO","KKY","EBI","KRB","YJP","MUR"};
+char[] playerNameE = {' ',' ',' '};
+String playerName = "";
+int[] rankPoint = {10000,9000,8000,7000,6000,5000,4000,3000,2000,1000};
+int state = 0; //0=入力受け付け中　1=落下中 2=追加タイル落下中
+int limit = 300;
+int score = 0;
+int broken = 0;
+int cx = 0;
+int cy = 0;
+int least = 4;//繋げなければいけないタイルの最少数
+int falling = 0;
+int gameover = 0;
+int bgroop = 0;
+int limitMAX = 300;
+int shacchAnm = 0;
+int siren = 0;
+int[] dark = {255,0,255};
+int zoom = 300;
+int playerRank = -1;
+int pN = 0;
+int rankingTime = 0;
+int demo = 0;
+int input = 0;
+
+void setup(){
+  size(750,500);
+  title = loadImage("title.png");
+  titlebg = loadImage("REVERSEbg.png");
+  titlelogo = loadImage("REVERSElogo.png");
+  screen = loadImage("bgsky.jpg");
+  fukidashi = loadImage("fukidashi.png");
+  ranking = loadImage("ranking.png");
+  cursor = loadImage("mouse.png");
+  for(int i = 0;i < 11;i++){
+    if(i == 10){
+      shacch[i] = loadImage("shacch_miss.png");
+    }else{
+      int p = i+1;
+      shacch[i] = loadImage("shacch"+p+".png");
+    }
+  }
+  for(int i = 0;i < 7;i++){
+    serif[i] = loadImage("serif"+(i+1)+".png");
+  }
+}
+
+void draw(){
+  if(scene == -2){
+    background(255);
+    bgroop--;
+    score = 0;
+    demo++;
+    if(bgroop <= -height*2.589){
+      bgroop = 0;
+    }
+    image(screen,bgroop,0,height*2.589,height);
+    image(screen,bgroop+height*2.589,0,height*2.589,height);
+    //demoでlimitを管理
+    if(demo > 450 && demo <= 550){
+      limit -= 3;
+    }else if(demo > 1040 && demo <= 1190){
+      limit -= 6;
+    }
+
+    stroke(0);
+    
+    //危険ライン
+    siren = 0;
+    for(int i = 0;i < 8;i++){
+      if(tile[i][8] >= 1){
+        siren ++;
+        strokeWeight(2);
+        stroke(255,0,0);
+        fill(230,46,86,120);
+        rect(66+i*40,-20,40,520);
+      }
+    }
+    stroke(0);
+    
+    for(int i = 0;i < 9;i++){ //縦ライン
+      if(i == 0 || i == 8){
+        strokeWeight(2);
+      }else{
+        strokeWeight(1);
+      }
+      line(66+i*40,110,66+i*40,470);
+    }
+    for(int i = 0;i < 10;i++){ //横ライン
+      if(i == 9){
+        strokeWeight(2);
+      }else{
+        strokeWeight(1);
+      }
+      line(66,110+i*40,386,110+i*40);
+    }
+    strokeWeight(2);
+    line(66,30,66,70);
+    line(66,30,386,30);
+    line(66,70,386,70);
+    line(386,30,386,70);
+    strokeWeight(0);
+    fill(169,169,169,150);
+    rect(66,110,320,360);
+     //タイル描写
+    strokeWeight(1);
+    for(int i = 0;i < 8;i++){
+      for(int j = 0;j < 9;j++){
+        if(tile[i][j] == 1){ //黒タイル
+          fill(30);
+          rect(66+i*40,430-j*40,40,40);
+        }else if(tile[i][j] == 2){ //白タイル
+          fill(255);
+          rect(66+i*40,430-j*40,40,40);
+        }
+      }
+    }
+    fill(0);
+    textSize(30);
+    text("NEXT:"+limit,420,30);
+    strokeWeight(1);
+    fill(169,169,169,150);
+    rect(420,50,300,40);
+    fill(124,252,0);
+    rect(420,50,map(limit,0,limitMAX,0,300),40);
+    if(limit == 0){
+      state = 1;
+      limitMAX = 300 - score/50;
+      if(limitMAX < 20){
+        limitMAX = 20;
+      }
+      limit = limitMAX;
+    }
+    
+    strokeWeight(1);
+    if(state == 0){
+      for(int i = 0;i < 8;i++){
+        if(next[i] == 1){ //黒タイル
+          fill(30);
+          rect(66+i*40,30,40,40);
+        }else if(next[i] == 2){ //白タイル
+          fill(255);
+          rect(66+i*40,30,40,40);
+        }
+      }
+    }else if(state == 1){
+      for(int i = 0;i < 8;i++){
+        for(int j = 0;j < 9;j++){
+          if(tile[i][j]  >= 1){
+            if(j >  high[i]){
+              if(j == 8){
+                scene = 2;
+              }else {
+                high[i] = j;
+              }
+            }
+          }
+        }
+      }
+        for(int i = 0;i < 8;i++){
+          if(high[i] == 0 && tile[i][0] ==0){
+            high[i] = -1;
+          }
+          tile[i][high[i]+1] = next[i];
+        }
+      for(int i = 0;i < 8;i++){
+        next[i] = int(random(1,3));
+        high[i] = 0;
+      }
+      state = 0;
+    }
+    
+    
+    if(shacchAnm == 0){
+      image(shacch[0],460,280,230,230);
+      //if(random(0,10) == 0){*/
+        shacchAnm = 1;
+      //}
+    }else{
+      shacchAnm++;
+      if(shacchAnm < 90){
+        image(shacch[shacchAnm/10],460,280,230,230);
+      }else{
+        image(shacch[(180-shacchAnm)/10],460,280,230,230);
+        if(shacchAnm == 180){
+          shacchAnm = 0;
+        }
+      }
+    }
+    
+    if(demo > 150 && demo < 240){
+      cursorxy[0] = int(map(demo,150,240,430,166));
+      cursorxy[1] = int(map(demo,150,240,350,410));
+    }else if(demo == 240){
+      treverse(2,1);
+    }else if(demo > 300 && demo < 390){
+      cursorxy[0] = int(map(demo,300,390,166,346));
+      cursorxy[1] = int(map(demo,300,390,410,370));
+    }else if(demo == 390){
+      Btile(2);
+    }else if(demo > 690 && demo < 830){
+      cursorxy[0] = int(map(demo,690,830,346,226));
+      cursorxy[1] = int(map(demo,690,830,370,50));
+    }else if(demo == 830){
+      state = 1;
+      limit = limitMAX;
+    }
+    
+    image(cursor,cursorxy[0],cursorxy[1]);
+    
+    //シャッチ台詞
+    if(demo > 60 && demo < 120){
+      image(serif[0],440,150,250,170); //あいさつ
+    }else if(demo > 150 && demo < 270){
+      image(serif[1],440,150,250,170); //白いタイルの説明
+    }else if(demo > 300 && demo < 420){
+      image(serif[2],440,150,250,170); //黒いタイルの説明
+    }else if(demo > 450 && demo < 660){
+      image(serif[3],440,150,250,170); //タイル落下の説明
+    }else if(demo > 690 && demo < 860){
+      image(serif[4],440,150,250,170); //タイル自発落下の説明
+    }else if(demo > 890 && demo <1010){
+      image(serif[5],440,150,250,170); //難易度上昇の説明
+    }else if(demo > 1040 && demo < 1220){
+      image(serif[6],440,150,250,170); //限界を目指そうの説明
+    }else if(demo >= 1220){
+      //ランキングへ
+      noStroke();
+      fill(0,0,0,map(demo,1160,1190,0,255));
+      rect(0,0,width,height);
+      if(demo >= 1270){
+        scene = 4;
+        demo = -1;
+      }
+    }
+    
+    if(demo <= 60){
+      noStroke();
+      fill(0,0,0,map(demo,0,60,255,0));
+      rect(0,0,width,height);
+    }
+    
+  }else if(scene == -1){ //OP
+    background(255);
+    image(titlebg,0,0,750,500);
+    if(dark[0] > 0){
+      noStroke();
+      //fill(255);
+      fill(0,0,0,dark[0]);
+      rect(0,0,750,500);
+      dark[0]--;
+    }else if(zoom > 0){
+      image(titlelogo,-zoom,-zoom,750+zoom*2,500+zoom*2);
+      zoom--;
+    }else if(dark[1] < 255){
+      image(titlelogo,0,0,750,500);
+      noStroke();
+      fill(255,255,255,dark[1]);
+      rect(0,0,750,500);
+      dark[1] += 5;
+    }else if(dark[2] > 0){
+      image(title,0,0,750,500);
+      noStroke();
+      fill(255,255,255,dark[2]);
+      rect(0,0,750,500);
+      dark[2] -= 3;
+    }else{
+      image(title,0,0,750,500);
+      scene = 0;
+    }
+  }else if(scene == 0){ //タイトル
+    background(255);
+    demo++;
+    image(title,0,0,750,500);
+    fill(0);
+    textSize(50);
+    text("click to start",210,450);
+    if(demo >= 660){
+      noStroke();
+      fill(0);
+      rect(0,0,width,height);
+      scene = -2;
+      demo = 0;
+      tile = new int[][]{{1,1,2,2,0,0,0,0,0},{2,2,1,1,0,0,0,0,0},{2,2,2,1,0,0,0,0,0},{1,2,2,2,0,0,0,0,0},{2,2,1,2,0,0,0,0,0},{2,2,1,1,0,0,0,0,0},{2,1,1,1,0,0,0,0,0},{2,1,1,1,0,0,0,0,0}};
+      next = new int[]{2,2,2,1,1,1,2,2};
+    }else if(demo >=600){
+      noStroke();
+      fill(0,0,0,map(demo,600,660,0,255));
+      rect(0,0,width,height);
+    }
+  }else if(scene == 1){ //ゲーム画面
+    background(255);
+    bgroop--;
+    if(bgroop <= -height*2.589){
+      bgroop = 0;
+    }
+    image(screen,bgroop,0,height*2.589,height);
+    image(screen,bgroop+height*2.589,0,height*2.589,height);
+    stroke(0);
+    limit--;
+    
+    //危険ライン
+    siren = 0;
+    for(int i = 0;i < 8;i++){
+      if(tile[i][8] >= 1){
+        siren ++;
+        strokeWeight(2);
+        stroke(255,0,0);
+        fill(230,46,86,120);
+        rect(66+i*40,-20,40,520);
+      }
+    }
+    stroke(0);
+    
+    for(int i = 0;i < 9;i++){ //縦ライン
+      if(i == 0 || i == 8){
+        strokeWeight(2);
+      }else{
+        strokeWeight(1);
+      }
+      line(66+i*40,110,66+i*40,470);
+    }
+    for(int i = 0;i < 10;i++){ //横ライン
+      if(i == 9){
+        strokeWeight(2);
+      }else{
+        strokeWeight(1);
+      }
+      line(66,110+i*40,386,110+i*40);
+    }
+    strokeWeight(2);
+    line(66,30,66,70);
+    line(66,30,386,30);
+    line(66,70,386,70);
+    line(386,30,386,70);
+    strokeWeight(0);
+    fill(169,169,169,150);
+    rect(66,110,320,360);
+    
+    //タイル描写
+    strokeWeight(1);
+    for(int i = 0;i < 8;i++){
+      for(int j = 0;j < 9;j++){
+        if(tile[i][j] == 1){ //黒タイル
+          fill(30);
+          rect(66+i*40,430-j*40,40,40);
+        }else if(tile[i][j] == 2){ //白タイル
+          fill(255);
+          rect(66+i*40,430-j*40,40,40);
+        }
+      }
+    }
+    fill(0);
+    textSize(30);
+    text("NEXT:"+limit,420,30);
+    strokeWeight(1);
+    fill(169,169,169,150);
+    rect(420,50,300,40);
+    fill(124,252,0);
+    rect(420,50,map(limit,0,limitMAX,0,300),40);
+    if(limit == 0){
+      state = 1;
+      limitMAX = 300 - score/50;
+      if(limitMAX < 20){
+        limitMAX = 20;
+      }
+      limit = limitMAX;
+    }
+    
+    strokeWeight(1);
+    if(state == 0){
+      for(int i = 0;i < 8;i++){
+        if(next[i] == 1){ //黒タイル
+          fill(30);
+          rect(66+i*40,30,40,40);
+        }else if(next[i] == 2){ //白タイル
+          fill(255);
+          rect(66+i*40,30,40,40);
+        }
+      }
+    }else if(state == 1){
+      for(int i = 0;i < 8;i++){
+        for(int j = 0;j < 9;j++){
+          if(tile[i][j]  >= 1){
+            if(j >  high[i]){
+              if(j == 8){
+                scene = 2;
+              }else {
+                high[i] = j;
+              }
+            }
+          }
+        }
+      }
+      if(scene == 1){
+        for(int i = 0;i < 8;i++){
+          if(high[i] == 0 && tile[i][0] ==0){
+            high[i] = -1;
+          }
+          tile[i][high[i]+1] = next[i];
+        }
+      }
+      for(int i = 0;i < 8;i++){
+        next[i] = int(random(1,3));
+        high[i] = 0;
+      }
+      state = 0;
+    }
+    fill(0);
+    textSize(30);
+    text("SCORE:"+score,420,130);
+    image(fukidashi,440,150,250,170); /*フキダシサイズはここ*/
+    least = 4 + score/1000;
+    text("connect",505,180);
+    fill(230,0,0);
+    textSize(110);
+    text(least,525,280);
+    
+    if(shacchAnm == 0){
+      image(shacch[0],460,280,230,230);
+      //if(random(0,10) == 0){*/
+        shacchAnm = 1;
+      //}
+    }else{
+      shacchAnm++;
+      if(shacchAnm < 90){
+        image(shacch[shacchAnm/10],460,280,230,230);
+      }else{
+        image(shacch[(180-shacchAnm)/10],460,280,230,230);
+        if(shacchAnm == 180){
+          shacchAnm = 0;
+        }
+      }
+    }//!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+    
+  }else if(scene == 2){ //ゲームオーバー
+    background(0);
+    fill(255);
+    textSize(80);
+    text("GAME OVER",130,200);
+    textSize(60);
+    text("SCORE:"+score,60,350);
+    image(shacch[10],460,250,230,230);
+    textSize(30);
+    text("click to check ranking",80,440);
+    //text("click to return home",80,440); 
+    
+  }else if(scene == 3){ //お名前入力
+    background(255);
+    input++;
+    image(ranking,0,0,750,500);
+    fill(0,0,230);
+    textSize(37);
+    text("Enter your name by the keyboard",80,160);
+    textSize(20);
+    text("Press Enter key to finish entering",230,445);
+    strokeWeight(3);
+    fill(0);
+    line(280,330,330,330);
+    line(350,330,400,330);
+    line(420,330,470,330);
+    textSize(65);
+    fill(255,88,233);
+    text(playerNameE[0],283,320);
+    text(playerNameE[1],353,320);
+    text(playerNameE[2],423,320);
+    if(input >= 3600){
+      scene = 4;
+      playerName = str(playerNameE[0]) + str(playerNameE[1]) + str(playerNameE[2]);
+      if(playerName == "   "){
+        playerName = "NoName";
+      }
+      rankName[playerRank] = playerName;
+      println("playerRank="+playerRank);
+      println("rankPoint="+rankPoint[playerRank]);
+    }
+    
+  }else if(scene == 4){ //ランキング
+    background(255);
+    image(ranking,0,0,750,500);
+    rankingTime++;
+    int rankX = 750 - (rankingTime%420) * 6;
+    if(rankingTime < 420){
+      textSize(60);
+      fill(0);
+      for(int i = 0;i < 5;i++){
+        if(i == 0){
+          int st = rankX;
+          if(st < 60){
+            st = 60;
+          }
+          text("1st:"+rankName[0]+" "+rankPoint[0],st,160);
+        }else if(i == 1){
+          int nd = rankX + 70;
+          if(nd < 60){
+            nd = 60;
+          }
+          text("2nd:"+rankName[1]+" "+rankPoint[1],nd,230);
+        }else if(i == 2){
+          int rd = rankX + 140;
+          if(rd < 60){
+            rd = 60;
+          }
+          text("3rd:"+rankName[2]+" "+rankPoint[2],rd,300);
+        }else{
+          int th = rankX + 70*i;
+          if(th < 60){
+            th= 60;
+          }
+          text((i+1)+"th:"+rankName[i]+" "+rankPoint[i],th,160+70*i);
+        }
+      }
+    }else if(rankingTime < 840){
+      textSize(60);
+      fill(0);
+      for(int i = 5;i < 10;i++){
+        int th = rankX+ 70*(i-5);
+        if(th < 60){
+          th = 60;
+        }
+        text((i+1)+"th:"+rankName[i]+" "+rankPoint[i],th,160+70*(i-5));
+      }
+    }else if(rankingTime >= 900){
+      scene = -1;
+      reset();
+    }else {
+      noStroke();
+      if(rankingTime <= 850){
+        fill(0,0,0,map(rankingTime,800,850,255,0));
+      }else{
+        fill(0);
+      }
+      rect(0,0,750,5000);
+      if(rankingTime <= 850){
+        fill(255,255,255,map(rankingTime,800,850,255,0));
+      }else{
+        fill(255);
+      }
+      textSize(20);
+      text("(c)ASAEDA",600,490);
+    }
+  }
+}
+
+void mousePressed(){
+  if(scene == -1){
+    scene = 0;
+  }else if(scene == 0){ //タイトル
+    scene = 1;
+    //下四段を適当なタイルで埋める
+    for(int i = 0;i < 8;i++){
+      for(int j = 0;j < 4;j++){
+        tile[i][j] = int(random(1,3));
+      }
+    }
+    //NEXTも決める
+    for(int i = 0;i < 8;i++){
+      next[i] = int(random(1,3));
+    }
+  }else if(scene == 1){ //ゲーム画面
+    if(state == 0){ //落下中は入力を受け付けない
+      if(66 <= mouseX && mouseX < 386 && 470 > mouseY && mouseY >= 110){
+        cx = (mouseX - 66) / 40;
+        cy = 8 - (mouseY - 110) / 40;
+        /*println("mouseX = "+mouseX);
+        println("(mouseX - 66) / 40 = "+(mouseX - 66) / 40);
+        println("mouseY = "+mouseY);
+        println("8 - (mouseX - 110) / 40 = "+ (8 - (mouseY - 110) / 40));*/
+        if(tile[cx][cy] == 1){ //黒タイルをクリック(破壊)
+          Btile(1);
+        }else if(tile[cx][cy] == 2){ //白タイルをクリック(反転)
+          println("blue");
+          treverse(cx,cy);
+        }
+      }else if(66 <= mouseX && mouseX < 386 && 70 > mouseY && mouseY >= 30){ //NEXT落下
+        state = 1;
+        limit = limitMAX;
+      }
+    }
+  }else if(scene == 2){ //ゲームオーバー
+    scene = 3;
+    for(int i = 0;i <= 9; i++){
+      if(score >= rankPoint[i]){
+        for(int j = 9;j > i; j--){
+          rankName[j] = rankName[j-1];
+          rankPoint[j] = rankPoint[j-1];
+        }
+        playerRank = i;
+        rankPoint[i] = score;
+        //rankName[i] = playerName;
+        i = 10;
+      }
+    }
+    if(playerRank < 0){
+      scene = 4;
+    }
+  }else if(scene == 4){ //ランキング
+    if(demo == -1){
+      scene = -1;
+      reset();
+    }
+  }else if(scene == -2){ //遊び方
+    scene = -1;
+    reset();
+  }
+}
+
+void treverse (int x,int y){ //上下左右のタイルを反転させる
+  if(y+1 <= 8){
+    if(tile[x][y+1] == 1){
+      tile[x][y+1] = 2;
+    }else if(tile[x][y+1] == 2){
+      tile[x][y+1] = 1;
+    }
+  }
+  if(y-1 >= 0){
+    if(tile[x][y-1] == 1){
+      tile[x][y-1] = 2;
+    }else if(tile[x][y-1] == 2){
+      tile[x][y-1] = 1;
+    }
+  }
+  if(x+1 <= 7){
+    if(tile[x+1][y] == 1){
+      tile[x+1][y] = 2;
+    }else if(tile[x+1][y] == 2){
+      tile[x+1][y] = 1;
+    }
+  }
+  if(x-1 >= 0){
+    if(tile[x-1][y] == 1){
+      tile[x-1][y] = 2;
+    }else if(tile[x-1][y] == 2){
+      tile[x-1][y] = 1;
+    }
+  }
+}
+
+void brake(int x,int y){
+  //破壊するタイルを走査
+  //println(broken + "(" + x +"," + y + ")");
+  check[x][y] = 1;
+  broken++;
+  if(x-1 >= 0){//右
+    if(tile[x-1][y] == 1){
+      if(check[x-1][y] <= 0){
+        brake(x-1,y);
+      }
+    }
+  }
+  if(y-1 >= 0){//下
+    if(tile[x][y-1] == 1){
+      if(check[x][y-1] <= 0){
+        brake(x,y-1);
+      }
+    }
+  }
+  if(y+1 <= 8){//上
+    if(tile[x][y+1] == 1){
+      if(check[x][y+1] <= 0){
+        brake(x,y+1);
+      }
+    }
+  }
+  if(x+1 <= 7){//左
+    if(tile[x+1][y] == 1){
+      if(check[x+1][y] <= 0){
+        brake(x+1,y);
+      }
+    }
+  }
+  
+  check[x][y] = -1;
+  
+}
+
+void keyPressed(){
+  if(scene == 3){
+    if(key == 'q'||key == 'Q'){
+      playerNameE[pN] = 'Q';
+      nextpn();
+    }else if(key == 'w'||key == 'W'){
+      playerNameE[pN] = 'W';
+      nextpn();
+    }else if(key == 'e'||key == 'E'){
+      playerNameE[pN] = 'E';
+      nextpn();
+    }else if(key == 'r'||key == 'R'){
+      playerNameE[pN] = 'R';
+      nextpn();
+    }else if(key == 't'||key == 'T'){
+      playerNameE[pN] = 'T';
+      nextpn();
+    }else if(key == 'y'||key == 'Y'){
+      playerNameE[pN] = 'Y';
+      nextpn();
+    }else if(key == 'u'||key == 'U'){
+      playerNameE[pN] = 'U';
+      nextpn();
+    }else if(key == 'i'||key == 'I'){
+      playerNameE[pN] = 'I';
+      nextpn();
+    }else if(key == 'o'||key == 'O'){
+      playerNameE[pN] = 'O';
+      nextpn();
+    }else if(key == 'p'||key == 'P'){
+      playerNameE[pN] = 'P';
+      nextpn();
+    }else if(key == 'a'||key == 'A'){
+      playerNameE[pN] = 'A';
+      nextpn();
+    }else if(key == 's'||key == 'S'){
+      playerNameE[pN] = 'S';
+      nextpn();
+    }else if(key == 'd'||key == 'D'){
+      playerNameE[pN] = 'D';
+      nextpn();
+    }else if(key == 'f'||key == 'F'){
+      playerNameE[pN] = 'F';
+      nextpn();
+    }else if(key == 'g'||key == 'G'){
+      playerNameE[pN] = 'G';
+      nextpn();
+    }else if(key == 'h'||key == 'H'){
+      playerNameE[pN] = 'H';
+      nextpn();
+    }else if(key == 'j'||key == 'J'){
+      playerNameE[pN] = 'J';
+      nextpn();
+    }else if(key == 'k'||key == 'K'){
+      playerNameE[pN] = 'K';
+      nextpn();
+    }else if(key == 'l'||key == 'L'){
+      playerNameE[pN] = 'L';
+      nextpn();
+    }else if(key == 'z'||key == 'Z'){
+      playerNameE[pN] = 'Z';
+      nextpn();
+    }else if(key == 'x'||key == 'X'){
+      playerNameE[pN] = 'X';
+      nextpn();
+    }else if(key == 'c'||key == 'C'){
+      playerNameE[pN] = 'C';
+      nextpn();
+    }else if(key == 'v'||key == 'V'){
+      playerNameE[pN] = 'V';
+      nextpn();
+    }else if(key == 'b'||key == 'B'){
+      playerNameE[pN] = 'B';
+      nextpn();
+    }else if(key == 'n'||key == 'N'){
+      playerNameE[pN] = 'N';
+      nextpn();
+    }else if(key == 'm'||key == 'M'){
+      playerNameE[pN] = 'M';
+      nextpn();
+    }else if(key == '.'||key == '!'||key == '&'||key == '?'||key == '1'||key == '2'||key == '3'||key == '4'||key == '5'||key == '6'||key == '7'||key == '8'||key == '9'||key == '0'||key == ' '){
+      playerNameE[pN] = key;
+      nextpn();
+    }else if(keyCode == BACKSPACE){
+      if(playerNameE[pN] == ' '){
+        if(pN > 0){
+          pN --;
+        }
+      }
+      playerNameE[pN] = ' ';
+    }else if(keyCode == ENTER){
+      scene = 4;
+      playerName = str(playerNameE[0]) + str(playerNameE[1]) + str(playerNameE[2]);
+      if(playerName == "   "){
+        playerName = "NoName";
+      }
+      rankName[playerRank] = playerName;
+      println("playerRank="+playerRank);
+      println("rankPoint="+rankPoint[playerRank]);
+    }
+    
+  }
+}
+
+void nextpn(){
+  if(pN < 2){
+    pN++;
+  }
+}
+
+void reset(){
+  state = 0;
+  limit = 300;
+  score = 0;
+  broken = 0;
+  cx = 0;
+  cy = 0;
+  least = 4;
+  falling = 0;
+  gameover = 0;
+  bgroop = 0;
+  limitMAX = 300;
+  shacchAnm = 0;
+  siren = 0;
+  playerRank = -1;
+  zoom = 300;
+  pN = 0;
+  rankingTime = 0;
+  cursorxy[0] = 430;
+  cursorxy[1] = 350;
+  demo = 0;
+  input = 0;
+  for(int i = 0;i < 8;i++){
+    for(int j = 0;j < 9;j++){
+      tile[i][j] = 0;
+      check[i][j] = 0;
+      space[i][j] = 0;
+    }
+    next[i] = 0;    
+    high[i] = 0;
+    fall[i] = 0;
+  }
+  dark[0] = 255;
+  dark[1] = 0;
+  dark[2] = 255;
+}
+
+void Btile(int mode){
+  if(mode == 1){
+          brake(cx,cy);
+  }else if(mode == 2){
+    brake(6,2);
+  }
+          for(int i = 0;i < 8;i++){
+            for(int j = 0;j < 9;j++){
+              if(check[i][j] == -1 && broken >= least){
+                tile[i][j] = 0;
+              }
+            check[i][j] = 0;
+            }
+          }
+          if(broken >= least){ //得点加算と落下処理
+            score += (broken^2)*10;
+            int a = 1;
+            while(a >=1){
+              println(a);
+              a = 0;
+            for(int i = 0;i < 8;i++){
+              for(int j = 0;j < 9;j++){
+                if(tile[i][j] == 0){
+                  space[i][j] = -1;
+                }else if(j >= 1){
+                  if(tile[i][j] == 1 || tile[i][j] == 2){
+                    for(int k = j;k >= 0;k--){
+                      if(space[i][k] == -1){
+                        for(int l = j;l < 9;l++){
+                          tile[i][l-1] = tile[i][l];
+                        }
+                         tile[i][8] = 0;
+                        k = -1;
+                        a++; 
+                      }
+                    }
+                  }
+                }
+              }
+            }
+            for(int i = 0;i < 8;i++){
+            for(int j = 0;j < 9;j++){
+              space[i][j] = 0;
+            }
+          }
+            }
+            //壊れた音入れる
+          }
+          broken = 0;
+}
+		</script>
+		<canvas> </canvas>
+	</body>
+</html>
