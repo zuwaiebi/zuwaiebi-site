@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="ja">
+    <head>
+        <meta charset="UTF-8">
+        <title>ギャラリー</title>
+        <meta name="description" content="お気に入りのkey作品の画像ギャラリー">
+        <meta name="viewport" content="width=device-width,initial-scale=1">
+        <link rel="stylesheet" href="gallery.css">
+    </head>
+    <body>
+        <div class="page-shell">
+            <header class="gallery-header">
+                <h1>ギャラリー</h1>
+                <nav>
+                    <a href="../../index.html">トップに戻る</a>
+                </nav>
+            </header>
+
+            <section class="filter-bar">
+                <div class="filter-row">
+                    <span class="filter-label">作品</span>
+                    <select id="work-filter" class="tag-select">
+                        <option value="">すべて</option>
+                    </select>
+                    <span class="filter-label">キャラクター</span>
+                    <select id="character-filter" class="tag-select">
+                        <option value="">すべて</option>
+                    </select>
+                </div>
+                <div class="filter-toolbar">
+                    <span class="result-count" id="result-count"></span>
+                    <div style="display:flex; gap:10px; align-items:center;">
+                        <select id="sort-order" class="tag-select sort-select">
+                            <option value="newest">新しい順</option>
+                            <option value="oldest">古い順</option>
+                            <option value="random">ランダム</option>
+                        </select>
+                        <div class="size-toggle" id="size-toggle">
+                            <button type="button" data-size="130">小</button>
+                            <button type="button" data-size="200" class="active">中</button>
+                            <button type="button" data-size="300">大</button>
+                        </div>
+                        <button type="button" class="clear-filters" id="clear-filters">絞り込み解除</button>
+                    </div>
+                </div>
+            </section>
+
+            <main>
+                <div class="gallery-grid" id="gallery-grid"></div>
+                <p class="empty-message" id="empty-message" style="display:none;">条件に一致する画像がありません。</p>
+            </main>
+        </div>
+
+        <div class="lightbox" id="lightbox">
+            <div class="lightbox-content">
+                <div class="lightbox-image-wrap">
+                    <button type="button" class="lightbox-nav lightbox-nav--prev" id="lightbox-prev" aria-label="前の画像">‹</button>
+                    <img id="lightbox-img" src="" alt="">
+                    <button type="button" class="lightbox-nav lightbox-nav--next" id="lightbox-next" aria-label="次の画像">›</button>
+                    <button type="button" class="lightbox-close" id="lightbox-close" aria-label="閉じる">×</button>
+                </div>
+                <div class="lightbox-tags" id="lightbox-tags"></div>
+                <div class="lightbox-source" id="lightbox-source" style="display:none;"></div>
+            </div>
+        </div>
+
+        <script src="gallery_data.js"></script>
+        <script src="gallery_core.js"></script>
+        <script src="gallery.js"></script>
+    </body>
+</html>
