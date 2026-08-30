@@ -1,0 +1,255 @@
+html, body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: #111;
+  color: #f5f0e6;
+  font-family: "Yuji Syuku", "Hiragino Sans", "Yu Gothic", "Meiryo", sans-serif;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ボタン等のフォームコントロールはブラウザ標準でbodyのfont-familyを
+   継承しないため、明示的に継承させる(「はじめる」「EXTRA」等のボタン文字にも
+   毛筆風フォントを適用するため) */
+button, input, select, textarea {
+  font-family: inherit;
+}
+
+.screen {
+  display: none;
+  position: fixed;
+  inset: 0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 24px;
+  box-sizing: border-box;
+}
+
+.screen.active {
+  display: flex;
+}
+
+#screen-play {
+  padding: 0;
+}
+
+.title-logo {
+  font-size: 2.2rem;
+  line-height: 1.4;
+  margin: 0 0 24px;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.6);
+}
+
+.title-logo .subtitle {
+  font-size: 1.1rem;
+  color: #e0b64f;
+}
+
+.menu {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.main-button {
+  font-size: 1.2rem;
+  padding: 12px 36px;
+  border-radius: 999px;
+  border: none;
+  background: linear-gradient(180deg, #d9622b, #a8391a);
+  color: #fff;
+  box-shadow: 0 3px 0 #6f2510;
+  cursor: pointer;
+}
+
+.main-button:active {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 #6f2510;
+}
+
+.main-button--extra {
+  background: linear-gradient(180deg, #f2c94c, #b8860b);
+  box-shadow: 0 3px 0 #7a5c06;
+  color: #2b1c00;
+  font-weight: bold;
+}
+
+.sub-button {
+  font-size: 0.95rem;
+  padding: 8px 20px;
+  border-radius: 999px;
+  border: 1px solid #888;
+  background: transparent;
+  color: #f5f0e6;
+  cursor: pointer;
+}
+
+.best-score {
+  margin-top: 18px;
+  font-size: 0.9rem;
+  color: #cbb98a;
+}
+
+.back-link {
+  position: absolute;
+  bottom: 12px;
+}
+
+.back-link a {
+  color: #999;
+  font-size: 0.8rem;
+  text-decoration: none;
+}
+
+.rotate-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.94);
+  color: #fff;
+  z-index: 9999;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  font-size: 1.4rem;
+  padding: 2rem;
+  box-sizing: border-box;
+}
+
+@media (orientation: portrait) {
+  .rotate-overlay {
+    display: flex;
+  }
+}
+
+.story-slide {
+  max-width: 480px;
+  width: 100%;
+}
+
+.story-image,
+.omake-image {
+  width: 100%;
+  max-width: 420px;
+  aspect-ratio: 4 / 3;
+  margin: 0 auto 16px;
+  border-radius: 12px;
+  background-size: cover;
+  background-position: center;
+}
+
+.placeholder {
+  border: 2px dashed #777;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #999;
+  font-size: 0.95rem;
+}
+
+.placeholder::before {
+  content: "🖼️ 画像準備中";
+}
+
+.story-caption {
+  font-size: 1.05rem;
+  min-height: 2.6em;
+}
+
+.story-nav {
+  display: flex;
+  gap: 16px;
+  margin-top: 12px;
+}
+
+.howto-body {
+  max-width: 480px;
+  text-align: left;
+}
+
+.howto-body ul {
+  line-height: 1.9;
+  padding-left: 1.2em;
+}
+
+#btn-howto-close {
+  margin-top: 20px;
+}
+
+#game-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: #c8a165;
+  touch-action: none;
+}
+
+.hud {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: space-between;
+  padding: 10px 16px;
+  pointer-events: none;
+  font-size: 1rem;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+}
+
+.boss-hp-wrap {
+  position: absolute;
+  top: 44px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(70%, 420px);
+  text-align: center;
+  pointer-events: none;
+}
+
+.boss-hp-label {
+  font-size: 0.95rem;
+  margin-bottom: 4px;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+}
+
+.boss-hp-bar {
+  height: 12px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+}
+
+.boss-hp-fill {
+  height: 100%;
+  width: 100%;
+  background: linear-gradient(90deg, #f85149, #ff8a65);
+  transition: width 0.15s linear;
+}
+
+.result-stats {
+  list-style: none;
+  padding: 0;
+  margin: 12px 0;
+}
+
+.result-stats li {
+  margin: 4px 0;
+}
+
+.result-best {
+  color: #e0b64f;
+  margin-bottom: 6px;
+}
+
+.omake {
+  margin: 12px 0;
+}
+
+.omake-heading {
+  margin: 0 0 8px;
+}

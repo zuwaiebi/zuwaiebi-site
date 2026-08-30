@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>どす恋2 ～恋に千秋楽なし～</title>
+<meta name="description" content="どす恋2 ～恋に千秋楽なし～ 土俵を襲い来る力士をタップで撃退するタワーディフェンス風ブラウザゲーム">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Yuji+Syuku&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="dosukoi2.css">
+</head>
+<body>
+
+  <div id="rotate-overlay" class="rotate-overlay">
+    <p>📱 端末を横向きにしてください</p>
+  </div>
+
+  <div id="screen-title" class="screen active">
+    <h1 class="title-logo">どす恋2<br><span class="subtitle">～恋に千秋楽なし～</span></h1>
+    <div class="menu">
+      <button id="btn-start" class="main-button">はじめる</button>
+      <button id="btn-extra" class="main-button main-button--extra" hidden>EXTRA</button>
+      <button id="btn-story" class="sub-button">ストーリー</button>
+      <button id="btn-howto" class="sub-button">遊び方</button>
+    </div>
+    <p class="best-score" id="title-best"></p>
+    <p class="back-link"><a href="../../index.html">トップに戻る</a></p>
+  </div>
+
+  <div id="screen-story" class="screen">
+    <div class="story-slide">
+      <div class="story-image placeholder" id="story-image"></div>
+      <p class="story-caption" id="story-caption"></p>
+    </div>
+    <div class="story-nav">
+      <button id="btn-story-skip" class="sub-button">スキップ</button>
+      <button id="btn-story-next" class="main-button">つぎへ</button>
+    </div>
+  </div>
+
+  <div id="screen-howto" class="screen">
+    <div class="howto-body">
+      <h2>遊び方</h2>
+      <ul>
+        <li>四方八方から力士が土俵中央に向かって迫ってくる。</li>
+        <li>タップ／クリックで力士を張り倒して撃退しよう。</li>
+        <li>力士が土俵の輪に到達したらゲームオーバー。</li>
+        <li>一定数を倒すと強いボスが登場する。何度もタップして倒そう。</li>
+      </ul>
+    </div>
+    <button id="btn-howto-close" class="main-button">はじめる</button>
+  </div>
+
+  <div id="screen-play" class="screen">
+    <canvas id="game-canvas"></canvas>
+    <div class="hud">
+      <div class="hud-left"><span id="hud-score">撃退数: 0</span></div>
+      <div class="hud-right"><span id="hud-rank"></span></div>
+    </div>
+    <div id="boss-hp-wrap" class="boss-hp-wrap" hidden>
+      <div class="boss-hp-label" id="boss-hp-label"></div>
+      <div class="boss-hp-bar"><div class="boss-hp-fill" id="boss-hp-fill"></div></div>
+    </div>
+  </div>
+
+  <div id="screen-result" class="screen">
+    <h2 id="result-title">ゲームオーバー</h2>
+    <ul class="result-stats" id="result-stats"></ul>
+    <p id="result-best" class="result-best"></p>
+    <div class="omake" id="omake" hidden>
+      <p class="omake-heading">🎁 おまけ</p>
+      <div class="omake-image placeholder" id="omake-image"></div>
+    </div>
+    <div class="menu">
+      <button id="btn-retry" class="main-button">もう一度遊ぶ</button>
+      <button id="btn-to-title" class="sub-button">タイトルへ</button>
+    </div>
+  </div>
+
+  <script src="dosukoi2_storage.js"></script>
+  <script src="dosukoi2_assets.js"></script>
+  <script src="dosukoi2_boss.js"></script>
+  <script src="dosukoi2_entities.js"></script>
+  <script src="dosukoi2_spawner.js"></script>
+  <script src="dosukoi2_input.js"></script>
+  <script src="dosukoi2_render.js"></script>
+  <script src="dosukoi2_state.js"></script>
+  <script src="dosukoi2_game.js"></script>
+  <script src="dosukoi2_result.js"></script>
+  <script src="dosukoi2_main.js"></script>
+</body>
+</html>
