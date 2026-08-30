@@ -134,10 +134,22 @@
       var el = document.documentElement;
       var request = el.requestFullscreen || el.webkitRequestFullscreen ||
         el.mozRequestFullScreen || el.msRequestFullscreen;
-      if (!request || document.fullscreenElement) { return; }
+      if (!request) {
+        console.warn('[dosukoi2] Fullscreen API非対応(requestFullscreenが存在しない)');
+        return;
+      }
+      if (document.fullscreenElement) { return; }
       var result = request.call(el);
-      if (result && typeof result.catch === 'function') { result.catch(function () {}); }
-    } catch (e) { /* フルスクリーン非対応環境では何もしない */ }
+      if (result && typeof result.catch === 'function') {
+        result.catch(function (err) {
+          // 失敗理由が分かるようコンソールに残す(例: Permissions-Policyでの禁止、
+          // iframe埋め込みでallow="fullscreen"が無い、等が典型的な原因)
+          console.warn('[dosukoi2] フルスクリーン化に失敗:', err && err.name, err && err.message);
+        });
+      }
+    } catch (e) {
+      console.warn('[dosukoi2] フルスクリーン化で例外:', e && e.message);
+    }
   }
 
   function init() {
