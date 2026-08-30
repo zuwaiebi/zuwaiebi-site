@@ -15,10 +15,15 @@
   // 円形のフィールド半径だけで計算すると、横長画面では横方向が画面内に収まって
   // しまい「画面外から出現」にならないため。
 
-  function createZako(angle, speed, width, height) {
+  function createZako(angle, referenceSpeed, width, height) {
     var Render = global.Dosukoi2.Render;
     var geometry = Render.computeFieldGeometry(width, height);
     var spawnDistance = Render.computeSpawnDistance(geometry, width, height, angle);
+    // 出現角度によって出現距離(spawnDistance)は変わる(横長画面では左右からの
+    // 出現の方が遠い)。実際に移動する距離(spawnDistance - DOHYO_RATIO、土俵の輪に
+    // 到達するまでの距離)に比例して速度を決めることで、基準距離1.0での所要時間を
+    // 基準に、どの角度から出現しても土俵到達までの所要時間が一定になるようにする。
+    var speed = referenceSpeed * (spawnDistance - DOHYO_RATIO) / (1 - DOHYO_RATIO);
     return {
       id: nextId++,
       kind: 'zako',
@@ -28,7 +33,7 @@
       speed: speed,
       hp: 1,
       maxHp: 1,
-      size: 0.22,
+      size: 0.30,
       pattern: null,
       patternState: {},
       phase: 'active',
@@ -54,7 +59,7 @@
       speed: stats.speed,
       hp: stats.hp,
       maxHp: stats.hp,
-      size: 0.36,
+      size: 0.48,
       pattern: info.pattern,
       patternState: {},
       phase: 'intro',
@@ -84,7 +89,7 @@
       traveled: 0,
       pathLength: Math.sqrt(dx * dx + dy * dy),
       speed: speed,
-      size: 0.24,
+      size: 0.32,
       phase: 'active',
       spawnedAt: 0
     };

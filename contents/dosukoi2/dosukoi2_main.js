@@ -125,10 +125,27 @@
       best ? '自己ベスト: スコア ' + best.score : '';
   }
 
+  // スマホのブラウザで開いた際、ブラウザのアドレスバー等を隠した全画面表示に
+  // できるようにする。Fullscreen APIはユーザー操作(タップ)を起点にしないと
+  // 呼び出せないため、最初のタップ1回だけを捉えて試行する。非対応環境
+  // (一部のiOS Safari等)では静かに諦める。
+  function tryEnterFullscreen() {
+    try {
+      var el = document.documentElement;
+      var request = el.requestFullscreen || el.webkitRequestFullscreen ||
+        el.mozRequestFullScreen || el.msRequestFullscreen;
+      if (!request || document.fullscreenElement) { return; }
+      var result = request.call(el);
+      if (result && typeof result.catch === 'function') { result.catch(function () {}); }
+    } catch (e) { /* フルスクリーン非対応環境では何もしない */ }
+  }
+
   function init() {
     // ボタンの配線を最優先で行う。アセット読み込み/BGM再生を先に行うと、
     // 万一そちらで例外が起きた際にボタンが一切反応しなくなってしまうため、
     // 配線を終えてから後段でアセット関連の処理を行う。
+    document.addEventListener('pointerdown', tryEnterFullscreen, { once: true });
+
     document.getElementById('btn-start').addEventListener('click', goToStart);
 
     document.getElementById('btn-extra').addEventListener('click', function () {

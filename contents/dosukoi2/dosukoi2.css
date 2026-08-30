@@ -22,6 +22,12 @@ button, input, select, textarea {
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  /* 横持ちスマホ等、縦幅が狭くコンテンツが収まりきらない場合でも
+     ボタンが見切れて操作不能にならないよう、縦スクロールできるようにする。
+     safe centerに対応するブラウザでは、はみ出た際に先頭側から見えるように
+     揃える(対応ブラウザのみ有効。centerは非対応ブラウザ向けのフォールバック)。 */
+  overflow-y: auto;
+  justify-content: safe center;
   text-align: center;
   padding: 24px;
   box-sizing: border-box;
