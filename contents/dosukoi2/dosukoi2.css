@@ -93,10 +93,37 @@ button, input, select, textarea {
   cursor: pointer;
 }
 
+.fullscreen-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 14px;
+  font-size: 0.85rem;
+  color: #cbb98a;
+  cursor: pointer;
+}
+
+.fullscreen-toggle input {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
 .best-score {
   margin-top: 18px;
   font-size: 0.9rem;
   color: #cbb98a;
+}
+
+.reset-link {
+  margin-top: 10px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: #777;
+  font-size: 0.75rem;
+  text-decoration: underline;
+  cursor: pointer;
 }
 
 .back-link {
