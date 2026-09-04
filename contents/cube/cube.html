@@ -50,16 +50,26 @@
                         <label class="check-label"><input type="checkbox" id="civ-consider-other-face"> ツインパクトのもう一方に異なる文明が含まれる場合多色とみなす</label>
                     </div>
                     <div class="filter-row">
-                        <span class="filter-label">コスト</span>
-                        <input type="number" id="cost-min" class="cost-input" placeholder="下限" min="0">
-                        <span>〜</span>
-                        <input type="number" id="cost-max" class="cost-input" placeholder="上限" min="0">
-                        <span class="filter-label">パワー</span>
-                        <input type="number" id="power-min" class="cost-input" placeholder="下限" min="0">
-                        <span>〜</span>
-                        <input type="number" id="power-max" class="cost-input" placeholder="上限" min="0">
-                        <span class="filter-label">カード名</span>
-                        <input type="search" id="name-filter" class="name-input" placeholder="カード名で検索…">
+                        <span class="filter-group">
+                            <span class="filter-label">コスト</span>
+                            <input type="number" id="cost-min" class="cost-input" placeholder="下限" min="0">
+                            <span>〜</span>
+                            <input type="number" id="cost-max" class="cost-input" placeholder="上限" min="0">
+                        </span>
+                        <span class="filter-group">
+                            <span class="filter-label">パワー</span>
+                            <input type="number" id="power-min" class="cost-input" placeholder="下限" min="0">
+                            <span>〜</span>
+                            <input type="number" id="power-max" class="cost-input" placeholder="上限" min="0">
+                        </span>
+                        <span class="filter-group">
+                            <span class="filter-label">カード名</span>
+                            <input type="search" id="name-filter" class="name-input" placeholder="カード名で検索…">
+                        </span>
+                    </div>
+                    <div class="filter-row">
+                        <span class="filter-label">種族</span>
+                        <input type="search" id="race-filter" class="name-input wide-input" placeholder="種族で検索…">
                     </div>
                     <div class="filter-row">
                         <span class="filter-label">テキスト</span>
@@ -67,17 +77,26 @@
                     </div>
                     <div class="filter-row">
                         <label class="check-label"><input type="checkbox" id="enchant-only-filter"> エンチャント付与カードのみ</label>
-                        <label class="check-label"><input type="checkbox" id="twinpact-toggle" checked> ツインパクトを表示する</label>
-                        <span class="filter-label">並べ替え</span>
-                        <select id="sort-select" class="tag-select">
-                            <option value="default">デフォルト</option>
-                            <option value="cost-asc">コストが低い順</option>
-                            <option value="cost-desc">コストが高い順</option>
-                            <option value="power-asc">パワーが低い順</option>
-                            <option value="power-desc">パワーが高い順</option>
-                            <option value="civilization">文明順</option>
-                            <option value="cardType">カードタイプ順</option>
-                        </select>
+                        <span class="filter-group">
+                            <span class="filter-label">ツインパクト</span>
+                            <select id="twinpact-select" class="tag-select">
+                                <option value="show" selected>ツインパクトも表示する</option>
+                                <option value="hide">ツインパクトを表示しない</option>
+                                <option value="only">ツインパクトのみ表示する</option>
+                            </select>
+                        </span>
+                        <span class="filter-group">
+                            <span class="filter-label">並べ替え</span>
+                            <select id="sort-select" class="tag-select">
+                                <option value="default">デフォルト</option>
+                                <option value="cost-asc">コストが低い順</option>
+                                <option value="cost-desc">コストが高い順</option>
+                                <option value="power-asc">パワーが低い順</option>
+                                <option value="power-desc">パワーが高い順</option>
+                                <option value="civilization">文明順</option>
+                                <option value="cardType">カードタイプ順</option>
+                            </select>
+                        </span>
                         <span class="result-count" id="result-count"></span>
                         <button type="button" class="clear-filters" id="clear-filters">絞り込み解除</button>
                     </div>

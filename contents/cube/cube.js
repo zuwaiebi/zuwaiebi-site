@@ -26,8 +26,9 @@
       powerMax: null,
       name: "",
       abilityText: "",
+      race: "",
       enchantOnly: false,
-      includeTwinpact: true,
+      twinpactMode: "show",       // "show"(も表示する) | "hide"(表示しない) | "only"(のみ表示する)
       civConsiderOtherFace: false, // カードタイプ絞り込み中のみ有効: もう一方の面の文明も加味して多色判定するか
     },
     sort: "default",
@@ -271,7 +272,7 @@
   // の3条件をすべて満たす時だけ表示する
   function updateCivConsiderRow() {
     const f = state.filters;
-    const show = f.cardTypes.size > 0 && f.includeTwinpact && !(f.civSingle && f.civMulti);
+    const show = f.cardTypes.size > 0 && f.twinpactMode !== "hide" && !(f.civSingle && f.civMulti);
     $("#civ-consider-other-face-row").style.display = show ? "" : "none";
     if (!show && f.civConsiderOtherFace) {
       f.civConsiderOtherFace = false; // 非表示化する条件になった時は無効な状態を持ち越さずOFFに戻す
@@ -339,12 +340,16 @@
       state.filters.abilityText = e.target.value.trim();
       applyAndRender();
     });
+    $("#race-filter").addEventListener("input", (e) => {
+      state.filters.race = e.target.value.trim();
+      applyAndRender();
+    });
     $("#enchant-only-filter").addEventListener("change", (e) => {
       state.filters.enchantOnly = e.target.checked;
       applyAndRender();
     });
-    $("#twinpact-toggle").addEventListener("change", (e) => {
-      state.filters.includeTwinpact = e.target.checked;
+    $("#twinpact-select").addEventListener("change", (e) => {
+      state.filters.twinpactMode = e.target.value;
       updateCivConsiderRow();
       applyAndRender();
     });
@@ -372,8 +377,9 @@
     state.filters.powerMax = null;
     state.filters.name = "";
     state.filters.abilityText = "";
+    state.filters.race = "";
     state.filters.enchantOnly = false;
-    state.filters.includeTwinpact = true;
+    state.filters.twinpactMode = "show";
     state.filters.civConsiderOtherFace = false;
     state.sort = "default";
 
@@ -391,17 +397,18 @@
     $("#power-max").value = "";
     $("#name-filter").value = "";
     $("#ability-text-filter").value = "";
+    $("#race-filter").value = "";
     $("#enchant-only-filter").checked = false;
-    $("#twinpact-toggle").checked = true;
+    $("#twinpact-select").value = "show";
     $("#sort-select").value = "default";
 
     applyAndRender();
   }
 
   // --- 絞り込み・並べ替え ---
-  // 文明・カードタイプ・コスト・カード名は「面単位」のフィルター: ツインパクトは
-  // 上面・下面のどちらかがこれらすべてを満たせばヒットする(OR条件)。
-  // エンチャント有無・ツインパクト表示トグルはカード全体(面に依らない)レベルの判定。
+  // 文明・カードタイプ・コスト・パワー・カード名・テキスト・種族は「面単位」のフィルター:
+  // ツインパクトは上面・下面のどちらかがこれらすべてを満たせばヒットする(OR条件)。
+  // エンチャント有無・ツインパクト表示モードはカード全体(面に依らない)レベルの判定。
   // カードタイプで絞り込んでいない時は、ツインパクトの上面・下面で異なる文明を持つ場合
   // (各面はそれぞれ単色でも)、カード全体としては多色として扱う。カードタイプで絞り込んで
   // いる時は特定の面(タイプ)に着目していることになるため、その面自身の文明数で判定するが、
@@ -452,13 +459,16 @@
 
     if (f.abilityText && !(face.abilityText || "").includes(f.abilityText)) return false;
 
+    if (f.race && !(face.race || "").includes(f.race)) return false;
+
     return true;
   }
 
   function matchesFilters(card) {
     const f = state.filters;
 
-    if (!f.includeTwinpact && card.isTwinpact) return false;
+    if (f.twinpactMode === "hide" && card.isTwinpact) return false;
+    if (f.twinpactMode === "only" && !card.isTwinpact) return false;
     if (f.enchantOnly && !card.enchantId) return false;
 
     return cardFaces(card).some((face) => faceMatchesFilters(face, f, card));

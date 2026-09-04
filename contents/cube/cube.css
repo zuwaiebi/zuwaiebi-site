@@ -83,6 +83,10 @@ body { padding: 24px; }
 }
 .filter-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .filter-row .filter-label { font-size: 0.85rem; color: var(--muted); min-width: 3.5em; }
+/* ラベルとその入力欄を1つの塊にして、幅が狭い時にラベルだけ・入力欄だけが
+   別の行に分かれてズレる(=ラベルと入力欄の高さが揃わなくなる)のを防ぐ */
+.filter-group { display: inline-flex; align-items: center; gap: 10px; flex-wrap: nowrap; max-width: 100%; }
+.filter-group .filter-label { min-width: 0; }
 .check-label { font-size: 0.85rem; color: var(--muted); display: inline-flex; align-items: center; gap: 5px; }
 .civ-toggle, .type-toggle {
   border: 1px solid var(--border); background: transparent; color: var(--muted);
