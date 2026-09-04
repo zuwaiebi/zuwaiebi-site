@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="ja">
+    <head>
+        <meta charset="UTF-8">
+        <title id="page-title">キューブ</title>
+        <meta name="description" content="デュエルマスターズ キューブドラフト カードリスト">
+        <meta name="viewport" content="width=device-width,initial-scale=1">
+        <link rel="stylesheet" href="cube.css">
+    </head>
+    <body>
+        <div class="page-shell">
+            <header class="cube-header">
+                <h1 id="cube-title">キューブ</h1>
+                <nav>
+                    <a href="../../index.html">トップに戻る</a>
+                </nav>
+            </header>
+
+            <nav class="cube-tabs">
+                <button type="button" class="cube-tab active" data-tab="list">カード一覧</button>
+                <button type="button" class="cube-tab" data-tab="history">更新履歴</button>
+            </nav>
+
+            <section id="tab-list" class="cube-tab-panel active">
+                <section class="civ-ratio" id="civ-ratio" aria-label="文明比率"></section>
+                <section class="civ-ratio" id="color-ratio" aria-label="単色/多色比率"></section>
+
+                <section class="filter-bar">
+                    <div class="filter-row" id="civ-mode-row">
+                        <span class="filter-label">文明</span>
+                    </div>
+                    <div class="filter-row" id="civ-filter-row"></div>
+                    <div class="filter-row" id="civ-exclude-row" style="display:none;">
+                        <span class="filter-label">多色カードに含めない文明</span>
+                        <span id="civ-exclude-buttons"></span>
+                    </div>
+                    <div class="filter-row" id="civ-mode-toggle-row" style="display:none;">
+                        <label class="check-label"><input type="radio" name="civRequireMode" value="all" id="civ-mode-all" checked> 選んだ文明をすべて含む</label>
+                        <label class="check-label"><input type="radio" name="civRequireMode" value="any" id="civ-mode-any"> 選んだ文明を1つ以上含む</label>
+                    </div>
+                    <div class="filter-row" id="type-filter-row">
+                        <span class="filter-label">タイプ</span>
+                    </div>
+                    <div class="filter-row" id="civ-consider-other-face-row" style="display:none;">
+                        <label class="check-label"><input type="checkbox" id="civ-consider-other-face"> ツインパクトのもう一方に異なる文明が含まれる場合多色とみなす</label>
+                    </div>
+                    <div class="filter-row">
+                        <span class="filter-label">コスト</span>
+                        <input type="number" id="cost-min" class="cost-input" placeholder="下限" min="0">
+                        <span>〜</span>
+                        <input type="number" id="cost-max" class="cost-input" placeholder="上限" min="0">
+                        <span class="filter-label">パワー</span>
+                        <input type="number" id="power-min" class="cost-input" placeholder="下限" min="0">
+                        <span>〜</span>
+                        <input type="number" id="power-max" class="cost-input" placeholder="上限" min="0">
+                        <span class="filter-label">カード名</span>
+                        <input type="search" id="name-filter" class="name-input" placeholder="カード名で検索…">
+                    </div>
+                    <div class="filter-row">
+                        <label class="check-label"><input type="checkbox" id="enchant-only-filter"> エンチャント付与カードのみ</label>
+                        <label class="check-label"><input type="checkbox" id="twinpact-toggle" checked> ツインパクトを表示する</label>
+                        <span class="filter-label">並べ替え</span>
+                        <select id="sort-select" class="tag-select">
+                            <option value="default">デフォルト</option>
+                            <option value="cost-asc">コストが低い順</option>
+                            <option value="cost-desc">コストが高い順</option>
+                            <option value="power-asc">パワーが低い順</option>
+                            <option value="power-desc">パワーが高い順</option>
+                            <option value="civilization">文明順</option>
+                            <option value="cardType">カードタイプ順</option>
+                        </select>
+                        <span class="result-count" id="result-count"></span>
+                        <button type="button" class="clear-filters" id="clear-filters">絞り込み解除</button>
+                    </div>
+                </section>
+
+                <main>
+                    <div class="card-grid" id="card-grid"></div>
+                    <p class="empty-message" id="empty-message" style="display:none;">条件に一致するカードがありません。</p>
+                </main>
+            </section>
+
+            <section id="tab-history" class="cube-tab-panel">
+                <table class="history-table">
+                    <thead><tr><th>日時</th><th>操作</th><th>カード名</th></tr></thead>
+                    <tbody id="history-body"></tbody>
+                </table>
+                <p class="empty-message" id="history-empty" style="display:none;">更新履歴はまだありません。</p>
+            </section>
+        </div>
+
+        <div class="card-modal" id="card-modal">
+            <div class="card-modal-content">
+                <button type="button" class="card-modal-close" id="card-modal-close" aria-label="閉じる">×</button>
+                <div class="card-modal-image" id="card-modal-image"></div>
+                <div class="card-modal-info">
+                    <h2 id="card-modal-name"></h2>
+                    <dl class="card-modal-basics" id="card-modal-basics"></dl>
+                    <div class="card-modal-section" id="card-modal-ability-section">
+                        <h3>テキスト</h3>
+                        <p id="card-modal-ability"></p>
+                    </div>
+                    <div id="card-modal-twinpact-faces" style="display:none;"></div>
+                    <div class="card-modal-section" id="card-modal-enchant-section" style="display:none;">
+                        <h3>エンチャント</h3>
+                        <p id="card-modal-enchant-text"></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <script src="cube.js"></script>
+    </body>
+</html>

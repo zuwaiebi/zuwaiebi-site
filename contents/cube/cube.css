@@ -1,0 +1,183 @@
+:root {
+  color-scheme: dark;
+  --bg: #0e1116;
+  --panel: rgba(255,255,255,0.08);
+  --panel-strong: rgba(255,255,255,0.16);
+  --text: #f6f6f6;
+  --muted: #c8c8c8;
+  --accent: #4db5f7;
+  --border: rgba(255,255,255,0.14);
+
+  --civ-光: #e3c23c;
+  --civ-水: #3a8fd1;
+  --civ-闇: #8a63c9;
+  --civ-火: #e0533f;
+  --civ-自然: #5cb85c;
+  --civ-ゼロ: #9aa0ac;
+
+  --color-mono: #4db5f7;
+  --color-multi: #e0a030;
+
+  --history-add: #2f6fed;
+  --history-remove: #d6453f;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  min-height: 100%;
+  background: radial-gradient(circle at top, rgba(255,255,255,0.06), transparent 36%),
+              linear-gradient(180deg, #12151b 0%, #0b0d11 100%);
+  color: var(--text);
+  font-family: 'Yu Gothic Medium', 'Hiragino Kaku Gothic Pro', Meiryo, sans-serif;
+}
+
+body { padding: 24px; }
+
+.page-shell {
+  width: min(1400px, 100%);
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.cube-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+.cube-header h1 { margin: 0; font-size: clamp(1.4rem, 3vw, 2rem); }
+.cube-header a { color: var(--muted); font-size: 0.85rem; text-decoration: none; }
+.cube-header a:hover { color: var(--accent); text-decoration: underline; }
+
+/* タブ */
+.cube-tabs { display: flex; gap: 6px; }
+.cube-tab {
+  background: var(--panel); border: 1px solid var(--border); color: var(--muted);
+  border-radius: 999px; padding: 8px 18px; font-size: 0.9rem; cursor: pointer;
+}
+.cube-tab.active { background: var(--accent); color: #06202c; border-color: var(--accent); font-weight: 600; }
+.cube-tab-panel { display: none; flex-direction: column; gap: 18px; }
+.cube-tab-panel.active { display: flex; }
+
+/* 文明比率バー */
+.civ-ratio {
+  display: flex; flex-direction: column; gap: 8px;
+  background: var(--panel); border: 1px solid var(--border); border-radius: 16px; padding: 14px 16px;
+}
+.civ-ratio-bar { display: flex; height: 20px; border-radius: 999px; overflow: hidden; background: rgba(255,255,255,0.05); }
+.civ-ratio-segment { height: 100%; }
+.civ-ratio-legend { display: flex; flex-wrap: wrap; gap: 12px; font-size: 0.82rem; color: var(--muted); }
+.civ-ratio-legend .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 4px; vertical-align: middle; }
+
+/* フィルターバー */
+.filter-bar {
+  display: flex; flex-direction: column; gap: 12px;
+  background: var(--panel); border: 1px solid var(--border); border-radius: 16px; padding: 14px 16px;
+}
+.filter-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.filter-row .filter-label { font-size: 0.85rem; color: var(--muted); min-width: 3.5em; }
+.check-label { font-size: 0.85rem; color: var(--muted); display: inline-flex; align-items: center; gap: 5px; }
+.civ-toggle, .type-toggle {
+  border: 1px solid var(--border); background: transparent; color: var(--muted);
+  border-radius: 999px; padding: 5px 14px; font-size: 0.85rem; cursor: pointer;
+}
+.civ-toggle.active { color: #08121a; font-weight: 700; border-color: transparent; }
+.type-toggle.active { background: var(--panel-strong); color: var(--text); border-color: var(--accent); }
+.civ-mode-toggle { border: 1px solid var(--border); background: transparent; color: var(--muted); border-radius: 999px; padding: 5px 14px; font-size: 0.85rem; cursor: pointer; }
+.civ-mode-toggle.active { background: var(--panel-strong); color: var(--text); border-color: var(--accent); }
+#civ-exclude-buttons { display: contents; }
+.cost-input, .name-input, .tag-select {
+  background: #14171d; border: 1px solid var(--border); color: var(--text);
+  border-radius: 8px; padding: 6px 10px; font-size: 0.9rem;
+}
+.cost-input { width: 5.5em; }
+.name-input { min-width: 200px; }
+.result-count { font-size: 0.82rem; color: var(--muted); margin-left: auto; }
+.clear-filters {
+  background: transparent; border: 1px solid var(--border); color: var(--muted);
+  border-radius: 999px; padding: 6px 14px; font-size: 0.85rem; cursor: pointer;
+}
+.clear-filters:hover { color: var(--accent); border-color: var(--accent); }
+
+/* カードグリッド */
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 12px;
+}
+.card-tile {
+  position: relative;
+  border-radius: 10px;
+  overflow: hidden;
+  cursor: pointer;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  aspect-ratio: 5 / 7;
+  transition: transform .12s ease;
+}
+.card-tile:hover { transform: translateY(-3px); border-color: var(--accent); }
+.card-tile img.base-image { width: 100%; height: 100%; object-fit: cover; display: block; }
+.card-tile img.overlay-image { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; pointer-events: none; }
+.card-tile .placeholder {
+  width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;
+  text-align: center; font-size: 0.78rem; color: var(--muted); padding: 6px;
+}
+.card-tile .card-name-caption {
+  position: absolute; left: 0; right: 0; bottom: 0; padding: 4px 6px;
+  background: linear-gradient(0deg, rgba(0,0,0,.78), transparent);
+  font-size: 0.72rem; line-height: 1.2;
+}
+.empty-message { color: var(--muted); text-align: center; padding: 40px 0; }
+
+/* 更新履歴タブ */
+.history-table { width: 100%; border-collapse: collapse; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+.history-table th, .history-table td { text-align: left; padding: 8px 12px; font-size: 0.85rem; border-bottom: 1px solid var(--border); }
+.history-table th { color: var(--muted); background: rgba(255,255,255,0.04); }
+.history-action-add { background: var(--history-add); color: #fff; font-weight: bold; }
+.history-action-remove { background: var(--history-remove); color: #fff; font-weight: bold; }
+
+/* カード詳細モーダル */
+.card-modal {
+  display: none; position: fixed; inset: 0; background: rgba(0,0,0,.72);
+  align-items: center; justify-content: center; padding: 4vh 3vw; z-index: 100;
+}
+.card-modal.open { display: flex; }
+.card-modal-content {
+  position: relative; background: #14171d; border: 1px solid var(--border); border-radius: 16px;
+  max-width: 760px; width: 100%; max-height: 92vh; overflow-y: auto;
+  display: flex; align-items: flex-start; gap: 20px; padding: 24px;
+}
+/* align-items:flex-startが無いと、右側の情報量に応じて画像コンテナが縦にストレッチされ、
+   中の画像は自然な高さのままなためエンチャントの重ね画像(絶対配置でコンテナいっぱいに広がる)がずれる */
+.card-modal-image { flex: 0 0 220px; display: flex; flex-direction: column; gap: 10px; }
+/* 1面目の画像(+エンチャント重ね画像)を包む。overlay-imageの絶対配置はこの内側の枠を基準にする
+   (card-modal-image自体に付けると、2面目の画像も含めた列全体に対して広がってしまいずれる) */
+.card-modal-main-image { position: relative; }
+.card-modal-main-image img.base-image { width: 100%; border-radius: 10px; display: block; }
+.card-modal-main-image img.overlay-image { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+.card-modal-image img.second-face-image { width: 100%; border-radius: 10px; display: block; }
+.card-modal-info { flex: 1; min-width: 0; }
+.card-modal-info h2 { margin: 0 0 10px; font-size: 1.3rem; }
+.card-modal-basics { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; font-size: 0.88rem; margin: 0 0 14px; }
+.card-modal-basics dt { color: var(--muted); }
+.card-modal-basics dd { margin: 0; white-space: pre-wrap; }
+.card-modal-section { margin-top: 14px; }
+.face-block + .face-block { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border); }
+.card-modal-section h3 { font-size: 0.9rem; color: var(--muted); margin: 0 0 6px; }
+.card-modal-section p { white-space: pre-wrap; margin: 0; font-size: 0.92rem; line-height: 1.6; }
+.card-modal-section img { max-width: 100%; border-radius: 8px; margin-bottom: 8px; }
+.card-modal-close {
+  position: absolute; top: 10px; right: 14px; background: none; border: none; color: var(--muted);
+  font-size: 1.4rem; cursor: pointer; line-height: 1;
+}
+.card-modal-close:hover { color: var(--text); }
+
+@media (max-width: 640px) {
+  .card-modal-content { flex-direction: column; }
+  .card-modal-image { flex: none; width: 45%; }
+}
