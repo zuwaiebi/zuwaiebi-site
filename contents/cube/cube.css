@@ -99,6 +99,7 @@ body { padding: 24px; }
 }
 .cost-input { width: 5.5em; }
 .name-input { min-width: 200px; }
+.wide-input { flex: 1; min-width: 260px; }
 .result-count { font-size: 0.82rem; color: var(--muted); margin-left: auto; }
 .clear-filters {
   background: transparent; border: 1px solid var(--border); color: var(--muted);
