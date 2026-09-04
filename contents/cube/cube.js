@@ -25,6 +25,7 @@
       powerMin: null,
       powerMax: null,
       name: "",
+      abilityText: "",
       enchantOnly: false,
       includeTwinpact: true,
       civConsiderOtherFace: false, // カードタイプ絞り込み中のみ有効: もう一方の面の文明も加味して多色判定するか
@@ -334,6 +335,10 @@
       state.filters.name = e.target.value.trim();
       applyAndRender();
     });
+    $("#ability-text-filter").addEventListener("input", (e) => {
+      state.filters.abilityText = e.target.value.trim();
+      applyAndRender();
+    });
     $("#enchant-only-filter").addEventListener("change", (e) => {
       state.filters.enchantOnly = e.target.checked;
       applyAndRender();
@@ -366,6 +371,7 @@
     state.filters.powerMin = null;
     state.filters.powerMax = null;
     state.filters.name = "";
+    state.filters.abilityText = "";
     state.filters.enchantOnly = false;
     state.filters.includeTwinpact = true;
     state.filters.civConsiderOtherFace = false;
@@ -384,6 +390,7 @@
     $("#power-min").value = "";
     $("#power-max").value = "";
     $("#name-filter").value = "";
+    $("#ability-text-filter").value = "";
     $("#enchant-only-filter").checked = false;
     $("#twinpact-toggle").checked = true;
     $("#sort-select").value = "default";
@@ -442,6 +449,8 @@
     if (f.powerMax !== null && (face.power === null || face.power === undefined || face.power > f.powerMax)) return false;
 
     if (f.name && !(face.name || "").includes(f.name)) return false;
+
+    if (f.abilityText && !(face.abilityText || "").includes(f.abilityText)) return false;
 
     return true;
   }
