@@ -1,0 +1,3 @@
+# キューブのカードデータ・画像は管理画面(cube_admin)が本番サーバー上で直接
+# 読み書きする実データであり、gitでは追跡しない(cube_spec.md 6章参照)。
+contents/cube/data/
