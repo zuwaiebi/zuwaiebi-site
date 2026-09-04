@@ -64,11 +64,13 @@ body { padding: 24px; }
 .cube-tab-panel { display: none; flex-direction: column; gap: 18px; }
 .cube-tab-panel.active { display: flex; }
 
-/* 文明比率バー */
+/* 文明比率バー・単色/多色比率バー(同じ枠内にまとめて表示) */
 .civ-ratio {
-  display: flex; flex-direction: column; gap: 8px;
+  display: flex; flex-direction: column; gap: 14px;
   background: var(--panel); border: 1px solid var(--border); border-radius: 16px; padding: 14px 16px;
 }
+#civ-ratio, #color-ratio { display: flex; flex-direction: column; gap: 8px; }
+.civ-ratio-divider { height: 1px; background: var(--border); }
 .civ-ratio-bar { display: flex; height: 20px; border-radius: 999px; overflow: hidden; background: rgba(255,255,255,0.05); }
 .civ-ratio-segment { height: 100%; }
 .civ-ratio-legend { display: flex; flex-wrap: wrap; gap: 12px; font-size: 0.82rem; color: var(--muted); }

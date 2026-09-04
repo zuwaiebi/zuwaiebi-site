@@ -5,6 +5,8 @@
         <title id="page-title">キューブ</title>
         <meta name="description" content="デュエルマスターズ キューブドラフト カードリスト">
         <meta name="viewport" content="width=device-width,initial-scale=1">
+        <meta name="color-scheme" content="dark">
+        <meta name="theme-color" content="#0e1116">
         <link rel="stylesheet" href="cube.css">
     </head>
     <body>
@@ -22,8 +24,11 @@
             </nav>
 
             <section id="tab-list" class="cube-tab-panel active">
-                <section class="civ-ratio" id="civ-ratio" aria-label="文明比率"></section>
-                <section class="civ-ratio" id="color-ratio" aria-label="単色/多色比率"></section>
+                <section class="civ-ratio">
+                    <div id="civ-ratio" aria-label="文明比率"></div>
+                    <div class="civ-ratio-divider"></div>
+                    <div id="color-ratio" aria-label="単色/多色比率"></div>
+                </section>
 
                 <section class="filter-bar">
                     <div class="filter-row" id="civ-mode-row">
