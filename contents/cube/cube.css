@@ -20,6 +20,9 @@
 
   --history-add: #2f6fed;
   --history-remove: #d6453f;
+
+  --mode-and: #d6453f;
+  --mode-or: #2f6fed;
 }
 
 * { box-sizing: border-box; }
@@ -104,12 +107,17 @@ body { padding: 24px; }
 .cost-input { width: 5.5em; }
 .name-input { min-width: 200px; }
 .wide-input { flex: 1; min-width: 260px; }
+/* テキスト/種族検索のAND・OR切り替え。1つのボタンをタップ/クリックするたびに
+   AND(赤)⇔OR(青)が切り替わる */
+.search-mode-toggle { border: none; border-radius: 999px; padding: 5px 16px; font-size: 0.85rem; font-weight: 700; color: #fff; cursor: pointer; }
+.search-mode-toggle.mode-and { background: var(--mode-and); }
+.search-mode-toggle.mode-or { background: var(--mode-or); }
 .result-count { font-size: 0.82rem; color: var(--muted); margin-left: auto; }
 .clear-filters {
-  background: transparent; border: 1px solid var(--border); color: var(--muted);
-  border-radius: 999px; padding: 6px 14px; font-size: 0.85rem; cursor: pointer;
+  background: var(--accent); border: 1px solid var(--accent); color: #06202c;
+  border-radius: 999px; padding: 6px 14px; font-size: 0.85rem; font-weight: 700; cursor: pointer;
 }
-.clear-filters:hover { color: var(--accent); border-color: var(--accent); }
+.clear-filters:hover { opacity: 0.85; }
 
 /* カードグリッド */
 .card-grid {

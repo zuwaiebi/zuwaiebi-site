@@ -26,7 +26,9 @@
       powerMax: null,
       name: "",
       abilityText: "",
+      abilityTextMode: "and",     // スペース区切りの複数単語を"and"(すべて含む)/"or"(いずれか含む)で判定
       race: "",
+      raceMode: "and",
       enchantOnly: false,
       twinpactMode: "show",       // "show"(も表示する) | "hide"(表示しない) | "only"(のみ表示する)
       civConsiderOtherFace: false, // カードタイプ絞り込み中のみ有効: もう一方の面の文明も加味して多色判定するか
@@ -101,6 +103,18 @@
     return (face.civilizations || []).length >= 2;
   }
 
+  // --- テキスト検索(スペース区切りで複数単語のAND/OR検索) ---
+  // \s は半角スペースだけでなく全角スペース(U+3000)にもマッチする(ECMAScript仕様)
+  function splitSearchWords(text) {
+    return (text || "").split(/\s+/).filter(Boolean);
+  }
+
+  function matchesSearchWords(text, words, mode) {
+    if (!words.length) return true;
+    const t = text || "";
+    return mode === "or" ? words.some((w) => t.includes(w)) : words.every((w) => t.includes(w));
+  }
+
   // --- データ読み込み ---
   async function loadData() {
     const dataUrl = `data/${encodeURIComponent(cubeId)}/cube_data.json`;
@@ -146,9 +160,10 @@
   }
 
   // --- 文明比率バー ---
-  function renderCivRatio() {
+  // cards: 比率の集計対象(検索結果と連動させるため、現在の絞り込みを通過したカードのみを渡す)
+  function renderCivRatio(cards) {
     const counts = Object.fromEntries(CIV_ORDER.map((c) => [c, 0]));
-    state.cubeData.cards.forEach((card) => {
+    cards.forEach((card) => {
       // ツインパクトは上面・下面の文明の和集合で1回ずつ数える(両面が同じ文明でも1枚として扱う)
       const civSet = new Set();
       cardFaces(card).forEach((face) => (face.civilizations || []).forEach((civ) => civSet.add(civ)));
@@ -157,9 +172,10 @@
     renderRatioBar("#civ-ratio", CIV_ORDER.map((civ) => ({ label: civ, count: counts[civ], color: `var(--civ-${civ})` })));
   }
 
-  // カード全体が多色かどうか(絞り込みをしていない全体表示用)。ツインパクトで上面・下面の
-  // 文明が異なる場合(和集合が2色以上になる場合)も多色として扱う。絞り込みボタンの
-  // 単色/多色判定(面ごとのisMulticolorFace)とは別の、カード単位の判定であることに注意。
+  // カード全体が多色かどうか(カードタイプによる絞り込みの有無に関わらず一定の基準で判定する、
+  // 比率バー用の基準)。ツインパクトで上面・下面の文明が異なる場合(和集合が2色以上になる場合)も
+  // 多色として扱う。絞り込みボタンの単色/多色判定(面ごとのisMulticolorFace)とは別の、
+  // カード単位の判定であることに注意。
   function isCardMulticolor(card) {
     const civSet = new Set();
     cardFaces(card).forEach((face) => (face.civilizations || []).forEach((civ) => civSet.add(civ)));
@@ -167,10 +183,11 @@
   }
 
   // --- 単色/多色比率バー ---
-  function renderColorRatio() {
+  // cards: 比率の集計対象(検索結果と連動させるため、現在の絞り込みを通過したカードのみを渡す)
+  function renderColorRatio(cards) {
     let single = 0;
     let multi = 0;
-    state.cubeData.cards.forEach((card) => {
+    cards.forEach((card) => {
       if (isCardMulticolor(card)) multi += 1; else single += 1;
     });
     renderRatioBar("#color-ratio", [
@@ -280,12 +297,38 @@
     }
   }
 
+  // テキスト検索(種族・テキスト)のAND/OR切り替えボタンを構築する。1つのボタンをタップ/クリックする
+  // たびにAND(赤)⇔OR(青)を切り替える。呼び直すとstate.filters[filterKey]の現在値に合わせて
+  // 再描画されるため、resetFiltersでの表示リセットにも流用する
+  function buildSearchModeToggle(containerSel, filterKey) {
+    const container = $(containerSel);
+    container.innerHTML = "";
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "search-mode-toggle";
+    const render = () => {
+      const isOr = state.filters[filterKey] === "or";
+      btn.textContent = isOr ? "OR" : "AND";
+      btn.classList.toggle("mode-or", isOr);
+      btn.classList.toggle("mode-and", !isOr);
+    };
+    btn.addEventListener("click", () => {
+      state.filters[filterKey] = state.filters[filterKey] === "or" ? "and" : "or";
+      render();
+      applyAndRender();
+    });
+    render();
+    container.appendChild(btn);
+  }
+
   // --- フィルターUI構築 ---
   function buildFilterToggles() {
     buildCivModeRow();
     buildCivRequiredRow();
     updateCivExcludeRow();
     updateCivConsiderRow();
+    buildSearchModeToggle("#race-mode-toggle", "raceMode");
+    buildSearchModeToggle("#ability-text-mode-toggle", "abilityTextMode");
 
     const typeRow = $("#type-filter-row");
     CARD_TYPE_ORDER.forEach((type) => {
@@ -377,13 +420,17 @@
     state.filters.powerMax = null;
     state.filters.name = "";
     state.filters.abilityText = "";
+    state.filters.abilityTextMode = "and";
     state.filters.race = "";
+    state.filters.raceMode = "and";
     state.filters.enchantOnly = false;
     state.filters.twinpactMode = "show";
     state.filters.civConsiderOtherFace = false;
     state.sort = "default";
 
-    $$(".civ-mode-toggle").forEach((btn) => btn.classList.add("active"));
+    $$("#civ-mode-row .civ-mode-toggle").forEach((btn) => btn.classList.add("active"));
+    buildSearchModeToggle("#race-mode-toggle", "raceMode");
+    buildSearchModeToggle("#ability-text-mode-toggle", "abilityTextMode");
     $$("#civ-filter-row .civ-toggle").forEach((btn) => { btn.classList.remove("active"); btn.style.background = "transparent"; btn.style.color = "var(--muted)"; });
     updateCivExcludeRow();
     updateCivModeToggleRow();
@@ -457,9 +504,9 @@
 
     if (f.name && !(face.name || "").includes(f.name)) return false;
 
-    if (f.abilityText && !(face.abilityText || "").includes(f.abilityText)) return false;
+    if (!matchesSearchWords(face.abilityText, splitSearchWords(f.abilityText), f.abilityTextMode)) return false;
 
-    if (f.race && !(face.race || "").includes(f.race)) return false;
+    if (!matchesSearchWords(face.race, splitSearchWords(f.race), f.raceMode)) return false;
 
     return true;
   }
@@ -589,6 +636,10 @@
 
     $("#result-count").textContent = `${sorted.length} / ${state.cubeData.cards.length} 枚`;
     $("#empty-message").style.display = sorted.length ? "none" : "block";
+
+    // 文明比率・単色/多色比率バーは常に現在の絞り込み結果と連動させる
+    renderCivRatio(filtered);
+    renderColorRatio(filtered);
   }
 
   // --- カード詳細モーダル ---
@@ -760,8 +811,6 @@
       console.error(err);
       return;
     }
-    renderCivRatio();
-    renderColorRatio();
     applyAndRender();
     renderHistory();
   }

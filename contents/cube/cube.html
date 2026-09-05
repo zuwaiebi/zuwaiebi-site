@@ -69,11 +69,13 @@
                     </div>
                     <div class="filter-row">
                         <span class="filter-label">種族</span>
-                        <input type="search" id="race-filter" class="name-input wide-input" placeholder="種族で検索…">
+                        <input type="search" id="race-filter" class="name-input wide-input" placeholder="種族で検索…(スペース区切りで複数指定可)">
+                        <span class="filter-group" id="race-mode-toggle"></span>
                     </div>
                     <div class="filter-row">
                         <span class="filter-label">テキスト</span>
-                        <input type="search" id="ability-text-filter" class="name-input wide-input" placeholder="テキストで検索…">
+                        <input type="search" id="ability-text-filter" class="name-input wide-input" placeholder="テキストで検索…(スペース区切りで複数指定可)">
+                        <span class="filter-group" id="ability-text-mode-toggle"></span>
                     </div>
                     <div class="filter-row">
                         <label class="check-label"><input type="checkbox" id="enchant-only-filter"> エンチャント付与カードのみ</label>
@@ -98,7 +100,7 @@
                             </select>
                         </span>
                         <span class="result-count" id="result-count"></span>
-                        <button type="button" class="clear-filters" id="clear-filters">絞り込み解除</button>
+                        <button type="button" class="clear-filters" id="clear-filters">リセット</button>
                     </div>
                 </section>
 
