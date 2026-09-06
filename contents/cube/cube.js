@@ -10,9 +10,18 @@
 
   const cubeId = new URLSearchParams(location.search).get("cube") || DEFAULT_CUBE_ID;
 
+  // デッキ登録(認証なしの公開API)の書き込み先。cube_admin側のURLプレフィックスを直接指す
+  // (website側は静的ファイルのみで完結しているためテンプレート変数の注入ができない。
+  // cube_admin/README.mdのCUBE_ADMIN_URL_PREFIXを変更した場合はここも合わせて変更する)
+  const DECK_API_BASE = "/cube-admin";
+  const DECK_SUGGEST_LIMIT = 15;
+
   const state = {
     cubeData: { cards: [], enchants: [] },
     history: { entries: [] },
+    trashData: { cards: [], enchants: [] },
+    decksData: { decks: [] },
+    deckBuilding: { cards: [] },
     filters: {
       civSingle: true,            // 単色ボタン
       civMulti: true,             // 多色ボタン(どちらか最低1つは常にtrue)
@@ -119,10 +128,18 @@
   async function loadData() {
     const dataUrl = `data/${encodeURIComponent(cubeId)}/cube_data.json`;
     const historyUrl = `data/${encodeURIComponent(cubeId)}/cube_history.json`;
-    const [cubeRes, historyRes] = await Promise.all([fetch(dataUrl), fetch(historyUrl)]);
+    const trashUrl = `data/${encodeURIComponent(cubeId)}/trash.json`;
+    const decksUrl = `data/${encodeURIComponent(cubeId)}/decks.json`;
+    const [cubeRes, historyRes, trashRes, decksRes] = await Promise.all([
+      fetch(dataUrl), fetch(historyUrl), fetch(trashUrl), fetch(decksUrl),
+    ]);
     if (!cubeRes.ok) throw new Error(`キューブデータの読み込みに失敗しました (${cubeRes.status})`);
     state.cubeData = await cubeRes.json();
     state.history = historyRes.ok ? await historyRes.json() : { entries: [] };
+    // ゴミ箱・デッキ記録はデッキ登録機能(cube_spec.md 9節)のサジェスト・一覧表示に使う。
+    // まだ1件もゴミ箱行き/デッキ記録が無いキューブではファイル自体が存在しないため、404は空扱いにする
+    state.trashData = trashRes.ok ? await trashRes.json() : { cards: [], enchants: [] };
+    state.decksData = decksRes.ok ? await decksRes.json() : { decks: [] };
 
     document.title = state.cubeData.displayName || "キューブ";
     $("#cube-title").textContent = state.cubeData.displayName || "キューブ";
@@ -572,9 +589,12 @@
   }
 
   // --- カードグリッド描画 ---
-  function cardImagePath(kind, filename) {
+  // fromTrash: デッキ記録(cube_spec.md 9節)がゴミ箱行きだったカード/エンチャントの画像を
+  // スナップショットしている場合にtrueを渡す(images/ではなくtrash_images/を参照する)
+  function cardImagePath(kind, filename, fromTrash) {
     const dir = kind === "base" ? "base" : "enchant";
-    return `data/${encodeURIComponent(cubeId)}/images/${dir}/${encodeURIComponent(filename)}`;
+    const root = fromTrash ? "trash_images" : "images";
+    return `data/${encodeURIComponent(cubeId)}/${root}/${dir}/${encodeURIComponent(filename)}`;
   }
 
   function renderCardTile(card) {
@@ -768,7 +788,11 @@
     if (ev.target.id === "card-modal") $("#card-modal").classList.remove("open");
   });
   document.addEventListener("keydown", (ev) => {
-    if (ev.key === "Escape") $("#card-modal").classList.remove("open");
+    if (ev.key !== "Escape") return;
+    $("#card-modal").classList.remove("open");
+    $("#deck-enchant-modal").classList.remove("open");
+    $("#deck-save-modal").classList.remove("open");
+    $("#deck-detail-modal").classList.remove("open");
   });
 
   // --- 更新履歴タブ ---
@@ -783,6 +807,311 @@
       })
       .join("");
     $("#history-empty").style.display = entries.length ? "none" : "block";
+  }
+
+  // --- デッキ記録(登録・一覧。cube_spec.md 9節) ---
+  // カード/エンチャントはライブ参照せず、選択した時点の名前・画像ファイル名をそのまま
+  // デッキのカードエントリにスナップショットする(trash.json/cube_history.jsonと同じ考え方)。
+  const isTrashImageSource = (src) => src === "trash_base" || src === "trash_enchant";
+
+  function deckCardImageSrc(entry) {
+    if (!entry.baseImage) return null;
+    return cardImagePath("base", entry.baseImage, isTrashImageSource(entry.imageSource));
+  }
+
+  function deckEnchantImageSrc(entry) {
+    if (!entry.enchant || !entry.enchant.overlayImage) return null;
+    return cardImagePath("enchant", entry.enchant.overlayImage, isTrashImageSource(entry.enchant.imageSource));
+  }
+
+  // サジェスト・エンチャント選択候補は、現行キューブに加えゴミ箱内のものも対象にする
+  // (キューブは更新され続けるため、過去のデッキが既に削除されたカードを含むことがある)
+  function allCardSuggestCandidates() {
+    const live = state.cubeData.cards.map((card) => ({ card, fromTrash: false }));
+    const trashed = (state.trashData.cards || []).map((card) => ({ card, fromTrash: true }));
+    return live.concat(trashed);
+  }
+
+  function allEnchantCandidates() {
+    const live = state.cubeData.enchants.map((enchant) => ({ enchant, fromTrash: false }));
+    const trashed = (state.trashData.enchants || []).map((enchant) => ({ enchant, fromTrash: true }));
+    return live.concat(trashed);
+  }
+
+  function deckCardEntryFromCard(card, fromTrash) {
+    return {
+      name: displayName(card),
+      baseImage: card.baseImage || null,
+      imageSource: card.baseImage ? (fromTrash ? "trash_base" : "base") : null,
+      isDummy: false,
+      enchant: null,
+    };
+  }
+
+  function addDeckCard(entry) {
+    state.deckBuilding.cards.push(entry);
+    renderDeckBuildingGrid();
+  }
+
+  function removeDeckCard(index) {
+    state.deckBuilding.cards.splice(index, 1);
+    renderDeckBuildingGrid();
+  }
+
+  function clearDeckSuggest() {
+    $("#deck-card-search").value = "";
+    $("#deck-suggest-list").hidden = true;
+    $("#deck-suggest-list").innerHTML = "";
+  }
+
+  function renderDeckSuggestions(query) {
+    const list = $("#deck-suggest-list");
+    list.innerHTML = "";
+    const q = query.trim();
+    if (!q) { list.hidden = true; return; }
+
+    const matches = allCardSuggestCandidates()
+      .filter(({ card }) => displayName(card).includes(q))
+      .slice(0, DECK_SUGGEST_LIMIT);
+
+    if (matches.length === 0) {
+      const item = document.createElement("div");
+      item.className = "deck-suggest-item deck-suggest-dummy";
+      item.textContent = `《${q}》をダミーとして記録する`;
+      item.addEventListener("click", () => {
+        addDeckCard({ name: q, baseImage: null, imageSource: null, isDummy: true, enchant: null });
+        clearDeckSuggest();
+      });
+      list.appendChild(item);
+    } else {
+      matches.forEach(({ card, fromTrash }) => {
+        const item = document.createElement("div");
+        item.className = "deck-suggest-item";
+        item.textContent = displayName(card) + (fromTrash ? "（ゴミ箱）" : "");
+        item.addEventListener("click", () => {
+          addDeckCard(deckCardEntryFromCard(card, fromTrash));
+          clearDeckSuggest();
+        });
+        list.appendChild(item);
+      });
+    }
+    list.hidden = false;
+  }
+
+  // removable: true=登録中デッキ(削除ボタン・エンチャント設定クリックあり) / false=デッキ詳細表示(閲覧専用)
+  function renderDeckCardTile(entry, index, removable) {
+    const tile = document.createElement("div");
+    tile.className = "card-tile" + (removable ? " card-tile-removable" : "");
+
+    const imgSrc = deckCardImageSrc(entry);
+    if (imgSrc) {
+      const img = document.createElement("img");
+      img.className = "base-image";
+      img.loading = "lazy";
+      img.src = imgSrc;
+      img.alt = entry.name;
+      tile.appendChild(img);
+    } else {
+      const ph = document.createElement("div");
+      ph.className = "placeholder";
+      ph.textContent = entry.name;
+      tile.appendChild(ph);
+    }
+
+    const enchantImgSrc = deckEnchantImageSrc(entry);
+    if (enchantImgSrc) {
+      const overlay = document.createElement("img");
+      overlay.className = "overlay-image";
+      overlay.loading = "lazy";
+      overlay.src = enchantImgSrc;
+      overlay.alt = `エンチャント: ${entry.enchant.name}`;
+      tile.appendChild(overlay);
+    }
+
+    if (imgSrc) {
+      const caption = document.createElement("div");
+      caption.className = "card-name-caption";
+      caption.textContent = entry.name;
+      tile.appendChild(caption);
+    }
+
+    if (removable) {
+      tile.tabIndex = 0;
+      tile.setAttribute("role", "button");
+      tile.setAttribute("aria-label", `${entry.name}のエンチャントを設定`);
+
+      const removeBtn = document.createElement("button");
+      removeBtn.type = "button";
+      removeBtn.className = "card-tile-remove-btn";
+      removeBtn.textContent = "×";
+      removeBtn.setAttribute("aria-label", "このカードを登録から外す");
+      removeBtn.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        removeDeckCard(index);
+      });
+      tile.appendChild(removeBtn);
+
+      tile.addEventListener("click", () => openDeckEnchantModal(index));
+      tile.addEventListener("keydown", (ev) => {
+        if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); openDeckEnchantModal(index); }
+      });
+    }
+
+    return tile;
+  }
+
+  function renderDeckBuildingGrid() {
+    const grid = $("#deck-building-grid");
+    grid.innerHTML = "";
+    state.deckBuilding.cards.forEach((entry, index) => grid.appendChild(renderDeckCardTile(entry, index, true)));
+    const count = state.deckBuilding.cards.length;
+    $("#deck-building-count").textContent = `${count}枚`;
+    $("#deck-building-empty").style.display = count ? "none" : "block";
+  }
+
+  function openDeckEnchantModal(index) {
+    const current = state.deckBuilding.cards[index].enchant;
+    const candidates = allEnchantCandidates();
+    const select = $("#deck-enchant-select");
+    select.innerHTML = "";
+
+    const noneOpt = document.createElement("option");
+    noneOpt.value = "";
+    noneOpt.textContent = "なし";
+    select.appendChild(noneOpt);
+
+    candidates.forEach(({ enchant, fromTrash }, i) => {
+      const opt = document.createElement("option");
+      opt.value = String(i);
+      opt.textContent = enchant.name + (fromTrash ? "（ゴミ箱）" : "");
+      select.appendChild(opt);
+    });
+
+    const currentIndex = current
+      ? candidates.findIndex(({ enchant }) => enchant.name === current.name && (enchant.overlayImage || null) === current.overlayImage)
+      : -1;
+    select.value = currentIndex >= 0 ? String(currentIndex) : "";
+
+    select.onchange = () => {
+      const val = select.value;
+      if (val === "") {
+        state.deckBuilding.cards[index].enchant = null;
+      } else {
+        const { enchant, fromTrash } = candidates[Number(val)];
+        state.deckBuilding.cards[index].enchant = {
+          name: enchant.name,
+          abilityText: enchant.abilityText || "",
+          overlayImage: enchant.overlayImage || null,
+          imageSource: enchant.overlayImage ? (fromTrash ? "trash_enchant" : "enchant") : null,
+        };
+      }
+      renderDeckBuildingGrid();
+      $("#deck-enchant-modal").classList.remove("open");
+    };
+
+    $("#deck-enchant-modal").classList.add("open");
+  }
+
+  function openDeckSaveModal() {
+    const count = state.deckBuilding.cards.length;
+    if (count === 0) {
+      alert("カードを1枚以上登録してください。");
+      return;
+    }
+    if (count < 40 && !confirm(`${count}枚ですが保存しますか？`)) return;
+
+    $("#deck-save-name").value = "";
+    $("#deck-save-note").value = "";
+    $("#deck-save-error").textContent = "";
+    $("#deck-save-modal").classList.add("open");
+  }
+
+  async function submitDeckSave() {
+    const errorEl = $("#deck-save-error");
+    errorEl.textContent = "";
+    try {
+      const payload = {
+        name: $("#deck-save-name").value.trim(),
+        note: $("#deck-save-note").value,
+        cards: state.deckBuilding.cards,
+      };
+      const res = await fetch(`${DECK_API_BASE}/api/cube/${encodeURIComponent(cubeId)}/decks`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
+
+      state.deckBuilding.cards = [];
+      renderDeckBuildingGrid();
+      $("#deck-save-modal").classList.remove("open");
+      state.decksData.decks = state.decksData.decks || [];
+      state.decksData.decks.push(body);
+      renderDeckList();
+    } catch (err) {
+      errorEl.textContent = "保存に失敗しました: " + err.message;
+    }
+  }
+
+  function deckSourceLabel(source) {
+    return source === "simulator" ? "シミュレータ" : "実戦";
+  }
+
+  function renderDeckList() {
+    const entries = (state.decksData.decks || []).slice()
+      .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+    const body = $("#deck-list-body");
+    body.innerHTML = entries.map((d) => {
+      const sourceClass = d.source === "simulator" ? "deck-source-simulator" : "deck-source-manual";
+      return `<tr data-deck-id="${escapeHtml(d.id)}">
+        <td>${escapeHtml(d.name)}</td>
+        <td><span class="deck-source-badge ${sourceClass}">${deckSourceLabel(d.source)}</span></td>
+        <td>${escapeHtml(d.createdAt)}</td>
+        <td>${d.cards.length}枚</td>
+      </tr>`;
+    }).join("");
+    $$("#deck-list-body tr").forEach((tr) => {
+      tr.addEventListener("click", () => openDeckDetailModal(tr.dataset.deckId));
+    });
+    $("#deck-list-empty").style.display = entries.length ? "none" : "block";
+  }
+
+  function openDeckDetailModal(deckId) {
+    const deck = (state.decksData.decks || []).find((d) => d.id === deckId);
+    if (!deck) return;
+
+    $("#deck-detail-name").textContent = deck.name;
+    $("#deck-detail-meta").textContent = `${deckSourceLabel(deck.source)} ／ ${deck.createdAt} ／ ${deck.cards.length}枚`;
+    $("#deck-detail-note").textContent = deck.note || "";
+    $("#deck-detail-note").style.display = deck.note ? "" : "none";
+
+    const grid = $("#deck-detail-grid");
+    grid.innerHTML = "";
+    deck.cards.forEach((entry) => grid.appendChild(renderDeckCardTile(entry, -1, false)));
+
+    $("#deck-detail-modal").classList.add("open");
+  }
+
+  function initDeckFeature() {
+    $("#deck-card-search").addEventListener("input", (e) => renderDeckSuggestions(e.target.value));
+    $("#deck-save-btn").addEventListener("click", openDeckSaveModal);
+    $("#deck-save-confirm-btn").addEventListener("click", submitDeckSave);
+
+    $("#deck-enchant-modal-close").addEventListener("click", () => $("#deck-enchant-modal").classList.remove("open"));
+    $("#deck-enchant-modal").addEventListener("click", (ev) => {
+      if (ev.target.id === "deck-enchant-modal") $("#deck-enchant-modal").classList.remove("open");
+    });
+
+    $("#deck-save-modal-close").addEventListener("click", () => $("#deck-save-modal").classList.remove("open"));
+    $("#deck-save-modal").addEventListener("click", (ev) => {
+      if (ev.target.id === "deck-save-modal") $("#deck-save-modal").classList.remove("open");
+    });
+
+    $("#deck-detail-modal-close").addEventListener("click", () => $("#deck-detail-modal").classList.remove("open"));
+    $("#deck-detail-modal").addEventListener("click", (ev) => {
+      if (ev.target.id === "deck-detail-modal") $("#deck-detail-modal").classList.remove("open");
+    });
   }
 
   // --- タブ切替 ---
@@ -802,6 +1131,7 @@
     initTabs();
     buildFilterToggles();
     bindFilterInputs();
+    initDeckFeature();
     try {
       await loadData();
     } catch (err) {
@@ -813,6 +1143,8 @@
     }
     applyAndRender();
     renderHistory();
+    renderDeckBuildingGrid();
+    renderDeckList();
   }
 
   init();

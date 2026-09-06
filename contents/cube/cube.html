@@ -21,6 +21,8 @@
             <nav class="cube-tabs">
                 <button type="button" class="cube-tab active" data-tab="list">カード一覧</button>
                 <button type="button" class="cube-tab" data-tab="history">更新履歴</button>
+                <button type="button" class="cube-tab" data-tab="deck-register">デッキ登録</button>
+                <button type="button" class="cube-tab" data-tab="deck-list">デッキ一覧</button>
             </nav>
 
             <section id="tab-list" class="cube-tab-panel active">
@@ -117,6 +119,35 @@
                 </table>
                 <p class="empty-message" id="history-empty" style="display:none;">更新履歴はまだありません。</p>
             </section>
+
+            <section id="tab-deck-register" class="cube-tab-panel">
+                <section class="filter-bar">
+                    <div class="filter-row">
+                        <span class="filter-label">カード名</span>
+                        <div class="deck-suggest-wrap">
+                            <input type="search" id="deck-card-search" class="name-input wide-input" placeholder="カード名を入力してください…">
+                            <div id="deck-suggest-list" class="deck-suggest-list" hidden></div>
+                        </div>
+                    </div>
+                </section>
+
+                <div class="deck-building-header">
+                    <span id="deck-building-count">0枚</span>
+                    <button type="button" class="clear-filters" id="deck-save-btn">保存</button>
+                </div>
+                <main>
+                    <div class="card-grid" id="deck-building-grid"></div>
+                    <p class="empty-message" id="deck-building-empty">カードを検索して追加してください。</p>
+                </main>
+            </section>
+
+            <section id="tab-deck-list" class="cube-tab-panel">
+                <table class="history-table">
+                    <thead><tr><th>デッキ名</th><th>種別</th><th>記録日時</th><th>枚数</th></tr></thead>
+                    <tbody id="deck-list-body"></tbody>
+                </table>
+                <p class="empty-message" id="deck-list-empty" style="display:none;">記録されたデッキはまだありません。</p>
+            </section>
         </div>
 
         <div class="card-modal" id="card-modal">
@@ -136,6 +167,43 @@
                         <p id="card-modal-enchant-text"></p>
                     </div>
                 </div>
+            </div>
+        </div>
+
+        <div class="card-modal" id="deck-enchant-modal">
+            <div class="modal-content-block">
+                <button type="button" class="card-modal-close" id="deck-enchant-modal-close" aria-label="閉じる">×</button>
+                <h2>エンチャントを設定</h2>
+                <select id="deck-enchant-select" class="tag-select deck-enchant-select"></select>
+            </div>
+        </div>
+
+        <div class="card-modal" id="deck-save-modal">
+            <div class="modal-content-block">
+                <button type="button" class="card-modal-close" id="deck-save-modal-close" aria-label="閉じる">×</button>
+                <h2>デッキを保存</h2>
+                <label class="deck-save-field">
+                    <span>デッキ名（空欄可）</span>
+                    <input type="text" id="deck-save-name" placeholder="空欄の場合は記録日時を使用します">
+                </label>
+                <label class="deck-save-field">
+                    <span>備考</span>
+                    <textarea id="deck-save-note" rows="4"></textarea>
+                </label>
+                <div class="modal-actions">
+                    <button type="button" class="clear-filters" id="deck-save-confirm-btn">保存する</button>
+                </div>
+                <p class="form-error" id="deck-save-error"></p>
+            </div>
+        </div>
+
+        <div class="card-modal" id="deck-detail-modal">
+            <div class="modal-content-block modal-content-wide">
+                <button type="button" class="card-modal-close" id="deck-detail-modal-close" aria-label="閉じる">×</button>
+                <h2 id="deck-detail-name"></h2>
+                <p class="deck-detail-meta" id="deck-detail-meta"></p>
+                <p class="deck-detail-note" id="deck-detail-note"></p>
+                <div class="card-grid" id="deck-detail-grid"></div>
             </div>
         </div>
 
