@@ -1022,6 +1022,7 @@
 
     $("#deck-save-name").value = "";
     $("#deck-save-note").value = "";
+    $("#deck-save-password").value = "";
     $("#deck-save-error").textContent = "";
     $("#deck-save-modal").classList.add("open");
   }
@@ -1034,6 +1035,7 @@
         name: $("#deck-save-name").value.trim(),
         note: $("#deck-save-note").value,
         cards: state.deckBuilding.cards,
+        password: $("#deck-save-password").value,
       };
       const res = await fetch(`${DECK_API_BASE}/api/cube/${encodeURIComponent(cubeId)}/decks`, {
         method: "POST",
@@ -1077,14 +1079,18 @@
     $("#deck-list-empty").style.display = entries.length ? "none" : "block";
   }
 
+  let deckDetailCurrentId = null;
+
   function openDeckDetailModal(deckId) {
     const deck = (state.decksData.decks || []).find((d) => d.id === deckId);
     if (!deck) return;
+    deckDetailCurrentId = deckId;
 
     $("#deck-detail-name").textContent = deck.name;
     $("#deck-detail-meta").textContent = `${deckSourceLabel(deck.source)} ／ ${deck.createdAt} ／ ${deck.cards.length}枚`;
     $("#deck-detail-note").textContent = deck.note || "";
     $("#deck-detail-note").style.display = deck.note ? "" : "none";
+    $("#deck-detail-error").textContent = "";
 
     const grid = $("#deck-detail-grid");
     grid.innerHTML = "";
@@ -1093,10 +1099,35 @@
     $("#deck-detail-modal").classList.add("open");
   }
 
+  async function deleteCurrentDeck() {
+    if (!deckDetailCurrentId) return;
+    const password = prompt("削除するには編集用パスワードを入力してください");
+    if (password === null || password === "") return;
+
+    const errorEl = $("#deck-detail-error");
+    errorEl.textContent = "";
+    try {
+      const res = await fetch(`${DECK_API_BASE}/api/cube/${encodeURIComponent(cubeId)}/decks/${encodeURIComponent(deckDetailCurrentId)}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
+
+      state.decksData.decks = (state.decksData.decks || []).filter((d) => d.id !== deckDetailCurrentId);
+      $("#deck-detail-modal").classList.remove("open");
+      renderDeckList();
+    } catch (err) {
+      errorEl.textContent = "削除に失敗しました: " + err.message;
+    }
+  }
+
   function initDeckFeature() {
     $("#deck-card-search").addEventListener("input", (e) => renderDeckSuggestions(e.target.value));
     $("#deck-save-btn").addEventListener("click", openDeckSaveModal);
     $("#deck-save-confirm-btn").addEventListener("click", submitDeckSave);
+    $("#deck-detail-delete-btn").addEventListener("click", deleteCurrentDeck);
 
     $("#deck-enchant-modal-close").addEventListener("click", () => $("#deck-enchant-modal").classList.remove("open"));
     $("#deck-enchant-modal").addEventListener("click", (ev) => {

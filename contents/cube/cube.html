@@ -190,6 +190,10 @@
                     <span>備考</span>
                     <textarea id="deck-save-note" rows="4"></textarea>
                 </label>
+                <label class="deck-save-field">
+                    <span>編集用パスワード</span>
+                    <input type="password" id="deck-save-password" placeholder="パスワード">
+                </label>
                 <div class="modal-actions">
                     <button type="button" class="clear-filters" id="deck-save-confirm-btn">保存する</button>
                 </div>
@@ -203,6 +207,10 @@
                 <h2 id="deck-detail-name"></h2>
                 <p class="deck-detail-meta" id="deck-detail-meta"></p>
                 <p class="deck-detail-note" id="deck-detail-note"></p>
+                <div class="deck-detail-actions">
+                    <button type="button" class="deck-delete-btn" id="deck-detail-delete-btn">このデッキを削除</button>
+                </div>
+                <p class="form-error" id="deck-detail-error"></p>
                 <div class="card-grid" id="deck-detail-grid"></div>
             </div>
         </div>

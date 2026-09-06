@@ -244,3 +244,9 @@ body { padding: 24px; }
 
 .deck-detail-meta { color: var(--muted); font-size: 0.85rem; margin: 0 0 10px; }
 .deck-detail-note { white-space: pre-wrap; font-size: 0.9rem; margin: 0 0 16px; }
+.deck-detail-actions { margin-bottom: 8px; }
+.deck-delete-btn {
+  background: transparent; border: 1px solid var(--history-remove); color: var(--history-remove);
+  border-radius: 999px; padding: 6px 14px; font-size: 0.85rem; cursor: pointer;
+}
+.deck-delete-btn:hover { background: var(--history-remove); color: #fff; }
