@@ -195,6 +195,17 @@
                 </div>
 
                 <div class="sim-screen" id="sim-final-review-screen" hidden>
+                    <h2 id="sim-final-title"></h2>
+                    <div class="sim-stats-row">
+                        <div class="sim-ratio-row">
+                            <div id="sim-review-civ-pie"></div>
+                            <div id="sim-review-color-pie"></div>
+                        </div>
+                        <div class="sim-cost-chart-wrap">
+                            <div class="sim-cost-chart-label">コスト分布</div>
+                            <div id="sim-review-cost-chart"></div>
+                        </div>
+                    </div>
                     <div class="sim-final-actions">
                         <span id="sim-final-count"></span>
                         <button type="button" class="clear-filters" id="sim-final-confirm-top-btn" disabled>これで決定する</button>
@@ -218,6 +229,16 @@
                         </div>
                         <p class="form-error" id="sim-finished-error"></p>
                     </section>
+                    <div class="sim-stats-row">
+                        <div class="sim-ratio-row">
+                            <div id="sim-finished-civ-pie"></div>
+                            <div id="sim-finished-color-pie"></div>
+                        </div>
+                        <div class="sim-cost-chart-wrap">
+                            <div class="sim-cost-chart-label">コスト分布</div>
+                            <div id="sim-finished-cost-chart"></div>
+                        </div>
+                    </div>
                     <div class="card-grid" id="sim-finished-grid"></div>
                 </div>
             </section>
