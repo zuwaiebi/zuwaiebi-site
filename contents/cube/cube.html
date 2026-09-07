@@ -23,6 +23,7 @@
                 <button type="button" class="cube-tab" data-tab="history">更新履歴</button>
                 <button type="button" class="cube-tab" data-tab="deck-register">デッキ登録</button>
                 <button type="button" class="cube-tab" data-tab="deck-list">デッキ一覧</button>
+                <button type="button" class="cube-tab" data-tab="simulator">ドラフトシミュレータ</button>
             </nav>
 
             <section id="tab-list" class="cube-tab-panel active">
@@ -148,6 +149,74 @@
                 </table>
                 <p class="empty-message" id="deck-list-empty" style="display:none;">記録されたデッキはまだありません。</p>
             </section>
+
+            <section id="tab-simulator" class="cube-tab-panel">
+                <div class="sim-screen" id="sim-setup-screen">
+                    <section class="filter-bar">
+                        <div class="filter-row">
+                            <span class="filter-label">キューブ</span>
+                            <select id="sim-cube-select" class="tag-select" disabled></select>
+                        </div>
+                        <div class="filter-row">
+                            <span class="filter-label">ピック形式</span>
+                        </div>
+                        <div class="sim-format-radio-row" id="sim-format-radio-row">
+                            <label class="sim-format-option">
+                                <input type="radio" name="sim-format" value="glimpse" id="sim-format-glimpse" checked>
+                                <span><strong>グリンプスドラフト(2人)</strong> — 15枚パック×2人、5ラウンド。1回に2枚採用+1枚除外を繰り返し、50枚から10枚を除いて40枚のデッキにします。</span>
+                            </label>
+                            <label class="sim-format-option">
+                                <input type="radio" name="sim-format" value="normal" id="sim-format-normal">
+                                <span><strong>通常ピック(6人)</strong> — 15枚パック×6人(CPU5体)、3ラウンド。1枚ずつ採用して隣へ回します。45枚から5枚を除いて40枚のデッキにします。</span>
+                            </label>
+                        </div>
+                    </section>
+                    <p class="form-error" id="sim-setup-error"></p>
+                    <button type="button" class="clear-filters" id="sim-start-btn">ドラフトを開始</button>
+                </div>
+
+                <div class="sim-screen" id="sim-pick-screen" hidden>
+                    <div class="sim-status-bar">
+                        <span id="sim-status-pack"></span>
+                        <span id="sim-status-turn"></span>
+                        <span id="sim-status-count"></span>
+                    </div>
+                    <div class="sim-pick-layout">
+                        <div class="card-grid" id="sim-pack-grid"></div>
+                        <div class="sim-deck-list-wrap">
+                            <h3>自分のデッキ</h3>
+                            <ul class="sim-deck-list-text" id="sim-deck-list-text"></ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="sim-screen" id="sim-final-review-screen" hidden>
+                    <div class="sim-final-actions">
+                        <span id="sim-final-count"></span>
+                        <button type="button" class="clear-filters" id="sim-final-confirm-top-btn" disabled>これで決定する</button>
+                    </div>
+                    <div class="card-grid" id="sim-final-grid"></div>
+                    <div class="sim-final-actions">
+                        <button type="button" class="clear-filters" id="sim-final-confirm-bottom-btn" disabled>これで決定する</button>
+                    </div>
+                </div>
+
+                <div class="sim-screen" id="sim-finished-screen" hidden>
+                    <section class="filter-bar">
+                        <label class="deck-save-field">
+                            <span>デッキ名（空欄可）</span>
+                            <input type="text" id="sim-finished-name" placeholder="空欄の場合は記録日時を使用します">
+                        </label>
+                        <div class="sim-finished-actions">
+                            <button type="button" class="clear-filters" id="sim-finished-image-btn">デッキ画像を出力</button>
+                            <button type="button" class="clear-filters" id="sim-finished-record-btn">デッキを記録する</button>
+                            <button type="button" class="deck-delete-btn" id="sim-restart-btn">もう一度ドラフトする</button>
+                        </div>
+                        <p class="form-error" id="sim-finished-error"></p>
+                    </section>
+                    <div class="card-grid" id="sim-finished-grid"></div>
+                </div>
+            </section>
         </div>
 
         <div class="card-modal" id="card-modal">
@@ -226,6 +295,48 @@
             </div>
         </div>
 
+        <div class="card-modal" id="sim-pack-card-modal">
+            <div class="card-modal-content">
+                <button type="button" class="card-modal-close" id="sim-pack-card-modal-close" aria-label="閉じる">×</button>
+                <div class="card-modal-image" id="sim-pack-card-modal-image"></div>
+                <div class="card-modal-info">
+                    <h2 id="sim-pack-card-modal-name"></h2>
+                    <dl class="card-modal-basics" id="sim-pack-card-modal-basics"></dl>
+                    <div class="card-modal-section">
+                        <h3>テキスト</h3>
+                        <p id="sim-pack-card-modal-ability"></p>
+                    </div>
+                    <div class="sim-pack-card-actions" id="sim-pack-card-actions"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card-modal" id="sim-final-confirm-modal">
+            <div class="modal-content-block">
+                <button type="button" class="card-modal-close" id="sim-final-confirm-modal-close" aria-label="閉じる">×</button>
+                <h2>これで確定しますか？</h2>
+                <div class="modal-actions">
+                    <button type="button" class="clear-filters" id="sim-final-confirm-ok-btn">確定する</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="card-modal" id="sim-record-modal">
+            <div class="modal-content-block">
+                <button type="button" class="card-modal-close" id="sim-record-modal-close" aria-label="閉じる">×</button>
+                <h2>デッキを記録</h2>
+                <label class="deck-save-field">
+                    <span>編集用パスワード</span>
+                    <input type="password" id="sim-record-password" placeholder="パスワード">
+                </label>
+                <div class="modal-actions">
+                    <button type="button" class="clear-filters" id="sim-record-confirm-btn">記録する</button>
+                </div>
+                <p class="form-error" id="sim-record-error"></p>
+            </div>
+        </div>
+
         <script src="cube.js"></script>
+        <script src="simulator.js"></script>
     </body>
 </html>

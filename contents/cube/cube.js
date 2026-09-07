@@ -1243,6 +1243,90 @@
     ctx.fillText(s, x, y);
   }
 
+  // entries・タイトル行の材料だけを受け取る汎用版。まだdecks.jsonに保存していない
+  // (createdAtが無い)デッキ(シミュレーターの完成デッキ画面など)からも呼べるようにするため、
+  // デッキ記録オブジェクトそのものではなく個々の値を引数に取る。
+  async function renderDeckToPngAndDownload(name, sourceLabel, createdAt, entries) {
+    const cols = Math.max(1, Math.min(DECK_IMAGE_COLS, entries.length));
+    const rows = Math.max(1, Math.ceil(entries.length / cols));
+    const width = DECK_IMAGE_PADDING * 2 + cols * DECK_IMAGE_CELL_W + (cols - 1) * DECK_IMAGE_GAP;
+    const height = DECK_IMAGE_PADDING * 2 + DECK_IMAGE_HEADER_H + rows * DECK_IMAGE_CELL_H + (rows - 1) * DECK_IMAGE_GAP;
+
+    const images = await Promise.all(entries.map(async (entry) => {
+      const baseSrc = deckCardImageSrc(entry);
+      const overlaySrc = deckEnchantImageSrc(entry);
+      const [baseImg, overlayImg] = await Promise.all([
+        baseSrc ? loadImageForExport(baseSrc) : Promise.resolve(null),
+        overlaySrc ? loadImageForExport(overlaySrc) : Promise.resolve(null),
+      ]);
+      return { entry, baseImg, overlayImg };
+    }));
+
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d");
+
+    ctx.fillStyle = "#0e1116";
+    ctx.fillRect(0, 0, width, height);
+
+    ctx.textBaseline = "top";
+    ctx.fillStyle = "#f6f6f6";
+    ctx.font = "bold 24px sans-serif";
+    ctx.fillText(name, DECK_IMAGE_PADDING, DECK_IMAGE_PADDING);
+
+    ctx.fillStyle = "#c8c8c8";
+    ctx.font = "14px sans-serif";
+    ctx.fillText(
+      `${sourceLabel} ／ ${createdAt} ／ ${entries.length}枚`,
+      DECK_IMAGE_PADDING, DECK_IMAGE_PADDING + 32
+    );
+
+    images.forEach(({ entry, baseImg, overlayImg }, i) => {
+      const col = i % cols;
+      const row = Math.floor(i / cols);
+      const x = DECK_IMAGE_PADDING + col * (DECK_IMAGE_CELL_W + DECK_IMAGE_GAP);
+      const y = DECK_IMAGE_PADDING + DECK_IMAGE_HEADER_H + row * (DECK_IMAGE_CELL_H + DECK_IMAGE_GAP);
+
+      ctx.save();
+      ctx.beginPath();
+      roundedRectPath(ctx, x, y, DECK_IMAGE_CELL_W, DECK_IMAGE_CELL_H, 8);
+      ctx.clip();
+
+      if (baseImg) {
+        drawCoverImage(ctx, baseImg, x, y, DECK_IMAGE_CELL_W, DECK_IMAGE_CELL_H);
+      } else {
+        ctx.fillStyle = "#1b1f27";
+        ctx.fillRect(x, y, DECK_IMAGE_CELL_W, DECK_IMAGE_CELL_H);
+      }
+      if (overlayImg) drawContainImage(ctx, overlayImg, x, y, DECK_IMAGE_CELL_W, DECK_IMAGE_CELL_H);
+
+      const capH = 26;
+      ctx.fillStyle = "rgba(0,0,0,0.72)";
+      ctx.fillRect(x, y + DECK_IMAGE_CELL_H - capH, DECK_IMAGE_CELL_W, capH);
+      ctx.fillStyle = "#fff";
+      ctx.font = "11px sans-serif";
+      ctx.textBaseline = "middle";
+      drawTruncatedText(ctx, entry.name, x + 6, y + DECK_IMAGE_CELL_H - capH / 2, DECK_IMAGE_CELL_W - 12);
+      ctx.textBaseline = "top";
+
+      ctx.restore();
+
+      ctx.beginPath();
+      roundedRectPath(ctx, x + 0.5, y + 0.5, DECK_IMAGE_CELL_W - 1, DECK_IMAGE_CELL_H - 1, 8);
+      ctx.strokeStyle = "#2a2f3a";
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    });
+
+    const a = document.createElement("a");
+    a.href = canvas.toDataURL("image/png");
+    a.download = `${(name || "deck").replace(/[\\/:*?"<>|]/g, "_")}.png`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  }
+
   async function exportDeckImage() {
     const deck = currentDeckDetail();
     if (!deck) return;
@@ -1252,84 +1336,7 @@
     btn.textContent = "生成中…";
     try {
       const entries = sortDeckEntries(deck.cards, deckDetailSort);
-      const cols = Math.max(1, Math.min(DECK_IMAGE_COLS, entries.length));
-      const rows = Math.max(1, Math.ceil(entries.length / cols));
-      const width = DECK_IMAGE_PADDING * 2 + cols * DECK_IMAGE_CELL_W + (cols - 1) * DECK_IMAGE_GAP;
-      const height = DECK_IMAGE_PADDING * 2 + DECK_IMAGE_HEADER_H + rows * DECK_IMAGE_CELL_H + (rows - 1) * DECK_IMAGE_GAP;
-
-      const images = await Promise.all(entries.map(async (entry) => {
-        const baseSrc = deckCardImageSrc(entry);
-        const overlaySrc = deckEnchantImageSrc(entry);
-        const [baseImg, overlayImg] = await Promise.all([
-          baseSrc ? loadImageForExport(baseSrc) : Promise.resolve(null),
-          overlaySrc ? loadImageForExport(overlaySrc) : Promise.resolve(null),
-        ]);
-        return { entry, baseImg, overlayImg };
-      }));
-
-      const canvas = document.createElement("canvas");
-      canvas.width = width;
-      canvas.height = height;
-      const ctx = canvas.getContext("2d");
-
-      ctx.fillStyle = "#0e1116";
-      ctx.fillRect(0, 0, width, height);
-
-      ctx.textBaseline = "top";
-      ctx.fillStyle = "#f6f6f6";
-      ctx.font = "bold 24px sans-serif";
-      ctx.fillText(deck.name, DECK_IMAGE_PADDING, DECK_IMAGE_PADDING);
-
-      ctx.fillStyle = "#c8c8c8";
-      ctx.font = "14px sans-serif";
-      ctx.fillText(
-        `${deckSourceLabel(deck.source)} ／ ${deck.createdAt} ／ ${entries.length}枚`,
-        DECK_IMAGE_PADDING, DECK_IMAGE_PADDING + 32
-      );
-
-      images.forEach(({ entry, baseImg, overlayImg }, i) => {
-        const col = i % cols;
-        const row = Math.floor(i / cols);
-        const x = DECK_IMAGE_PADDING + col * (DECK_IMAGE_CELL_W + DECK_IMAGE_GAP);
-        const y = DECK_IMAGE_PADDING + DECK_IMAGE_HEADER_H + row * (DECK_IMAGE_CELL_H + DECK_IMAGE_GAP);
-
-        ctx.save();
-        ctx.beginPath();
-        roundedRectPath(ctx, x, y, DECK_IMAGE_CELL_W, DECK_IMAGE_CELL_H, 8);
-        ctx.clip();
-
-        if (baseImg) {
-          drawCoverImage(ctx, baseImg, x, y, DECK_IMAGE_CELL_W, DECK_IMAGE_CELL_H);
-        } else {
-          ctx.fillStyle = "#1b1f27";
-          ctx.fillRect(x, y, DECK_IMAGE_CELL_W, DECK_IMAGE_CELL_H);
-        }
-        if (overlayImg) drawContainImage(ctx, overlayImg, x, y, DECK_IMAGE_CELL_W, DECK_IMAGE_CELL_H);
-
-        const capH = 26;
-        ctx.fillStyle = "rgba(0,0,0,0.72)";
-        ctx.fillRect(x, y + DECK_IMAGE_CELL_H - capH, DECK_IMAGE_CELL_W, capH);
-        ctx.fillStyle = "#fff";
-        ctx.font = "11px sans-serif";
-        ctx.textBaseline = "middle";
-        drawTruncatedText(ctx, entry.name, x + 6, y + DECK_IMAGE_CELL_H - capH / 2, DECK_IMAGE_CELL_W - 12);
-        ctx.textBaseline = "top";
-
-        ctx.restore();
-
-        ctx.beginPath();
-        roundedRectPath(ctx, x + 0.5, y + 0.5, DECK_IMAGE_CELL_W - 1, DECK_IMAGE_CELL_H - 1, 8);
-        ctx.strokeStyle = "#2a2f3a";
-        ctx.lineWidth = 1;
-        ctx.stroke();
-      });
-
-      const a = document.createElement("a");
-      a.href = canvas.toDataURL("image/png");
-      a.download = `${(deck.name || "deck").replace(/[\\/:*?"<>|]/g, "_")}.png`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
+      await renderDeckToPngAndDownload(deck.name, deckSourceLabel(deck.source), deck.createdAt, entries);
     } catch (err) {
       alert("デッキ画像の生成に失敗しました: " + err.message);
     } finally {
@@ -1378,6 +1385,12 @@
   }
 
   // --- 初期化 ---
+  let resolveDataReady;
+  // simulator.js(ドラフトシミュレーター、cube_spec.md 10節)がstate.cubeData等を
+  // 触ってよくなるタイミングを知るためのフラグ。loadData()成功直後に解決する。
+  window.CubeShared = window.CubeShared || {};
+  window.CubeShared.dataReady = new Promise((resolve) => { resolveDataReady = resolve; });
+
   async function init() {
     initTabs();
     buildFilterToggles();
@@ -1392,11 +1405,27 @@
       console.error(err);
       return;
     }
+    resolveDataReady();
     applyAndRender();
     renderHistory();
     renderDeckBuildingGrid();
     renderDeckList();
   }
+
+  // simulator.jsはcube.jsの後に読み込まれる別ファイルで、このIIFE内の関数・stateには
+  // 直接アクセスできない。ドラフトシミュレーター実装に必要な分だけ、参照(コピーではない)を
+  // ここでまとめて公開する。stateは同じオブジェクトを共有するので、シミュレーター側で
+  // cube_data.json等を二重にfetchする必要はない。
+  Object.assign(window.CubeShared, {
+    cubeId, state, $, $$,
+    cardFaces, faceOf, displayName, isMulticolorFace, civRank, cardImagePath, enchantById,
+    allCardSuggestCandidates, allEnchantCandidates, deckCardEntryFromCard,
+    deckCardImageSrc, deckEnchantImageSrc, renderDeckCardTile,
+    resolveDeckCardFace, deckCivRank, deckCostOf, sortDeckEntries,
+    loadImageForExport, roundedRectPath, drawCoverImage, drawContainImage, drawTruncatedText,
+    DECK_IMAGE_COLS, DECK_IMAGE_CELL_W, DECK_IMAGE_CELL_H, DECK_IMAGE_GAP, DECK_IMAGE_PADDING, DECK_IMAGE_HEADER_H,
+    DECK_API_BASE, deckSourceLabel, renderDeckList, renderDeckToPngAndDownload,
+  });
 
   init();
 })();

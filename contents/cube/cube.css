@@ -252,3 +252,47 @@ body { padding: 24px; }
   border-radius: 999px; padding: 6px 14px; font-size: 0.85rem; cursor: pointer;
 }
 .deck-delete-btn:hover { background: var(--history-remove); color: #fff; }
+
+.clear-filters:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* ドラフトシミュレーター(cube_spec.md 10節) */
+.sim-screen { display: block; }
+.sim-screen[hidden] { display: none; }
+
+.sim-format-radio-row { display: flex; flex-direction: column; gap: 10px; }
+.sim-format-option {
+  display: flex; align-items: flex-start; gap: 10px; font-size: 0.88rem; cursor: pointer;
+  background: rgba(255,255,255,0.04); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px;
+}
+.sim-format-option input { margin-top: 3px; }
+
+.sim-status-bar {
+  display: flex; gap: 20px; flex-wrap: wrap; font-size: 0.88rem; color: var(--muted);
+  background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 10px 16px; margin-bottom: 14px;
+}
+.sim-status-bar span { color: var(--text); font-weight: 700; }
+
+.sim-pick-layout { display: flex; gap: 20px; align-items: flex-start; }
+.sim-pick-layout .card-grid { flex: 1; min-width: 0; }
+.sim-deck-list-wrap { flex: 0 0 240px; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; max-height: 70vh; overflow-y: auto; }
+.sim-deck-list-wrap h3 { margin: 0 0 8px; font-size: 0.9rem; color: var(--muted); }
+.sim-deck-list-text { list-style: none; margin: 0; padding: 0; font-size: 0.85rem; }
+.sim-deck-list-text li { padding: 2px 0; border-bottom: 1px solid var(--border); }
+@media (max-width: 720px) {
+  .sim-pick-layout { flex-direction: column; }
+  .sim-deck-list-wrap { flex: none; width: 100%; max-height: none; }
+}
+
+.sim-pack-card-actions { margin-top: 16px; display: flex; gap: 10px; flex-wrap: wrap; }
+
+.sim-final-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 12px 0; }
+.sim-cut-selected { opacity: 0.4; }
+.sim-cut-badge {
+  position: absolute; top: 4px; left: 4px; z-index: 2;
+  width: 22px; height: 22px; border-radius: 50%; background: var(--history-remove); color: #fff;
+  display: flex; align-items: center; justify-content: center; font-size: 0.85rem; line-height: 1;
+}
+.sim-enchant-transfer-control { position: absolute; left: 0; right: 0; bottom: 26px; padding: 2px 4px; }
+.sim-enchant-transfer-control select { width: 100%; font-size: 0.72rem; padding: 2px 4px; }
+
+.sim-finished-actions { display: flex; gap: 10px; flex-wrap: wrap; margin: 10px 0; }
