@@ -586,7 +586,9 @@
     costWrap.appendChild(buildCostBarChartEl(computeCostCounts(ids)));
   }
 
-  function renderSimPackCardModalBody(card) {
+  // enchantOverride省略時はcard.enchantIdをそのまま表示する(ピック中のパック/デッキ一覧用)。
+  // 最終調整・完成デッキ画面はここに移し替え後の実効エンチャント(effectiveEnchantInfo)を渡す。
+  function renderSimPackCardModalBody(card, enchantOverride) {
     const nameStr = CubeShared.displayName(card);
     const imageWrap = $("#sim-pack-card-modal-image");
     imageWrap.innerHTML = "";
@@ -610,7 +612,7 @@
       ph.textContent = nameStr;
       mainImageSlot.appendChild(ph);
     }
-    const enchantInfo = resolveEnchantById(card.enchantId);
+    const enchantInfo = (enchantOverride !== undefined) ? enchantOverride : resolveEnchantById(card.enchantId);
     if (enchantInfo && enchantInfo.enchant.overlayImage) {
       const overlay = document.createElement("img");
       overlay.className = "overlay-image";
@@ -641,7 +643,8 @@
   // アクションボタンは出さない。
   function openSimDeckCardModal(cardId) {
     const card = cardById(cardId);
-    renderSimPackCardModalBody(card);
+    const enchantOverride = session.finalReview ? effectiveEnchantInfo(cardId) : undefined;
+    renderSimPackCardModalBody(card, enchantOverride);
     $("#sim-pack-card-actions").innerHTML = "";
     $("#sim-pack-card-modal").classList.add("open");
   }
@@ -754,6 +757,13 @@
     return keptCardIds().filter((id) => id !== currentHolder && originHeldBy(id) === null);
   }
 
+  // cardIdが実際に(移し替え後の状態を反映して)表示すべきエンチャント情報。
+  // resolveEnchantByIdと同じ{enchant, fromTrash}形式、無ければnull。
+  function effectiveEnchantInfo(cardId) {
+    const holdingOriginId = originHeldBy(cardId);
+    return holdingOriginId ? resolveEnchantById(cardById(holdingOriginId).enchantId) : null;
+  }
+
   // 移し替え元(エンチャントの提供元カードID)として選択中のもの(nullなら選択中の移し替えは
   // 無い)。セッションには保存しない(一時的なUI状態。リロードすれば選択は解除される)。
   let transferOriginId = null;
@@ -829,12 +839,11 @@
       const card = cardById(cardId);
       const isCut = session.finalReview.cutIds.includes(cardId);
       const holdingOriginId = originHeldBy(cardId);
-      const effectiveEnchant = holdingOriginId ? resolveEnchantById(cardById(holdingOriginId).enchantId) : null;
 
       const tile = buildSimCardTile(card, cardId, {
         pendingBadge: isCut ? "×" : null,
         stateClass: isCut ? "sim-cut-selected" : null,
-        enchantOverride: effectiveEnchant,
+        enchantOverride: effectiveEnchantInfo(cardId),
         onClick: () => onFinalTileClick(cardId),
       });
 
@@ -911,10 +920,8 @@
     grid.innerHTML = "";
     keptCardIds().forEach((cardId) => {
       const card = cardById(cardId);
-      const holdingOriginId = originHeldBy(cardId);
-      const effectiveEnchant = holdingOriginId ? resolveEnchantById(cardById(holdingOriginId).enchantId) : null;
       const tile = buildSimCardTile(card, cardId, {
-        enchantOverride: effectiveEnchant,
+        enchantOverride: effectiveEnchantInfo(cardId),
         onClick: () => openSimDeckCardModal(cardId),
       });
       grid.appendChild(tile);
