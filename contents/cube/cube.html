@@ -208,6 +208,17 @@
                 <p class="deck-detail-meta" id="deck-detail-meta"></p>
                 <p class="deck-detail-note" id="deck-detail-note"></p>
                 <div class="deck-detail-actions">
+                    <span class="deck-detail-sort-group">
+                        <span class="deck-detail-sort-label">並べ替え</span>
+                        <select id="deck-detail-sort-select" class="tag-select">
+                            <option value="default">記録順</option>
+                            <option value="cost-asc">コストが低い順</option>
+                            <option value="cost-desc">コストが高い順</option>
+                            <option value="civilization">文明順</option>
+                            <option value="name">名前順(50音)</option>
+                        </select>
+                    </span>
+                    <button type="button" class="clear-filters" id="deck-detail-image-btn">デッキ画像を保存</button>
                     <button type="button" class="deck-delete-btn" id="deck-detail-delete-btn">このデッキを削除</button>
                 </div>
                 <p class="form-error" id="deck-detail-error"></p>

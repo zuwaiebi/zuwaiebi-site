@@ -1060,6 +1060,49 @@
     return source === "simulator" ? "シミュレータ" : "実戦";
   }
 
+  // --- デッキ詳細の並べ替え ---
+  // デッキのカードは名前・画像ファイル名のスナップショットのみを持ち、コスト・文明は
+  // 保持していない(cube_spec.md 9.1節)。並べ替えのため、現行キューブ+ゴミ箱のカードを
+  // 名前で照合して上面のコスト・文明を取得する。ダミーカードや、両方から消えたカードは
+  // 情報が取れないため常に末尾に回す。
+  function resolveDeckCardFace(entry) {
+    if (entry.isDummy) return null;
+    const found = allCardSuggestCandidates().find(({ card }) => displayName(card) === entry.name);
+    return found ? faceOf(found.card, 0) : null;
+  }
+
+  function deckCivRank(face) {
+    if (!face) return CIV_ORDER.length + 2;
+    if ((face.civilizations || []).length >= 2) return CIV_ORDER.length;
+    const idx = CIV_ORDER.indexOf((face.civilizations || [])[0]);
+    return idx === -1 ? CIV_ORDER.length + 1 : idx;
+  }
+
+  function deckCostOf(face) {
+    return face && face.cost != null ? face.cost : null;
+  }
+
+  function sortDeckEntries(cards, sortKey) {
+    const withFace = cards.map((entry) => ({ entry, face: resolveDeckCardFace(entry) }));
+    switch (sortKey) {
+      case "cost-asc":
+        withFace.sort((a, b) => (deckCostOf(a.face) ?? Infinity) - (deckCostOf(b.face) ?? Infinity));
+        break;
+      case "cost-desc":
+        withFace.sort((a, b) => (deckCostOf(b.face) ?? -Infinity) - (deckCostOf(a.face) ?? -Infinity));
+        break;
+      case "civilization":
+        withFace.sort((a, b) => deckCivRank(a.face) - deckCivRank(b.face));
+        break;
+      case "name":
+        withFace.sort((a, b) => (a.entry.name < b.entry.name ? -1 : a.entry.name > b.entry.name ? 1 : 0));
+        break;
+      default:
+        break; // 記録順のまま
+    }
+    return withFace.map((x) => x.entry);
+  }
+
   function renderDeckList() {
     const entries = (state.decksData.decks || []).slice()
       .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
@@ -1080,11 +1123,26 @@
   }
 
   let deckDetailCurrentId = null;
+  let deckDetailSort = "default";
+
+  function currentDeckDetail() {
+    return (state.decksData.decks || []).find((d) => d.id === deckDetailCurrentId) || null;
+  }
+
+  function renderDeckDetailGrid() {
+    const deck = currentDeckDetail();
+    if (!deck) return;
+    const grid = $("#deck-detail-grid");
+    grid.innerHTML = "";
+    sortDeckEntries(deck.cards, deckDetailSort).forEach((entry) => grid.appendChild(renderDeckCardTile(entry, -1, false)));
+  }
 
   function openDeckDetailModal(deckId) {
     const deck = (state.decksData.decks || []).find((d) => d.id === deckId);
     if (!deck) return;
     deckDetailCurrentId = deckId;
+    deckDetailSort = "default";
+    $("#deck-detail-sort-select").value = "default";
 
     $("#deck-detail-name").textContent = deck.name;
     $("#deck-detail-meta").textContent = `${deckSourceLabel(deck.source)} ／ ${deck.createdAt} ／ ${deck.cards.length}枚`;
@@ -1092,9 +1150,7 @@
     $("#deck-detail-note").style.display = deck.note ? "" : "none";
     $("#deck-detail-error").textContent = "";
 
-    const grid = $("#deck-detail-grid");
-    grid.innerHTML = "";
-    deck.cards.forEach((entry) => grid.appendChild(renderDeckCardTile(entry, -1, false)));
+    renderDeckDetailGrid();
 
     $("#deck-detail-modal").classList.add("open");
   }
@@ -1123,11 +1179,175 @@
     }
   }
 
+  // --- デッキ画像の出力 ---
+  // カード画像をグリッド状に並べた1枚のPNGを生成しダウンロードさせる。画像は同一オリジン
+  // (data/<cubeId>/images/・trash_images/)から読み込むためcanvasは汚染されず、
+  // 本番(nginx同一オリジン)・python -m http.serverでのローカル確認のいずれでも動作する。
+  const DECK_IMAGE_COLS = 8;
+  const DECK_IMAGE_CELL_W = 150;
+  const DECK_IMAGE_CELL_H = 210;
+  const DECK_IMAGE_GAP = 10;
+  const DECK_IMAGE_PADDING = 20;
+  const DECK_IMAGE_HEADER_H = 76;
+
+  function loadImageForExport(src) {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = () => resolve(null);
+      img.src = src;
+    });
+  }
+
+  function roundedRectPath(ctx, x, y, w, h, r) {
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
+  function drawCoverImage(ctx, img, x, y, w, h) {
+    const ir = img.width / img.height;
+    const cr = w / h;
+    let sx, sy, sw, sh;
+    if (ir > cr) {
+      sh = img.height;
+      sw = sh * cr;
+      sx = (img.width - sw) / 2;
+      sy = 0;
+    } else {
+      sw = img.width;
+      sh = sw / cr;
+      sx = 0;
+      sy = (img.height - sh) / 2;
+    }
+    ctx.drawImage(img, sx, sy, sw, sh, x, y, w, h);
+  }
+
+  function drawContainImage(ctx, img, x, y, w, h) {
+    const ir = img.width / img.height;
+    const cr = w / h;
+    let dw, dh;
+    if (ir > cr) { dw = w; dh = w / ir; } else { dh = h; dw = h * ir; }
+    ctx.drawImage(img, x + (w - dw) / 2, y + (h - dh) / 2, dw, dh);
+  }
+
+  function drawTruncatedText(ctx, text, x, y, maxWidth) {
+    let s = text;
+    if (ctx.measureText(s).width > maxWidth) {
+      while (s.length > 1 && ctx.measureText(s + "…").width > maxWidth) s = s.slice(0, -1);
+      s += "…";
+    }
+    ctx.fillText(s, x, y);
+  }
+
+  async function exportDeckImage() {
+    const deck = currentDeckDetail();
+    if (!deck) return;
+    const btn = $("#deck-detail-image-btn");
+    const originalLabel = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = "生成中…";
+    try {
+      const entries = sortDeckEntries(deck.cards, deckDetailSort);
+      const cols = Math.max(1, Math.min(DECK_IMAGE_COLS, entries.length));
+      const rows = Math.max(1, Math.ceil(entries.length / cols));
+      const width = DECK_IMAGE_PADDING * 2 + cols * DECK_IMAGE_CELL_W + (cols - 1) * DECK_IMAGE_GAP;
+      const height = DECK_IMAGE_PADDING * 2 + DECK_IMAGE_HEADER_H + rows * DECK_IMAGE_CELL_H + (rows - 1) * DECK_IMAGE_GAP;
+
+      const images = await Promise.all(entries.map(async (entry) => {
+        const baseSrc = deckCardImageSrc(entry);
+        const overlaySrc = deckEnchantImageSrc(entry);
+        const [baseImg, overlayImg] = await Promise.all([
+          baseSrc ? loadImageForExport(baseSrc) : Promise.resolve(null),
+          overlaySrc ? loadImageForExport(overlaySrc) : Promise.resolve(null),
+        ]);
+        return { entry, baseImg, overlayImg };
+      }));
+
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+
+      ctx.fillStyle = "#0e1116";
+      ctx.fillRect(0, 0, width, height);
+
+      ctx.textBaseline = "top";
+      ctx.fillStyle = "#f6f6f6";
+      ctx.font = "bold 24px sans-serif";
+      ctx.fillText(deck.name, DECK_IMAGE_PADDING, DECK_IMAGE_PADDING);
+
+      ctx.fillStyle = "#c8c8c8";
+      ctx.font = "14px sans-serif";
+      ctx.fillText(
+        `${deckSourceLabel(deck.source)} ／ ${deck.createdAt} ／ ${entries.length}枚`,
+        DECK_IMAGE_PADDING, DECK_IMAGE_PADDING + 32
+      );
+
+      images.forEach(({ entry, baseImg, overlayImg }, i) => {
+        const col = i % cols;
+        const row = Math.floor(i / cols);
+        const x = DECK_IMAGE_PADDING + col * (DECK_IMAGE_CELL_W + DECK_IMAGE_GAP);
+        const y = DECK_IMAGE_PADDING + DECK_IMAGE_HEADER_H + row * (DECK_IMAGE_CELL_H + DECK_IMAGE_GAP);
+
+        ctx.save();
+        ctx.beginPath();
+        roundedRectPath(ctx, x, y, DECK_IMAGE_CELL_W, DECK_IMAGE_CELL_H, 8);
+        ctx.clip();
+
+        if (baseImg) {
+          drawCoverImage(ctx, baseImg, x, y, DECK_IMAGE_CELL_W, DECK_IMAGE_CELL_H);
+        } else {
+          ctx.fillStyle = "#1b1f27";
+          ctx.fillRect(x, y, DECK_IMAGE_CELL_W, DECK_IMAGE_CELL_H);
+        }
+        if (overlayImg) drawContainImage(ctx, overlayImg, x, y, DECK_IMAGE_CELL_W, DECK_IMAGE_CELL_H);
+
+        const capH = 26;
+        ctx.fillStyle = "rgba(0,0,0,0.72)";
+        ctx.fillRect(x, y + DECK_IMAGE_CELL_H - capH, DECK_IMAGE_CELL_W, capH);
+        ctx.fillStyle = "#fff";
+        ctx.font = "11px sans-serif";
+        ctx.textBaseline = "middle";
+        drawTruncatedText(ctx, entry.name, x + 6, y + DECK_IMAGE_CELL_H - capH / 2, DECK_IMAGE_CELL_W - 12);
+        ctx.textBaseline = "top";
+
+        ctx.restore();
+
+        ctx.beginPath();
+        roundedRectPath(ctx, x + 0.5, y + 0.5, DECK_IMAGE_CELL_W - 1, DECK_IMAGE_CELL_H - 1, 8);
+        ctx.strokeStyle = "#2a2f3a";
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      });
+
+      const a = document.createElement("a");
+      a.href = canvas.toDataURL("image/png");
+      a.download = `${(deck.name || "deck").replace(/[\\/:*?"<>|]/g, "_")}.png`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    } catch (err) {
+      alert("デッキ画像の生成に失敗しました: " + err.message);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = originalLabel;
+    }
+  }
+
   function initDeckFeature() {
     $("#deck-card-search").addEventListener("input", (e) => renderDeckSuggestions(e.target.value));
     $("#deck-save-btn").addEventListener("click", openDeckSaveModal);
     $("#deck-save-confirm-btn").addEventListener("click", submitDeckSave);
     $("#deck-detail-delete-btn").addEventListener("click", deleteCurrentDeck);
+    $("#deck-detail-image-btn").addEventListener("click", exportDeckImage);
+    $("#deck-detail-sort-select").addEventListener("change", (e) => {
+      deckDetailSort = e.target.value;
+      renderDeckDetailGrid();
+    });
 
     $("#deck-enchant-modal-close").addEventListener("click", () => $("#deck-enchant-modal").classList.remove("open"));
     $("#deck-enchant-modal").addEventListener("click", (ev) => {
