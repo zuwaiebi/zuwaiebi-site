@@ -754,20 +754,14 @@
     return keptCardIds().filter((id) => id !== currentHolder && originHeldBy(id) === null);
   }
 
-  // 移し替え先が取り除かれた(cutに追加された)場合、その移し替えは無効にして
-  // 提供元が自分自身を保持している状態に戻す。
-  function pruneInvalidEnchantTransfers() {
-    const transfers = session.finalReview.enchantTransfers;
-    const kept = keptCardIds();
-    Object.keys(transfers).forEach((originId) => {
-      if (!kept.includes(transfers[originId])) delete transfers[originId];
-    });
-  }
-
   // 移し替え元(エンチャントの提供元カードID)として選択中のもの(nullなら選択中の移し替えは
   // 無い)。セッションには保存しない(一時的なUI状態。リロードすれば選択は解除される)。
   let transferOriginId = null;
 
+  // 取り除く/取り除かないの切り替えは、エンチャントの保持関係(enchantTransfers)には
+  // 一切影響しない。保持しているカードが取り除かれても移し替えは無効化されず、
+  // (取り除かれていても)そのカードがエンチャントを保持し続けたまま表示・再移し替えが
+  // でき、確定時に取り除かれたままなら単にそのエンチャントはデッキに含まれない。
   function toggleCutCard(cardId) {
     const format = DRAFT_FORMATS[session.format];
     const cc = cutCount(format);
@@ -778,7 +772,6 @@
       if (session.finalReview.cutIds.length >= cc) return;
       session.finalReview.cutIds.push(cardId);
     }
-    pruneInvalidEnchantTransfers();
     saveSessionToStorage();
     renderFinalReviewScreen();
   }
@@ -791,7 +784,6 @@
       if (!eligibleTransferTargets(transferOriginId).includes(cardId)) return;
       session.finalReview.enchantTransfers[transferOriginId] = cardId;
       transferOriginId = null;
-      pruneInvalidEnchantTransfers();
       saveSessionToStorage();
       renderFinalReviewScreen();
       return;
@@ -917,8 +909,15 @@
 
     const grid = $("#sim-finished-grid");
     grid.innerHTML = "";
-    session.finishedDeck.entries.forEach((entry) => {
-      grid.appendChild(CubeShared.renderDeckCardTile(entry, -1, false));
+    keptCardIds().forEach((cardId) => {
+      const card = cardById(cardId);
+      const holdingOriginId = originHeldBy(cardId);
+      const effectiveEnchant = holdingOriginId ? resolveEnchantById(cardById(holdingOriginId).enchantId) : null;
+      const tile = buildSimCardTile(card, cardId, {
+        enchantOverride: effectiveEnchant,
+        onClick: () => openSimDeckCardModal(cardId),
+      });
+      grid.appendChild(tile);
     });
 
     showSimScreen("finished");
@@ -986,11 +985,18 @@
     showSimScreen("setup");
   }
 
+  // ピック中断: 確認の上、現在の進行状況を破棄してキューブ・ピック形式の選択画面へ戻る。
+  function onAbortDraftClick() {
+    if (!confirm("ドラフトを中断してキューブ・ピック形式の選択画面へ戻ります。現在の進行状況は破棄されます。よろしいですか？")) return;
+    restartDraft();
+  }
+
   // --- 初期化 ---
   function wireStaticHandlers() {
     $("#sim-format-glimpse").addEventListener("change", updateStartButtonState);
     $("#sim-format-normal").addEventListener("change", updateStartButtonState);
     $("#sim-start-btn").addEventListener("click", startDraft);
+    $("#sim-abort-btn").addEventListener("click", onAbortDraftClick);
 
     $("#sim-pack-card-modal-close").addEventListener("click", closeSimPackCardModal);
     $("#sim-pack-card-modal").addEventListener("click", (ev) => {

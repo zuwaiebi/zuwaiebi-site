@@ -271,6 +271,7 @@ body { padding: 24px; }
   background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 10px 16px; margin-bottom: 14px;
 }
 .sim-status-bar span { color: var(--text); font-weight: 700; }
+.sim-abort-btn { margin-left: auto; }
 
 .sim-pick-layout { display: flex; gap: 20px; align-items: flex-start; }
 .sim-pick-layout .card-grid { flex: 1; min-width: 0; }
@@ -311,10 +312,9 @@ body { padding: 24px; }
 .sim-enchant-transfer-control { position: absolute; left: 3px; right: 3px; bottom: 28px; }
 .sim-transfer-btn {
   width: 100%; font-size: 0.68rem; line-height: 1.2; padding: 3px 4px; border-radius: 6px; cursor: pointer;
-  border: 1px solid var(--border); background: rgba(0,0,0,0.72); color: var(--text); white-space: normal;
+  border: 1px solid var(--history-remove); background: rgba(0,0,0,0.72); color: var(--history-remove); white-space: normal;
 }
 .sim-transfer-btn.active { background: var(--accent); color: #06202c; border-color: var(--accent); font-weight: 700; }
-.sim-transfer-btn.assigned { color: var(--color-multi); border-color: var(--color-multi); }
 
 /* 最終調整: エンチャント移し替え先を選んでいる間のカード強調 */
 .sim-transfer-source { outline: 3px solid var(--color-multi); outline-offset: -3px; }
