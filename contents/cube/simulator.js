@@ -336,8 +336,8 @@
       badge.className = "sim-cut-badge";
       badge.textContent = o.pendingBadge;
       tile.appendChild(badge);
-      tile.classList.add("sim-cut-selected");
     }
+    if (o.stateClass) tile.classList.add(o.stateClass);
 
     tile.addEventListener("click", () => { if (o.onClick) o.onClick(); });
     tile.addEventListener("keydown", (ev) => {
@@ -377,6 +377,7 @@
   }
 
   function startDraft() {
+    transferSourceCardId = null;
     const formatKey = selectedFormatKey();
     const format = DRAFT_FORMATS[formatKey];
     const need = format.cardsPerPack * format.seatCount * format.rounds;
@@ -406,16 +407,95 @@
         const isExcluded = session.pendingSelections.exclude === cardId;
         const tile = buildSimCardTile(card, cardId, {
           pendingBadge: isAdded ? "採用" : (isExcluded ? "除外" : null),
+          stateClass: isAdded ? "sim-pending-add" : (isExcluded ? "sim-pending-exclude" : null),
           onClick: () => openSimPackCardModal(cardId),
         });
         grid.appendChild(tile);
       });
     }
 
+    renderSimDeckRatios();
+
     const list = $("#sim-deck-list-text");
-    list.innerHTML = session.seats[0].deck.map((id) => "<li>" + escapeHtml(nameOfId(id)) + "</li>").join("");
+    list.innerHTML = "";
+    session.seats[0].deck.forEach((id) => {
+      const li = document.createElement("li");
+      li.textContent = nameOfId(id);
+      li.addEventListener("click", () => openSimDeckCardModal(id));
+      list.appendChild(li);
+    });
 
     showSimScreen("picking");
+  }
+
+  // --- デッキの文明比率・単色/多色比率(円グラフ) ---
+  // ツインパクトは上面・下面の文明の和集合で判定する(cube.jsのisCardMulticolorと同じ基準。
+  // 上下がそれぞれ単色でも異なる文明の組み合わせなら多色とみなす)。
+  function buildPieChartEl(segments) {
+    const total = segments.reduce((sum, s) => sum + s.count, 0);
+    const wrap = document.createElement("div");
+    wrap.className = "sim-pie-block";
+
+    const pie = document.createElement("div");
+    pie.className = "sim-pie-chart";
+    if (total === 0) {
+      pie.style.background = "var(--panel)";
+    } else {
+      let acc = 0;
+      const stops = [];
+      segments.forEach((s) => {
+        if (s.count === 0) return;
+        const start = (acc / total) * 360;
+        acc += s.count;
+        const end = (acc / total) * 360;
+        stops.push(s.color + " " + start + "deg " + end + "deg");
+      });
+      pie.style.background = "conic-gradient(" + stops.join(", ") + ")";
+    }
+    wrap.appendChild(pie);
+
+    const legend = document.createElement("div");
+    legend.className = "sim-pie-legend";
+    segments.forEach((s) => {
+      const item = document.createElement("div");
+      item.className = "sim-pie-legend-item";
+      const dot = document.createElement("span");
+      dot.className = "sim-pie-legend-dot";
+      dot.style.background = s.color;
+      item.appendChild(dot);
+      const text = document.createElement("span");
+      text.textContent = s.label + " " + s.count;
+      item.appendChild(text);
+      legend.appendChild(item);
+    });
+    wrap.appendChild(legend);
+    return wrap;
+  }
+
+  function renderSimDeckRatios() {
+    const civCounts = {};
+    CubeShared.CIV_ORDER.forEach((c) => { civCounts[c] = 0; });
+    let mono = 0;
+    let multi = 0;
+    session.seats[0].deck.forEach((id) => {
+      const card = cardById(id);
+      if (!card) return;
+      const civSet = new Set();
+      CubeShared.cardFaces(card).forEach((face) => (face.civilizations || []).forEach((c) => civSet.add(c)));
+      civSet.forEach((c) => { if (c in civCounts) civCounts[c] += 1; });
+      if (CubeShared.isCardMulticolor(card)) multi += 1; else mono += 1;
+    });
+
+    const civWrap = $("#sim-deck-civ-pie");
+    civWrap.innerHTML = "";
+    civWrap.appendChild(buildPieChartEl(CubeShared.CIV_ORDER.map((c) => ({ label: c, count: civCounts[c], color: "var(--civ-" + c + ")" }))));
+
+    const colorWrap = $("#sim-deck-color-pie");
+    colorWrap.innerHTML = "";
+    colorWrap.appendChild(buildPieChartEl([
+      { label: "単色", count: mono, color: "var(--color-mono)" },
+      { label: "多色", count: multi, color: "var(--color-multi)" },
+    ]));
   }
 
   function renderSimPackCardModalBody(card) {
@@ -468,6 +548,15 @@
   }
 
   function closeSimPackCardModal() { $("#sim-pack-card-modal").classList.remove("open"); }
+
+  // 自分のデッキ一覧(文字リスト)のカード名クリック用。ピック操作は行わず閲覧のみなので
+  // アクションボタンは出さない。
+  function openSimDeckCardModal(cardId) {
+    const card = cardById(cardId);
+    renderSimPackCardModalBody(card);
+    $("#sim-pack-card-actions").innerHTML = "";
+    $("#sim-pack-card-modal").classList.add("open");
+  }
 
   function openSimPackCardModal(cardId) {
     const format = DRAFT_FORMATS[session.format];
@@ -566,6 +655,10 @@
     });
   }
 
+  // 移し替え元として選択中のカード(nullなら選択中の移し替えは無い)。セッションには
+  // 保存しない(一時的なUI状態。リロードすれば選択は解除される)。
+  let transferSourceCardId = null;
+
   function toggleCutCard(cardId) {
     const format = DRAFT_FORMATS[session.format];
     const cc = cutCount(format);
@@ -581,10 +674,73 @@
     renderFinalReviewScreen();
   }
 
+  // 移し替え元ボタンを押した後に別のカードをクリックした時の処理。移し替え選択中は
+  // 通常のトグル(取り除く/戻す)を無効化し、有効な移し替え先だけを受け付ける。
+  function onFinalTileClick(cardId) {
+    if (transferSourceCardId !== null) {
+      if (cardId === transferSourceCardId) return;
+      if (!eligibleTransferTargets(transferSourceCardId).includes(cardId)) return;
+      session.finalReview.enchantTransfers[transferSourceCardId] = cardId;
+      transferSourceCardId = null;
+      pruneInvalidEnchantTransfers();
+      saveSessionToStorage();
+      renderFinalReviewScreen();
+      return;
+    }
+    toggleCutCard(cardId);
+  }
+
+  // 取り除くカード(エンチャント付き)に表示する「エンチャントを移し替える」ボタン。
+  // 未選択→ボタン押下で選択モードへ(ラベルは「キャンセル」に変化)。既に移し替え先が
+  // 決まっていればボタン自体が「→ 移し替え先名 ✕」表示になり、押すと取り消せる。
+  function buildEnchantTransferControl(cardId) {
+    const wrap = document.createElement("div");
+    wrap.className = "sim-enchant-transfer-control";
+    const btn = document.createElement("button");
+    btn.type = "button";
+
+    const currentTarget = session.finalReview.enchantTransfers[cardId];
+    const isActive = transferSourceCardId === cardId;
+
+    if (isActive) {
+      btn.className = "sim-transfer-btn active";
+      btn.textContent = "キャンセル";
+      btn.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        transferSourceCardId = null;
+        renderFinalReviewScreen();
+      });
+    } else if (currentTarget) {
+      const targetCard = cardById(currentTarget);
+      btn.className = "sim-transfer-btn assigned";
+      btn.textContent = "→ " + (targetCard ? CubeShared.displayName(targetCard) : currentTarget) + " ✕";
+      btn.title = "クリックで移し替えを取り消す";
+      btn.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        delete session.finalReview.enchantTransfers[cardId];
+        saveSessionToStorage();
+        renderFinalReviewScreen();
+      });
+    } else {
+      btn.className = "sim-transfer-btn";
+      btn.textContent = "エンチャントを移し替える";
+      btn.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        transferSourceCardId = cardId;
+        renderFinalReviewScreen();
+      });
+    }
+
+    wrap.appendChild(btn);
+    return wrap;
+  }
+
   function renderFinalReviewScreen() {
     const format = DRAFT_FORMATS[session.format];
     const cc = cutCount(format);
     $("#sim-final-count").textContent = session.finalReview.cutIds.length + "/" + cc + "枚を選択中";
+
+    const eligibleForActiveTransfer = transferSourceCardId !== null ? eligibleTransferTargets(transferSourceCardId) : null;
 
     const grid = $("#sim-final-grid");
     grid.innerHTML = "";
@@ -593,40 +749,22 @@
       const isCut = session.finalReview.cutIds.includes(cardId);
       const tile = buildSimCardTile(card, cardId, {
         pendingBadge: isCut ? "×" : null,
-        onClick: () => toggleCutCard(cardId),
+        stateClass: isCut ? "sim-cut-selected" : null,
+        onClick: () => onFinalTileClick(cardId),
       });
 
+      if (transferSourceCardId !== null) {
+        if (cardId === transferSourceCardId) {
+          tile.classList.add("sim-transfer-source");
+        } else if (eligibleForActiveTransfer.includes(cardId)) {
+          tile.classList.add("sim-transfer-eligible");
+        } else {
+          tile.classList.add("sim-transfer-ineligible");
+        }
+      }
+
       if (isCut && card.enchantId) {
-        const wrap = document.createElement("div");
-        wrap.className = "sim-enchant-transfer-control";
-        const select = document.createElement("select");
-        select.className = "tag-select";
-        const noneOpt = document.createElement("option");
-        noneOpt.value = "";
-        noneOpt.textContent = "手放す";
-        select.appendChild(noneOpt);
-        eligibleTransferTargets(cardId).forEach((targetId) => {
-          const targetCard = cardById(targetId);
-          const opt = document.createElement("option");
-          opt.value = targetId;
-          opt.textContent = targetCard ? CubeShared.displayName(targetCard) : targetId;
-          select.appendChild(opt);
-        });
-        select.value = session.finalReview.enchantTransfers[cardId] || "";
-        select.addEventListener("click", (ev) => ev.stopPropagation());
-        select.addEventListener("keydown", (ev) => ev.stopPropagation());
-        select.addEventListener("change", (ev) => {
-          ev.stopPropagation();
-          if (select.value) {
-            session.finalReview.enchantTransfers[cardId] = select.value;
-          } else {
-            delete session.finalReview.enchantTransfers[cardId];
-          }
-          saveSessionToStorage();
-          renderFinalReviewScreen();
-        });
-        wrap.appendChild(select);
-        tile.appendChild(wrap);
+        tile.appendChild(buildEnchantTransferControl(cardId));
       }
 
       grid.appendChild(tile);
@@ -753,6 +891,7 @@
   function restartDraft() {
     clearSessionStorage(CubeShared.cubeId);
     session = null;
+    transferSourceCardId = null;
     renderSetupScreen();
     showSimScreen("setup");
   }

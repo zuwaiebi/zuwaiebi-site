@@ -1417,8 +1417,8 @@
   // ここでまとめて公開する。stateは同じオブジェクトを共有するので、シミュレーター側で
   // cube_data.json等を二重にfetchする必要はない。
   Object.assign(window.CubeShared, {
-    cubeId, state, $, $$,
-    cardFaces, faceOf, displayName, isMulticolorFace, civRank, cardImagePath, enchantById,
+    cubeId, state, $, $$, CIV_ORDER,
+    cardFaces, faceOf, displayName, isMulticolorFace, isCardMulticolor, civRank, cardImagePath, enchantById,
     allCardSuggestCandidates, allEnchantCandidates, deckCardEntryFromCard,
     deckCardImageSrc, deckEnchantImageSrc, renderDeckCardTile,
     resolveDeckCardFace, deckCivRank, deckCostOf, sortDeckEntries,

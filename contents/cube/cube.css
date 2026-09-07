@@ -292,7 +292,32 @@ body { padding: 24px; }
   width: 22px; height: 22px; border-radius: 50%; background: var(--history-remove); color: #fff;
   display: flex; align-items: center; justify-content: center; font-size: 0.85rem; line-height: 1;
 }
-.sim-enchant-transfer-control { position: absolute; left: 0; right: 0; bottom: 26px; padding: 2px 4px; }
-.sim-enchant-transfer-control select { width: 100%; font-size: 0.72rem; padding: 2px 4px; }
+/* ピック中: 採用予定(赤枠)/除外予定(青枠) */
+.sim-pending-add { border: 3px solid var(--history-remove); }
+.sim-pending-exclude { border: 3px solid var(--history-add); }
+
+.sim-enchant-transfer-control { position: absolute; left: 3px; right: 3px; bottom: 28px; }
+.sim-transfer-btn {
+  width: 100%; font-size: 0.68rem; line-height: 1.2; padding: 3px 4px; border-radius: 6px; cursor: pointer;
+  border: 1px solid var(--border); background: rgba(0,0,0,0.72); color: var(--text); white-space: normal;
+}
+.sim-transfer-btn.active { background: var(--accent); color: #06202c; border-color: var(--accent); font-weight: 700; }
+.sim-transfer-btn.assigned { color: var(--color-multi); border-color: var(--color-multi); }
+
+/* 最終調整: エンチャント移し替え先を選んでいる間のカード強調 */
+.sim-transfer-source { outline: 3px solid var(--color-multi); outline-offset: -3px; }
+.sim-transfer-eligible { outline: 3px solid var(--accent); outline-offset: -3px; cursor: pointer; }
+.sim-transfer-ineligible { opacity: 0.35; }
 
 .sim-finished-actions { display: flex; gap: 10px; flex-wrap: wrap; margin: 10px 0; }
+
+/* ピック中のデッキ文明比率・単色/多色比率(円グラフ) */
+.sim-ratio-row { display: flex; gap: 14px; margin-bottom: 12px; flex-wrap: wrap; }
+.sim-pie-block { display: flex; align-items: center; gap: 8px; }
+.sim-pie-chart { width: 56px; height: 56px; border-radius: 50%; flex: none; }
+.sim-pie-legend { font-size: 0.72rem; color: var(--muted); display: flex; flex-direction: column; gap: 1px; }
+.sim-pie-legend-item { display: flex; align-items: center; gap: 5px; }
+.sim-pie-legend-dot { width: 7px; height: 7px; border-radius: 50%; flex: none; }
+
+.sim-deck-list-text li { cursor: pointer; }
+.sim-deck-list-text li:hover { color: var(--accent); }
