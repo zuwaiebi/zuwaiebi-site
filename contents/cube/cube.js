@@ -1459,10 +1459,14 @@
   // (1.2節)、付いている場合はデッキ一覧同様カード画像に重ねて1枚の画像に合成する。
   // 画像が無いカード(ダミー登録分)はプレースホルダー表示と同じ見た目で代用する。
   async function composeCardFrontPng(entry) {
-    const baseSrc = deckCardImageSrc(entry);
-    const overlaySrc = deckEnchantImageSrc(entry);
+    return composeCardImagePng(deckCardImageSrc(entry), deckEnchantImageSrc(entry), entry.name);
+  }
+
+  // imageSrc/overlaySrcを指定してカード1枚分の画像を合成する下請け(composeCardFrontPngの
+  // 汎用版)。禁断カードの裏面など、entryの通常のbaseImage以外を合成したい場合に使う。
+  async function composeCardImagePng(imageSrc, overlaySrc, fallbackName) {
     const [baseImg, overlayImg] = await Promise.all([
-      baseSrc ? loadImageForExport(baseSrc) : Promise.resolve(null),
+      imageSrc ? loadImageForExport(imageSrc) : Promise.resolve(null),
       overlaySrc ? loadImageForExport(overlaySrc) : Promise.resolve(null),
     ]);
 
@@ -1482,13 +1486,33 @@
       ctx.font = `bold ${Math.round(width * 0.09)}px sans-serif`;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      drawTruncatedText(ctx, entry.name, width / 2, height / 2, width - 24);
+      drawTruncatedText(ctx, fallbackName, width / 2, height / 2, width - 24);
       ctx.textAlign = "left";
       ctx.textBaseline = "top";
     }
     if (overlayImg) drawContainImage(ctx, overlayImg, 0, 0, width, height);
 
     return canvasToPngBytes(canvas);
+  }
+
+  // 「禁断」カードの例外: 「禁断～封印されしX～/伝説の禁断 ドキンダムX」だけは、
+  // 山札内で見える裏面が常に封印状態(禁断～封印されしX～=カード本来のbaseImage)側、
+  // めくった時の表が伝説の禁断ドキンダムX(backFace)側になるようにする
+  // (スリーブ画像を指定していてもこの1枚だけは専用の裏面を使う)。
+  // デッキのカード記録はbackFaceを保持しないスナップショットのため(9.1節)、
+  // resolveDeckCardFaceと同様に名前で現行キューブ+ゴミ箱と照合して引き直す。
+  const SPECIAL_FLIP_CARD_NAME = "禁断～封印されしX～/伝説の禁断 ドキンダムX";
+
+  function resolveSpecialFlipFaces(entry) {
+    if (entry.name !== SPECIAL_FLIP_CARD_NAME) return null;
+    const found = allCardSuggestCandidates().find(({ card }) => displayName(card) === entry.name);
+    const backFace = found && found.card.backFace;
+    if (!backFace || !backFace.baseImage) return null;
+    const fromTrash = isTrashImageSource(entry.imageSource);
+    return {
+      frontSrc: cardImagePath("base", backFace.baseImage, fromTrash),
+      backSrc: deckCardImageSrc(entry),
+    };
   }
 
   const MIME_EXTENSIONS = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/gif": "gif", "image/bmp": "bmp", "image/avif": "avif" };
@@ -1513,12 +1537,12 @@
   }
 
   // ユドナリウムの「山札」1個分のdata.xmlを組み立てる。stateは全カード共通で"1"(裏向き)。
-  function buildUdonariumDeckXml(deckName, cardFronts, backHash) {
-    const cardsXml = cardFronts.map(({ entry, hash }) => `    <card location.name="table" location.x="0" location.y="0" posZ="0" state="1" rotate="0" owner="" zindex="0">
+  function buildUdonariumDeckXml(deckName, cardFaces) {
+    const cardsXml = cardFaces.map(({ entry, frontHash, backHash }) => `    <card location.name="table" location.x="0" location.y="0" posZ="0" state="1" rotate="0" owner="" zindex="0">
       <data name="card">
         <data name="image">
           <data type="image" name="imageIdentifier"></data>
-          <data type="image" name="front">${hash}</data>
+          <data type="image" name="front">${frontHash}</data>
           <data type="image" name="back">${backHash}</data>
         </data>
         <data name="common">
@@ -1550,22 +1574,34 @@ ${cardsXml}
   async function buildAndDownloadUdonariumZip(deckNameRaw, entries, sleeveFile) {
     const deckName = (deckNameRaw || "").trim() || "デッキ";
 
-    const { bytes: backBytes, ext: backExt } = await resolveSleeveBytes(sleeveFile);
-    const backHash = await sha256Hex(backBytes);
+    const { bytes: sleeveBytes, ext: sleeveExt } = await resolveSleeveBytes(sleeveFile);
+    const sleeveHash = await sha256Hex(sleeveBytes);
 
     const composed = await Promise.all(entries.map(async (entry) => {
-      const bytes = await composeCardFrontPng(entry);
-      const hash = await sha256Hex(bytes);
-      return { entry, hash, bytes };
+      const specialFaces = resolveSpecialFlipFaces(entry);
+      const frontBytes = specialFaces
+        ? await composeCardImagePng(specialFaces.frontSrc, deckEnchantImageSrc(entry), entry.name)
+        : await composeCardFrontPng(entry);
+      const frontHash = await sha256Hex(frontBytes);
+
+      let backHash = sleeveHash;
+      let backBytes = null;
+      if (specialFaces) {
+        backBytes = await composeCardImagePng(specialFaces.backSrc, null, entry.name);
+        backHash = await sha256Hex(backBytes);
+      }
+
+      return { entry, frontHash, frontBytes, backHash, backBytes };
     }));
 
     const imageFiles = new Map(); // hash -> { bytes, ext }
-    imageFiles.set(backHash, { bytes: backBytes, ext: backExt });
-    composed.forEach(({ hash, bytes }) => {
-      if (!imageFiles.has(hash)) imageFiles.set(hash, { bytes, ext: "png" });
+    imageFiles.set(sleeveHash, { bytes: sleeveBytes, ext: sleeveExt });
+    composed.forEach(({ frontHash, frontBytes, backHash, backBytes }) => {
+      if (!imageFiles.has(frontHash)) imageFiles.set(frontHash, { bytes: frontBytes, ext: "png" });
+      if (backBytes && !imageFiles.has(backHash)) imageFiles.set(backHash, { bytes: backBytes, ext: "png" });
     });
 
-    const dataXml = buildUdonariumDeckXml(deckName, composed, backHash);
+    const dataXml = buildUdonariumDeckXml(deckName, composed);
 
     const files = [{ name: "data.xml", data: new TextEncoder().encode(dataXml) }];
     imageFiles.forEach((info, hash) => files.push({ name: `${hash}.${info.ext}`, data: info.bytes }));
