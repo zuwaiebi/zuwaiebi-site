@@ -814,14 +814,27 @@
   // デッキのカードエントリにスナップショットする(trash.json/cube_history.jsonと同じ考え方)。
   const isTrashImageSource = (src) => src === "trash_base" || src === "trash_enchant";
 
+  // 記録後にカードがゴミ箱へ移動したり画像が差し替えられたりすると、記録時点の
+  // ファイル名・参照先(images/ vs trash_images/)のスナップショットのままでは画像が
+  // 見つからなくなることがある。表示のたびに名前で現行キューブ+ゴミ箱と照合し、
+  // 見つかればそちらの最新のbaseImage/所在を優先する(resolveDeckCardFaceと同じ考え方)。
+  // 見つからなければ(名前が変わった等)記録時点のスナップショットのままフォールバックする。
   function deckCardImageSrc(entry) {
-    if (!entry.baseImage) return null;
-    return cardImagePath("base", entry.baseImage, isTrashImageSource(entry.imageSource));
+    if (entry.isDummy) return null;
+    const found = allCardSuggestCandidates().find(({ card }) => displayName(card) === entry.name);
+    const baseImage = found ? found.card.baseImage : entry.baseImage;
+    if (!baseImage) return null;
+    const fromTrash = found ? found.fromTrash : isTrashImageSource(entry.imageSource);
+    return cardImagePath("base", baseImage, fromTrash);
   }
 
   function deckEnchantImageSrc(entry) {
-    if (!entry.enchant || !entry.enchant.overlayImage) return null;
-    return cardImagePath("enchant", entry.enchant.overlayImage, isTrashImageSource(entry.enchant.imageSource));
+    if (!entry.enchant) return null;
+    const found = allEnchantCandidates().find(({ enchant }) => enchant.name === entry.enchant.name);
+    const overlayImage = found ? found.enchant.overlayImage : entry.enchant.overlayImage;
+    if (!overlayImage) return null;
+    const fromTrash = found ? found.fromTrash : isTrashImageSource(entry.enchant.imageSource);
+    return cardImagePath("enchant", overlayImage, fromTrash);
   }
 
   // サジェスト・エンチャント選択候補は、現行キューブに加えゴミ箱内のものも対象にする
