@@ -1493,7 +1493,9 @@
 
   const MIME_EXTENSIONS = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/gif": "gif", "image/bmp": "bmp", "image/avif": "avif" };
 
-  // スリーブ画像(裏面)のバイト列と拡張子。未指定ならキューブの既定裏面画像を使う。
+  // スリーブ画像(裏面)のバイト列と拡張子。未指定なら既定裏面画像を使う。
+  // cube_admin管理下のdata/(gitで追跡しない実データ)ではなく、コードと一緒にgit管理される
+  // assets/に置く(cubeIdに依存しない共通アセットのため。全キューブ世代で共用する)。
   async function resolveSleeveBytes(sleeveFile) {
     if (sleeveFile) {
       const bytes = new Uint8Array(await sleeveFile.arrayBuffer());
@@ -1501,7 +1503,7 @@
       const ext = extMatch ? extMatch[1].toLowerCase() : (MIME_EXTENSIONS[sleeveFile.type] || "png");
       return { bytes, ext };
     }
-    const res = await fetch(`data/${encodeURIComponent(cubeId)}/images/card_back.webp`);
+    const res = await fetch("assets/card_back.webp");
     if (!res.ok) throw new Error("既定の裏面画像の取得に失敗しました");
     return { bytes: new Uint8Array(await res.arrayBuffer()), ext: "webp" };
   }
