@@ -363,3 +363,12 @@ body { padding: 24px; }
 .sim-cost-bar-track { width: 100%; flex: 1; display: flex; align-items: flex-end; }
 .sim-cost-bar { width: 100%; background: var(--accent); border-radius: 3px 3px 0 0; min-height: 2px; }
 .sim-cost-bar-label { font-size: 0.62rem; color: var(--muted); margin-top: 2px; }
+
+/* ドラフト形式タブ(draft.mdの内容をそのまま掲載する静的な読み物) */
+#tab-draft-formats h2 { margin: 0 0 16px; }
+.draft-formats { display: flex; flex-direction: column; gap: 18px; }
+.draft-format-card { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 16px 20px; }
+.draft-format-card h3 { margin: 0 0 10px; font-size: 1.05rem; }
+.draft-format-card ol { margin: 0; padding-left: 1.4em; display: flex; flex-direction: column; gap: 6px; }
+.draft-format-card li { line-height: 1.7; }
+.draft-format-card ol ol { margin: 6px 0 0; list-style-type: lower-alpha; }
