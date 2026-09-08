@@ -225,8 +225,22 @@
                         </label>
                         <div class="sim-finished-actions">
                             <button type="button" class="clear-filters" id="sim-finished-image-btn">デッキ画像を出力</button>
+                            <button type="button" class="clear-filters" id="sim-finished-zip-toggle-btn">zipファイルで出力</button>
                             <button type="button" class="clear-filters" id="sim-finished-record-btn">デッキを記録する</button>
                             <button type="button" class="deck-delete-btn" id="sim-restart-btn">もう一度ドラフトする</button>
+                        </div>
+                        <div class="zip-export-panel" id="sim-finished-zip-panel" hidden>
+                            <p class="zip-export-label">デッキのスリーブ画像</p>
+                            <div class="zip-export-dropzone" id="sim-finished-zip-dropzone" tabindex="0" role="button" aria-label="スリーブ画像を選択">
+                                <input type="file" accept="image/*" id="sim-finished-zip-file-input" hidden>
+                                <img class="zip-export-preview" id="sim-finished-zip-preview" hidden alt="スリーブ画像プレビュー">
+                                <span id="sim-finished-zip-dropzone-text">クリックまたはドラッグ＆ドロップで画像を選択（未指定の場合は既定の裏面画像を使用します）</span>
+                            </div>
+                            <div class="zip-export-actions">
+                                <button type="button" class="clear-filters" id="sim-finished-zip-confirm-btn">これでzipファイル出力</button>
+                                <a href="https://udonarium-connect.com/" target="_blank" rel="noopener noreferrer" class="zip-export-link">ユドナリウムコネクトを開く ↗</a>
+                            </div>
+                            <p class="form-error" id="sim-finished-zip-error"></p>
                         </div>
                         <p class="form-error" id="sim-finished-error"></p>
                     </section>
@@ -314,7 +328,21 @@
                         </select>
                     </span>
                     <button type="button" class="clear-filters" id="deck-detail-image-btn">デッキ画像を保存</button>
+                    <button type="button" class="clear-filters" id="deck-detail-zip-toggle-btn">zipファイルで出力</button>
                     <button type="button" class="deck-delete-btn" id="deck-detail-delete-btn">このデッキを削除</button>
+                </div>
+                <div class="zip-export-panel" id="deck-detail-zip-panel" hidden>
+                    <p class="zip-export-label">デッキのスリーブ画像</p>
+                    <div class="zip-export-dropzone" id="deck-detail-zip-dropzone" tabindex="0" role="button" aria-label="スリーブ画像を選択">
+                        <input type="file" accept="image/*" id="deck-detail-zip-file-input" hidden>
+                        <img class="zip-export-preview" id="deck-detail-zip-preview" hidden alt="スリーブ画像プレビュー">
+                        <span id="deck-detail-zip-dropzone-text">クリックまたはドラッグ＆ドロップで画像を選択（未指定の場合は既定の裏面画像を使用します）</span>
+                    </div>
+                    <div class="zip-export-actions">
+                        <button type="button" class="clear-filters" id="deck-detail-zip-confirm-btn">これでzipファイル出力</button>
+                        <a href="https://udonarium-connect.com/" target="_blank" rel="noopener noreferrer" class="zip-export-link">ユドナリウムコネクトを開く ↗</a>
+                    </div>
+                    <p class="form-error" id="deck-detail-zip-error"></p>
                 </div>
                 <p class="form-error" id="deck-detail-error"></p>
                 <div class="card-grid" id="deck-detail-grid"></div>

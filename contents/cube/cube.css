@@ -255,6 +255,22 @@ body { padding: 24px; }
 
 .clear-filters:disabled { opacity: 0.4; cursor: not-allowed; }
 
+/* ユドナリウム用zip出力パネル(cube_spec.md 9.5節) */
+.zip-export-panel {
+  margin: 0 0 14px; padding: 14px 16px; border: 1px solid var(--border); border-radius: 12px;
+  background: rgba(255,255,255,0.03);
+}
+.zip-export-label { margin: 0 0 8px; font-size: 0.85rem; color: var(--muted); }
+.zip-export-dropzone {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
+  min-height: 90px; padding: 14px; border: 2px dashed var(--border); border-radius: 10px; cursor: pointer;
+  text-align: center; font-size: 0.8rem; color: var(--muted);
+}
+.zip-export-dropzone:hover, .zip-export-dropzone.dragover { border-color: var(--accent); color: var(--text); }
+.zip-export-preview { max-width: 96px; max-height: 96px; border-radius: 8px; object-fit: contain; }
+.zip-export-actions { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-top: 12px; }
+.zip-export-link { font-size: 0.85rem; color: var(--accent); }
+
 /* ドラフトシミュレーター(cube_spec.md 10節) */
 .sim-screen { display: block; }
 .sim-screen[hidden] { display: none; }

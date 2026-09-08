@@ -946,6 +946,8 @@
     }
   }
 
+  let simFinishedZipController = null;
+
   function openRecordModal() {
     $("#sim-record-password").value = "";
     $("#sim-record-error").textContent = "";
@@ -988,6 +990,7 @@
     clearSessionStorage(CubeShared.cubeId);
     session = null;
     transferOriginId = null;
+    if (simFinishedZipController) simFinishedZipController.close();
     renderSetupScreen();
     showSimScreen("setup");
   }
@@ -1023,6 +1026,19 @@
       saveSessionToStorage();
     });
     $("#sim-finished-image-btn").addEventListener("click", exportSimDeckImage);
+    simFinishedZipController = CubeShared.createZipExportController({
+      toggleBtn: $("#sim-finished-zip-toggle-btn"),
+      panel: $("#sim-finished-zip-panel"),
+      dropzone: $("#sim-finished-zip-dropzone"),
+      fileInput: $("#sim-finished-zip-file-input"),
+      previewImg: $("#sim-finished-zip-preview"),
+      dropzoneText: $("#sim-finished-zip-dropzone-text"),
+      confirmBtn: $("#sim-finished-zip-confirm-btn"),
+      errorEl: $("#sim-finished-zip-error"),
+    }, () => ({
+      deckName: $("#sim-finished-name").value.trim() || new Date().toISOString(),
+      entries: session.finishedDeck.entries,
+    }));
     $("#sim-finished-record-btn").addEventListener("click", openRecordModal);
     $("#sim-restart-btn").addEventListener("click", restartDraft);
 

@@ -1149,6 +1149,7 @@
     $("#deck-detail-note").textContent = deck.note || "";
     $("#deck-detail-note").style.display = deck.note ? "" : "none";
     $("#deck-detail-error").textContent = "";
+    if (deckDetailZipController) deckDetailZipController.close();
 
     renderDeckDetailGrid();
 
@@ -1345,6 +1346,314 @@
     }
   }
 
+  // --- ユドナリウム用zip出力(cube_spec.md 9.5節) ---
+  // ユドナリウム(https://github.com/TK11235/udonarium)のzip読み込み仕様に合わせる。
+  // 画像はファイル内容のSHA-256十六進数値をファイル名(拡張子付き)・data.xml内の参照に使う
+  // (ユドナリウム側もインポート時に内容から同じ方式でハッシュを計算し直すので、
+  // ファイル名の拡張子さえ合っていれば実際のバイト列さえ一致すれば良い)。圧縮はせずSTORE方式で
+  // 十分(カード画像は元々JPEG/PNG/WebPで、DEFLATEしてもほぼ縮まないため)。
+  function crc32(bytes) {
+    if (!crc32.table) {
+      const table = new Uint32Array(256);
+      for (let n = 0; n < 256; n++) {
+        let c = n;
+        for (let k = 0; k < 8; k++) c = (c & 1) ? (0xedb88320 ^ (c >>> 1)) : (c >>> 1);
+        table[n] = c >>> 0;
+      }
+      crc32.table = table;
+    }
+    const table = crc32.table;
+    let crc = 0xffffffff;
+    for (let i = 0; i < bytes.length; i++) crc = table[(crc ^ bytes[i]) & 0xff] ^ (crc >>> 8);
+    return (crc ^ 0xffffffff) >>> 0;
+  }
+
+  async function sha256Hex(bytes) {
+    const digest = await crypto.subtle.digest("SHA-256", bytes);
+    return Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, "0")).join("");
+  }
+
+  function toDosDateTime(date) {
+    const dosTime = ((date.getHours() & 0x1f) << 11) | ((date.getMinutes() & 0x3f) << 5) | ((date.getSeconds() >> 1) & 0x1f);
+    const dosDate = (((date.getFullYear() - 1980) & 0x7f) << 9) | (((date.getMonth() + 1) & 0xf) << 5) | (date.getDate() & 0x1f);
+    return { dosTime, dosDate };
+  }
+
+  // files: [{ name: string, data: Uint8Array }] からZIPアーカイブ(Blob)を組み立てる
+  // (無圧縮/STORE方式。外部ライブラリは使わずZIPフォーマットの仕様通りに手書きする)。
+  function buildZipBlob(files) {
+    const { dosTime, dosDate } = toDosDateTime(new Date());
+    const localParts = [];
+    const centralParts = [];
+    let offset = 0;
+
+    files.forEach((file) => {
+      const nameBytes = new TextEncoder().encode(file.name);
+      const data = file.data;
+      const crc = crc32(data);
+      const size = data.length;
+
+      const local = new DataView(new ArrayBuffer(30));
+      local.setUint32(0, 0x04034b50, true);
+      local.setUint16(4, 20, true);
+      local.setUint16(6, 0, true);
+      local.setUint16(8, 0, true);
+      local.setUint16(10, dosTime, true);
+      local.setUint16(12, dosDate, true);
+      local.setUint32(14, crc, true);
+      local.setUint32(18, size, true);
+      local.setUint32(22, size, true);
+      local.setUint16(26, nameBytes.length, true);
+      local.setUint16(28, 0, true);
+      localParts.push(new Uint8Array(local.buffer), nameBytes, data);
+
+      const central = new DataView(new ArrayBuffer(46));
+      central.setUint32(0, 0x02014b50, true);
+      central.setUint16(4, 20, true);
+      central.setUint16(6, 20, true);
+      central.setUint16(8, 0, true);
+      central.setUint16(10, 0, true);
+      central.setUint16(12, dosTime, true);
+      central.setUint16(14, dosDate, true);
+      central.setUint32(16, crc, true);
+      central.setUint32(20, size, true);
+      central.setUint32(24, size, true);
+      central.setUint16(28, nameBytes.length, true);
+      central.setUint16(30, 0, true);
+      central.setUint16(32, 0, true);
+      central.setUint16(34, 0, true);
+      central.setUint16(36, 0, true);
+      central.setUint32(38, 0, true);
+      central.setUint32(42, offset, true);
+      centralParts.push(new Uint8Array(central.buffer), nameBytes);
+
+      offset += 30 + nameBytes.length + size;
+    });
+
+    const centralStart = offset;
+    const centralSize = centralParts.reduce((sum, p) => sum + p.length, 0);
+
+    const eocd = new DataView(new ArrayBuffer(22));
+    eocd.setUint32(0, 0x06054b50, true);
+    eocd.setUint16(4, 0, true);
+    eocd.setUint16(6, 0, true);
+    eocd.setUint16(8, files.length, true);
+    eocd.setUint16(10, files.length, true);
+    eocd.setUint32(12, centralSize, true);
+    eocd.setUint32(16, centralStart, true);
+    eocd.setUint16(20, 0, true);
+
+    return new Blob([...localParts, ...centralParts, new Uint8Array(eocd.buffer)], { type: "application/zip" });
+  }
+
+  function canvasToPngBytes(canvas) {
+    return new Promise((resolve, reject) => {
+      canvas.toBlob((blob) => {
+        if (!blob) { reject(new Error("画像の生成に失敗しました")); return; }
+        blob.arrayBuffer().then((buf) => resolve(new Uint8Array(buf)));
+      }, "image/png");
+    });
+  }
+
+  // カード1枚の表面画像を作る。エンチャントは物理的にカードへ貼るシールなので
+  // (1.2節)、付いている場合はデッキ一覧同様カード画像に重ねて1枚の画像に合成する。
+  // 画像が無いカード(ダミー登録分)はプレースホルダー表示と同じ見た目で代用する。
+  async function composeCardFrontPng(entry) {
+    const baseSrc = deckCardImageSrc(entry);
+    const overlaySrc = deckEnchantImageSrc(entry);
+    const [baseImg, overlayImg] = await Promise.all([
+      baseSrc ? loadImageForExport(baseSrc) : Promise.resolve(null),
+      overlaySrc ? loadImageForExport(overlaySrc) : Promise.resolve(null),
+    ]);
+
+    const width = baseImg ? baseImg.width : 400;
+    const height = baseImg ? baseImg.height : 560;
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d");
+
+    if (baseImg) {
+      drawCoverImage(ctx, baseImg, 0, 0, width, height);
+    } else {
+      ctx.fillStyle = "#1b1f27";
+      ctx.fillRect(0, 0, width, height);
+      ctx.fillStyle = "#f6f6f6";
+      ctx.font = `bold ${Math.round(width * 0.09)}px sans-serif`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      drawTruncatedText(ctx, entry.name, width / 2, height / 2, width - 24);
+      ctx.textAlign = "left";
+      ctx.textBaseline = "top";
+    }
+    if (overlayImg) drawContainImage(ctx, overlayImg, 0, 0, width, height);
+
+    return canvasToPngBytes(canvas);
+  }
+
+  const MIME_EXTENSIONS = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/gif": "gif", "image/bmp": "bmp", "image/avif": "avif" };
+
+  // スリーブ画像(裏面)のバイト列と拡張子。未指定ならキューブの既定裏面画像を使う。
+  async function resolveSleeveBytes(sleeveFile) {
+    if (sleeveFile) {
+      const bytes = new Uint8Array(await sleeveFile.arrayBuffer());
+      const extMatch = /\.([A-Za-z0-9]+)$/.exec(sleeveFile.name || "");
+      const ext = extMatch ? extMatch[1].toLowerCase() : (MIME_EXTENSIONS[sleeveFile.type] || "png");
+      return { bytes, ext };
+    }
+    const res = await fetch(`data/${encodeURIComponent(cubeId)}/images/card_back.webp`);
+    if (!res.ok) throw new Error("既定の裏面画像の取得に失敗しました");
+    return { bytes: new Uint8Array(await res.arrayBuffer()), ext: "webp" };
+  }
+
+  function xmlEscape(str) {
+    return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  }
+
+  // ユドナリウムの「山札」1個分のdata.xmlを組み立てる。stateは全カード共通で"1"(裏向き)。
+  function buildUdonariumDeckXml(deckName, cardFronts, backHash) {
+    const cardsXml = cardFronts.map(({ entry, hash }) => `    <card location.name="table" location.x="0" location.y="0" posZ="0" state="1" rotate="0" owner="" zindex="0">
+      <data name="card">
+        <data name="image">
+          <data type="image" name="imageIdentifier"></data>
+          <data type="image" name="front">${hash}</data>
+          <data type="image" name="back">${backHash}</data>
+        </data>
+        <data name="common">
+          <data name="name">${xmlEscape(entry.name)}</data>
+          <data name="size">2</data>
+        </data>
+        <data name="detail"></data>
+      </data>
+    </card>`).join("\n");
+
+    return `<?xml version="1.0" encoding="UTF-8"?>
+<card-stack location.name="table" location.x="0" location.y="0" posZ="0" rotate="0" zindex="0" owner="" isShowTotal="true">
+  <data name="card-stack">
+    <data name="image">
+      <data type="image" name="imageIdentifier"></data>
+    </data>
+    <data name="common">
+      <data name="name">${xmlEscape(deckName)}</data>
+    </data>
+    <data name="detail"></data>
+  </data>
+  <node name="cardRoot">
+${cardsXml}
+  </node>
+</card-stack>
+`;
+  }
+
+  async function buildAndDownloadUdonariumZip(deckNameRaw, entries, sleeveFile) {
+    const deckName = (deckNameRaw || "").trim() || "デッキ";
+
+    const { bytes: backBytes, ext: backExt } = await resolveSleeveBytes(sleeveFile);
+    const backHash = await sha256Hex(backBytes);
+
+    const composed = await Promise.all(entries.map(async (entry) => {
+      const bytes = await composeCardFrontPng(entry);
+      const hash = await sha256Hex(bytes);
+      return { entry, hash, bytes };
+    }));
+
+    const imageFiles = new Map(); // hash -> { bytes, ext }
+    imageFiles.set(backHash, { bytes: backBytes, ext: backExt });
+    composed.forEach(({ hash, bytes }) => {
+      if (!imageFiles.has(hash)) imageFiles.set(hash, { bytes, ext: "png" });
+    });
+
+    const dataXml = buildUdonariumDeckXml(deckName, composed, backHash);
+
+    const files = [{ name: "data.xml", data: new TextEncoder().encode(dataXml) }];
+    imageFiles.forEach((info, hash) => files.push({ name: `${hash}.${info.ext}`, data: info.bytes }));
+
+    const zipBlob = buildZipBlob(files);
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(zipBlob);
+    a.download = `${deckName.replace(/[\\/:*?"<>|]/g, "_")}.zip`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 30000);
+  }
+
+  // zip出力パネル(スリーブ画像選択欄)の開閉・ドラッグ&ドロップ・出力実行を配線する。
+  // デッキ一覧の詳細ポップアップ・シミュレーターの完成デッキ画面の両方から使う共通部品。
+  // refs: { toggleBtn, panel, dropzone, fileInput, previewImg, dropzoneText, confirmBtn, errorEl }
+  // getExportInputs: () => { deckName, entries } (クリック時点の最新値を取得する)
+  function createZipExportController(refs, getExportInputs) {
+    let sleeveFile = null;
+    const defaultDropzoneText = refs.dropzoneText.textContent;
+
+    function setSleeveFile(file) {
+      sleeveFile = file || null;
+      if (sleeveFile) {
+        refs.previewImg.src = URL.createObjectURL(sleeveFile);
+        refs.previewImg.hidden = false;
+        refs.dropzoneText.textContent = sleeveFile.name;
+      } else {
+        refs.previewImg.hidden = true;
+        refs.previewImg.src = "";
+        refs.dropzoneText.textContent = defaultDropzoneText;
+      }
+    }
+
+    function close() {
+      refs.panel.hidden = true;
+      refs.toggleBtn.textContent = "zipファイルで出力";
+      refs.errorEl.textContent = "";
+      refs.fileInput.value = "";
+      setSleeveFile(null);
+    }
+
+    function open() {
+      refs.panel.hidden = false;
+      refs.toggleBtn.textContent = "キャンセル";
+    }
+
+    refs.toggleBtn.addEventListener("click", () => { if (refs.panel.hidden) open(); else close(); });
+
+    refs.dropzone.addEventListener("click", () => refs.fileInput.click());
+    refs.dropzone.addEventListener("keydown", (ev) => {
+      if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); refs.fileInput.click(); }
+    });
+    refs.fileInput.addEventListener("change", () => {
+      const file = refs.fileInput.files && refs.fileInput.files[0];
+      if (file) setSleeveFile(file);
+    });
+    refs.dropzone.addEventListener("dragover", (ev) => { ev.preventDefault(); refs.dropzone.classList.add("dragover"); });
+    refs.dropzone.addEventListener("dragleave", () => refs.dropzone.classList.remove("dragover"));
+    refs.dropzone.addEventListener("drop", (ev) => {
+      ev.preventDefault();
+      refs.dropzone.classList.remove("dragover");
+      const file = ev.dataTransfer.files && ev.dataTransfer.files[0];
+      if (file && file.type.indexOf("image/") === 0) setSleeveFile(file);
+    });
+
+    refs.confirmBtn.addEventListener("click", async () => {
+      const { deckName, entries } = getExportInputs();
+      if (!entries || entries.length === 0) { refs.errorEl.textContent = "カードがありません。"; return; }
+      refs.errorEl.textContent = "";
+      const original = refs.confirmBtn.textContent;
+      refs.confirmBtn.disabled = true;
+      refs.confirmBtn.textContent = "生成中…";
+      try {
+        await buildAndDownloadUdonariumZip(deckName, entries, sleeveFile);
+        close();
+      } catch (err) {
+        refs.errorEl.textContent = "zipファイルの生成に失敗しました: " + err.message;
+      } finally {
+        refs.confirmBtn.disabled = false;
+        refs.confirmBtn.textContent = original;
+      }
+    });
+
+    return { close };
+  }
+
+  let deckDetailZipController = null;
+
   function initDeckFeature() {
     $("#deck-card-search").addEventListener("input", (e) => renderDeckSuggestions(e.target.value));
     $("#deck-save-btn").addEventListener("click", openDeckSaveModal);
@@ -1354,6 +1663,19 @@
     $("#deck-detail-sort-select").addEventListener("change", (e) => {
       deckDetailSort = e.target.value;
       renderDeckDetailGrid();
+    });
+    deckDetailZipController = createZipExportController({
+      toggleBtn: $("#deck-detail-zip-toggle-btn"),
+      panel: $("#deck-detail-zip-panel"),
+      dropzone: $("#deck-detail-zip-dropzone"),
+      fileInput: $("#deck-detail-zip-file-input"),
+      previewImg: $("#deck-detail-zip-preview"),
+      dropzoneText: $("#deck-detail-zip-dropzone-text"),
+      confirmBtn: $("#deck-detail-zip-confirm-btn"),
+      errorEl: $("#deck-detail-zip-error"),
+    }, () => {
+      const deck = currentDeckDetail();
+      return deck ? { deckName: deck.name, entries: sortDeckEntries(deck.cards, deckDetailSort) } : { deckName: "", entries: [] };
     });
 
     $("#deck-enchant-modal-close").addEventListener("click", () => $("#deck-enchant-modal").classList.remove("open"));
@@ -1425,6 +1747,7 @@
     loadImageForExport, roundedRectPath, drawCoverImage, drawContainImage, drawTruncatedText,
     DECK_IMAGE_COLS, DECK_IMAGE_CELL_W, DECK_IMAGE_CELL_H, DECK_IMAGE_GAP, DECK_IMAGE_PADDING, DECK_IMAGE_HEADER_H,
     DECK_API_BASE, deckSourceLabel, renderDeckList, renderDeckToPngAndDownload,
+    buildAndDownloadUdonariumZip, createZipExportController,
   });
 
   init();
