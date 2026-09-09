@@ -33,20 +33,16 @@
   }
 
   function updateHud(game) {
-    document.getElementById('hud-score').textContent =
-      '撃退数: ' + (game.defeatedZako + game.defeatedBosses);
+    document.getElementById('hud-score').textContent = 'スコア: ' + game.score;
+    document.getElementById('hud-bosses').textContent = 'ボス撃破数: ' + game.defeatedBosses;
 
     var rankEl = document.getElementById('hud-rank');
     var bossWrap = document.getElementById('boss-hp-wrap');
 
-    if (game.phase === 'FINALE') {
-      rankEl.textContent = '千秋楽！';
-      bossWrap.hidden = true;
-    } else if (game.phase === 'BOSS_WARNING') {
+    if (game.phase === 'FINALE' || game.phase === 'BOSS_WARNING' || game.phase === 'BOSS_CLEAR') {
+      // 撃破・接近時の文字は正方形画面中央の大きな演出(Render.draw側)のみで表示し、
+      // この小さいHUD側の文言は表示しない
       rankEl.textContent = '';
-      bossWrap.hidden = true;
-    } else if (game.phase === 'BOSS_CLEAR') {
-      rankEl.textContent = '撃破！';
       bossWrap.hidden = true;
     } else if (game.currentBoss && (game.phase === 'BOSS_INTRO' || game.phase === 'BOSS')) {
       var info = Boss.RANK_INFO[game.currentBoss.rank];

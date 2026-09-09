@@ -12,6 +12,10 @@
   var BOSS_CLEAR_DURATION = 1.2;
   var FINALE_DURATION = 2.4;
   var EFFECT_TTL = 0.35;
+  // ゲーム開始演出。「はっけよぉい…」をこの秒数表示してから、
+  // 「のこった！」の表示と同時に実際のゲーム進行(雑魚の湧き)を始める。
+  var HAKKEYOI_DURATION = 3.0;
+  var NOKOTTA_DURATION = 1.0;
   // WARNING演出の長さ。雑魚・行司の残数に関わらず、この秒数が経過したらボスを出現させる。
   var BOSS_WARNING_DURATION = 3.0;
   // WARNING中、雑魚が全滅して行司だけが残った場合に行司を速める倍率
@@ -26,8 +30,10 @@
   function createGame(mode) {
     return {
       mode: mode,
-      phase: 'RUSH',
-      phaseTimer: 0,
+      phase: 'START_HAKKEYOI',
+      phaseTimer: HAKKEYOI_DURATION,
+      introBannerText: null,
+      introBannerTimer: 0,
       entities: [],
       effects: [],
       spawner: Spawner.createSpawner(mode),
@@ -268,6 +274,22 @@
     for (var i = game.effects.length - 1; i >= 0; i--) {
       game.effects[i].ttl -= dt;
       if (game.effects[i].ttl <= 0) { game.effects.splice(i, 1); }
+    }
+
+    // 「のこった！」の表示は、ゲーム進行(雑魚の湧き等)とは独立したタイマーで消す
+    if (game.introBannerTimer > 0) {
+      game.introBannerTimer -= dt;
+      if (game.introBannerTimer <= 0) { game.introBannerText = null; }
+    }
+
+    if (game.phase === 'START_HAKKEYOI') {
+      game.phaseTimer -= dt;
+      if (game.phaseTimer <= 0) {
+        game.phase = 'RUSH';
+        game.introBannerText = 'のこった！';
+        game.introBannerTimer = NOKOTTA_DURATION;
+      }
+      return;
     }
 
     if (game.phase === 'RUSH') {

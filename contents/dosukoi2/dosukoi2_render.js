@@ -6,7 +6,8 @@
   var Entities = global.Dosukoi2.Entities;
 
   // 勝負俵の輪(見た目)は画面の大部分を占める大きさにする。ゲームオーバー判定
-  // (Entities.DOHYO_RATIO)とは別の見た目専用の値で、難易度には影響しない。
+  // (敵が完全に中心distanceFromCenter<=0へ到達したか)とは別の見た目専用の値で、
+  // 難易度には影響しない。
   var DOHYO_VISUAL_RATIO = 0.85;
 
   function computeFieldGeometry(width, height) {
@@ -108,6 +109,20 @@
   // canvas上のテキストに使う毛筆風フォント(dosukoi2.htmlでGoogle Fontsから読み込み)
   var BRUSH_FONT_FAMILY = '"Yuji Syuku", sans-serif';
 
+  // 中央に大きく表示する系のテキストが、正方形画面の幅に収まりきらず
+  // 見切れてしまうことがないよう、必要ならフォントサイズを縮小してから
+  // ctx.fontに反映する。戻り値は最終的に使われたフォントサイズ(px)。
+  function fitBannerFontSize(ctx, text, maxWidth, baseFontSizePx) {
+    var fontSizePx = baseFontSizePx;
+    ctx.font = 'bold ' + fontSizePx + 'px ' + BRUSH_FONT_FAMILY;
+    var measured = ctx.measureText(text).width;
+    if (measured > maxWidth) {
+      fontSizePx = Math.floor(fontSizePx * maxWidth / measured);
+      ctx.font = 'bold ' + fontSizePx + 'px ' + BRUSH_FONT_FAMILY;
+    }
+    return fontSizePx;
+  }
+
   // ボス出現前の警告演出。敵キャラより先(下のレイヤー)に描画することで、
   // 残っている雑魚が見えにくくならないようにする。
   function drawWarning(ctx, width, height, elapsedTime, label) {
@@ -123,7 +138,23 @@
     ctx.fillStyle = '#fff';
     ctx.strokeStyle = '#7a0d0d';
     ctx.lineWidth = 4;
-    ctx.font = 'bold ' + Math.round(Math.min(width, height) * 0.16) + 'px ' + BRUSH_FONT_FAMILY;
+    fitBannerFontSize(ctx, label, width * 0.9, Math.round(Math.min(width, height) * 0.16));
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.strokeText(label, width / 2, height / 2);
+    ctx.fillText(label, width / 2, height / 2);
+    ctx.restore();
+  }
+
+  // ゲーム開始演出(「はっけよぉい…」「のこった！」)用。ボス警告のような
+  // 赤い点滅はせず、文字だけを中央に静かに表示する。
+  function drawCeremonyBanner(ctx, width, height, label) {
+    ctx.save();
+    ctx.globalAlpha = 0.9;
+    ctx.fillStyle = '#fff';
+    ctx.strokeStyle = '#3a2a10';
+    ctx.lineWidth = 4;
+    fitBannerFontSize(ctx, label, width * 0.9, Math.round(Math.min(width, height) * 0.13));
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.strokeText(label, width / 2, height / 2);
@@ -144,7 +175,7 @@
     var hue = (elapsedTime * 90) % 360;
     ctx.save();
     ctx.globalAlpha = 0.95;
-    var textSize = Math.round(Math.min(width, height) * 0.15);
+    var textSize = fitBannerFontSize(ctx, label, width * 0.9, Math.round(Math.min(width, height) * 0.15));
     var gradient = ctx.createLinearGradient(width / 2, height / 2 - textSize / 2, width / 2, height / 2 + textSize / 2);
     gradient.addColorStop(0, '#fff6d0');
     gradient.addColorStop(0.5, 'hsl(' + hue + ', 90%, 65%)');
@@ -154,7 +185,6 @@
     ctx.lineWidth = 5;
     ctx.shadowColor = 'hsl(' + hue + ', 100%, 70%)';
     ctx.shadowBlur = Math.min(width, height) * 0.09;
-    ctx.font = 'bold ' + textSize + 'px ' + BRUSH_FONT_FAMILY;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.strokeText(label, width / 2, height / 2);
@@ -304,7 +334,11 @@
     var geometry = computeFieldGeometry(width, height);
     drawDohyo(ctx, width, height, geometry);
 
-    if (game.phase === 'BOSS_WARNING') {
+    if (game.phase === 'START_HAKKEYOI') {
+      drawCeremonyBanner(ctx, width, height, 'はっけよぉい…');
+    } else if (game.introBannerText) {
+      drawCeremonyBanner(ctx, width, height, game.introBannerText);
+    } else if (game.phase === 'BOSS_WARNING') {
       var nextRank = Boss.rankAt(game.spawner.bossIndex);
       drawWarning(ctx, width, height, game.elapsedTime, Boss.RANK_INFO[nextRank].label + '接近!!!');
     } else if (game.phase === 'BOSS_CLEAR' || game.phase === 'FINALE') {

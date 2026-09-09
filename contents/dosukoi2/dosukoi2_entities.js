@@ -3,9 +3,6 @@
 
   var Boss = global.Dosukoi2.Boss;
 
-  // 土俵(中心の輪)の半径をフィールド半径に対する比率で定義。この値以下まで
-  // 近づいたら土俵の輪に到達したとみなす。dosukoi2_render.js の描画にも使う。
-  var DOHYO_RATIO = 0.2;
   var HIT_TOLERANCE = 0.02;
 
   var nextId = 1;
@@ -20,10 +17,9 @@
     var geometry = Render.computeFieldGeometry(width, height);
     var spawnDistance = Render.computeSpawnDistance(geometry, width, height, angle);
     // 出現角度によって出現距離(spawnDistance)は変わる(横長画面では左右からの
-    // 出現の方が遠い)。実際に移動する距離(spawnDistance - DOHYO_RATIO、土俵の輪に
-    // 到達するまでの距離)に比例して速度を決めることで、基準距離1.0での所要時間を
-    // 基準に、どの角度から出現しても土俵到達までの所要時間が一定になるようにする。
-    var speed = referenceSpeed * (spawnDistance - DOHYO_RATIO) / (1 - DOHYO_RATIO);
+    // 出現の方が遠い)。速度を出現距離に比例させることで、基準距離1.0での
+    // 所要時間を基準に、どの角度から出現しても中心到達までの所要時間が一定になる。
+    var speed = referenceSpeed * spawnDistance;
     return {
       id: nextId++,
       kind: 'zako',
@@ -125,8 +121,9 @@
     if (entity.distanceFromCenter < 0) { entity.distanceFromCenter = 0; }
   }
 
+  // 敵が完全に中心(土俵の真ん中)に到達したらゲームオーバーとする。
   function hasReachedCenter(entity) {
-    return entity.distanceFromCenter <= DOHYO_RATIO;
+    return entity.distanceFromCenter <= 0;
   }
 
   function hasExited(entity) {
@@ -155,7 +152,6 @@
 
   global.Dosukoi2 = global.Dosukoi2 || {};
   global.Dosukoi2.Entities = {
-    DOHYO_RATIO: DOHYO_RATIO,
     createZako: createZako,
     createBoss: createBoss,
     createGyoji: createGyoji,

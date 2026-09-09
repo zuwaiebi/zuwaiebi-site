@@ -39,6 +39,20 @@ button, input, select, textarea {
 
 #screen-play {
   padding: 0;
+  background: #000;
+}
+
+/* プレイ中の画面は縦幅・横幅のうち短い方に合わせた正方形にする
+   (横持ちなら高さいっぱい、縦持ちなら幅いっぱいの正方形になり、余った
+   部分が黒帯になる)。dvw/dvhはモバイルブラウザのアドレスバー等の
+   表示/非表示にも追従するので、対応環境ではこちらを優先する。 */
+.play-frame {
+  position: relative;
+  width: min(100vw, 100vh);
+  height: min(100vw, 100vh);
+  width: min(100dvw, 100dvh);
+  height: min(100dvw, 100dvh);
+  flex-shrink: 0;
 }
 
 .title-logo {
@@ -137,27 +151,6 @@ button, input, select, textarea {
   text-decoration: none;
 }
 
-.rotate-overlay {
-  display: none;
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.94);
-  color: #fff;
-  z-index: 9999;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  font-size: 1.4rem;
-  padding: 2rem;
-  box-sizing: border-box;
-}
-
-@media (orientation: portrait) {
-  .rotate-overlay {
-    display: flex;
-  }
-}
-
 .story-slide {
   max-width: 480px;
   width: 100%;
@@ -226,7 +219,7 @@ button, input, select, textarea {
   left: 0;
   right: 0;
   display: flex;
-  justify-content: space-between;
+  justify-content: center;
   padding: 10px 16px;
   pointer-events: none;
   font-size: 1rem;
@@ -262,6 +255,62 @@ button, input, select, textarea {
   width: 100%;
   background: linear-gradient(90deg, #f85149, #ff8a65);
   transition: width 0.15s linear;
+}
+
+/* 正方形のプレイ画面の外(黒帯)に表示するロゴ・スコア・ボス撃破数。
+   横持ちでは左の黒帯に縦並び、縦持ちでは上の黒帯に横並びで表示する。 */
+.play-outside {
+  position: fixed;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #f5f0e6;
+  font-size: 0.85rem;
+  text-align: center;
+  pointer-events: none;
+}
+
+.play-logo {
+  display: block;
+  border-radius: 6px;
+}
+
+.play-stat {
+  margin: 0;
+  white-space: nowrap;
+}
+
+@media (orientation: landscape) {
+  .play-outside {
+    flex-direction: column;
+    top: 50%;
+    left: 0;
+    transform: translateY(-50%);
+    width: calc((100vw - min(100vw, 100vh)) / 2);
+  }
+  .play-logo {
+    width: min(160px, 90%);
+    height: auto;
+  }
+}
+
+@media (orientation: portrait) {
+  .play-outside {
+    flex-direction: row;
+    justify-content: center;
+    flex-wrap: wrap;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 100vw;
+    height: calc((100vh - min(100vw, 100vh)) / 2);
+    padding: 0 12px;
+    box-sizing: border-box;
+  }
+  .play-logo {
+    height: min(76px, 68%);
+    width: auto;
+  }
 }
 
 .result-stats {

@@ -12,10 +12,6 @@
 </head>
 <body>
 
-  <div id="rotate-overlay" class="rotate-overlay">
-    <p>📱 端末を横向きにしてください</p>
-  </div>
-
   <div id="screen-title" class="screen active">
     <h1 class="title-logo">どす恋2<br><span class="subtitle">～恋に千秋楽なし～</span></h1>
     <div class="menu">
@@ -58,14 +54,20 @@
   </div>
 
   <div id="screen-play" class="screen">
-    <canvas id="game-canvas"></canvas>
-    <div class="hud">
-      <div class="hud-left"><span id="hud-score">撃退数: 0</span></div>
-      <div class="hud-right"><span id="hud-rank"></span></div>
+    <div id="play-frame" class="play-frame">
+      <canvas id="game-canvas"></canvas>
+      <div class="hud">
+        <span id="hud-rank"></span>
+      </div>
+      <div id="boss-hp-wrap" class="boss-hp-wrap" hidden>
+        <div class="boss-hp-label" id="boss-hp-label"></div>
+        <div class="boss-hp-bar"><div class="boss-hp-fill" id="boss-hp-fill"></div></div>
+      </div>
     </div>
-    <div id="boss-hp-wrap" class="boss-hp-wrap" hidden>
-      <div class="boss-hp-label" id="boss-hp-label"></div>
-      <div class="boss-hp-bar"><div class="boss-hp-fill" id="boss-hp-fill"></div></div>
+    <div class="play-outside">
+      <img class="play-logo" src="data/images/rogo.webp" alt="どす恋2 ～恋に千秋楽なし～">
+      <p class="play-stat" id="hud-score">スコア: 0</p>
+      <p class="play-stat" id="hud-bosses">ボス撃破数: 0</p>
     </div>
   </div>
 
