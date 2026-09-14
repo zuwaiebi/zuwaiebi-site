@@ -118,22 +118,18 @@
     return false;
   }
 
-  function onBossDamaged(game, boss) {
-    // 大関、および召喚フェーズの横綱は、自分が呼び出した雑魚が生きている間は無敵
-    // (先に雑魚を片付けさせる)
-    if (Boss.hasSummonShield(boss) && hasAliveSummonedZako(game, boss)) {
-      addEffect(game, boss);
-      return;
-    }
-
-    boss.hp--;
-    boss.patternState.hitsSinceWarp = (boss.patternState.hitsSinceWarp || 0) + 1;
-    Assets.playSound('bossHit');
-    if (boss.hp > 0) { return; }
-
+  // ボスのHPが尽きた際の共通処理(通常のタップ撃破・関脇の電撃ダメージ・
+  // 前頭(磁石)の共有HP消滅、いずれからも呼ぶ)。
+  function defeatBoss(game, boss) {
     boss.phase = 'dying';
     addEffect(game, boss);
     removeEntity(game, boss);
+    if (boss.partner) {
+      // 前頭(磁石)は体力共有のペアなので、片方が尽きたらもう片方も同時にいなくなる
+      boss.partner.phase = 'dying';
+      addEffect(game, boss.partner);
+      removeEntity(game, boss.partner);
+    }
     game.defeatedBosses++;
     game.score += 5;
     game.lastDefeatedRankLabel = Boss.RANK_INFO[boss.rank].label;
@@ -170,6 +166,65 @@
     game.currentBoss = null;
   }
 
+  function onBossDamaged(game, boss) {
+    // 大関、および召喚フェーズの横綱は、自分が呼び出した雑魚が生きている間は無敵
+    // (先に雑魚を片付けさせる)
+    if (Boss.hasSummonShield(boss) && hasAliveSummonedZako(game, boss)) {
+      addEffect(game, boss);
+      return;
+    }
+
+    boss.hp--;
+    boss.patternState.hitsSinceWarp = (boss.patternState.hitsSinceWarp || 0) + 1;
+    Assets.playSound('bossHit');
+    if (boss.hp > 0) { return; }
+    defeatBoss(game, boss);
+  }
+
+  // 関脇(半無敵サイボーグ)は通常のタップではダメージを受けず、斜め左右に
+  // 弾き飛ばされるだけ。弾き飛ばした先が画面端(電流の境界)まで届いていれば、
+  // 電撃ダメージが入る。
+  function onCyborgTapped(game, boss, canvasWidth, canvasHeight) {
+    Assets.playSound('cyborgKnockback');
+    Boss.applyCyborgKnockback(boss);
+    var geometry = Render.computeFieldGeometry(canvasWidth, canvasHeight);
+    var edgeDistance = Render.computeEdgeDistance(geometry, canvasWidth, canvasHeight, boss.angle);
+    if (boss.distanceFromCenter < edgeDistance) { return; }
+    boss.distanceFromCenter = edgeDistance;
+    // 弾き先が画面端でクランプされた場合、飛んでいく演出の着地点もそこに合わせる
+    if (boss.patternState.knockbackAnim) { boss.patternState.knockbackAnim.toDistance = edgeDistance; }
+    Boss.applyCyborgShockReset(boss);
+    boss.hp--;
+    Assets.playSound('cyborgShock');
+    addEffect(game, boss);
+    if (boss.hp > 0) {
+      // 画面端(edgeDistance)から、最初に登場した位置と同じ距離まで前方へスッと戻す
+      Boss.startCyborgReturnGlide(boss, BOSS_INTRO_TARGET_DISTANCE);
+      return;
+    }
+    defeatBoss(game, boss);
+  }
+
+  // 前頭(磁石、赤・青)。近づいている方をタップすると通常の1ダメージが入ると同時に
+  // 役割(近づく/遠ざかる)が入れ替わる。遠ざかっている方をタップした場合も
+  // ダメージは入るが、その半分(0.5)のみで、役割の入れ替えは起きない。
+  // ダメージは共有HPに入る(タップされた側と相棒の両方のhpを同期させる)。
+  var MAGNET_RETREAT_TAP_DAMAGE = 0.5;
+
+  function onMagnetTapped(game, entity) {
+    var isApproaching = entity.role === 'approaching';
+    entity.hp -= isApproaching ? 1 : MAGNET_RETREAT_TAP_DAMAGE;
+    if (entity.partner) { entity.partner.hp = entity.hp; }
+    Assets.playSound('bossHit');
+    addEffect(game, entity);
+    if (isApproaching) {
+      entity.role = 'retreating';
+      if (entity.partner) { entity.partner.role = 'approaching'; }
+    }
+    if (entity.hp > 0) { return; }
+    defeatBoss(game, game.currentBoss);
+  }
+
   function onTapAt(game, px, py, canvasWidth, canvasHeight) {
     if (game.isOver) { return; }
     var geometry = Render.computeFieldGeometry(canvasWidth, canvasHeight);
@@ -182,18 +237,23 @@
     } else if (hit.kind === 'gyoji') {
       // 行司は誤ってタップしてしまうと即ゲームオーバーの障害物
       endGame(game);
+    } else if (hit.rank === 'sekiwake') {
+      onCyborgTapped(game, hit, canvasWidth, canvasHeight);
+    } else if (hit.rank === 'jishaku') {
+      onMagnetTapped(game, hit);
     } else {
       onBossDamaged(game, hit);
     }
   }
 
-  // 雑魚・行司を1体ずつ更新する(exclude指定のエンティティ、通常はボス自身は除く)。
-  // 雑魚が土俵に到達したらゲームオーバー、行司が反対側まで抜けたら黙って除去する。
+  // 雑魚・行司を1体ずつ更新する(exclude/exclude2指定のエンティティ、通常は
+  // ボス自身、前頭(磁石)であればそのペア相手も除く)。雑魚が土俵に到達したら
+  // ゲームオーバー、行司が反対側まで抜けたら黙って除去する。
   // ゲームオーバーになった場合は true を返す。
-  function updateRoamingEntities(game, dt, exclude) {
+  function updateRoamingEntities(game, dt, exclude, exclude2) {
     for (var i = game.entities.length - 1; i >= 0; i--) {
       var e = game.entities[i];
-      if (e === exclude) { continue; }
+      if (e === exclude || e === exclude2) { continue; }
       Entities.updateEntity(e, dt, dt);
       if (e.kind === 'gyoji') {
         if (Entities.hasExited(e)) { removeEntityAt(game, i); }
@@ -232,12 +292,31 @@
     }
   }
 
+  // 前頭(磁石、赤・青)は必ず向かい合わせ(角度差π)で同時出現し、体力を共有する。
+  // game.currentBossには代表(赤)側を置き、相棒(青)はboss.partnerで参照する。
+  function spawnMagnetPartner(game, boss, width, height) {
+    var partner = Entities.createBoss('jishaku', boss.lap, Spawner.DIFFICULTY.lapDifficultyMultiplier,
+      width, height, boss.angle + Math.PI);
+    partner.hp = boss.hp;
+    partner.maxHp = boss.maxHp;
+    boss.partner = partner;
+    partner.partner = boss;
+    // 最初はどちらが近づく役かをランダムに決める
+    var bossApproachesFirst = Math.random() < 0.5;
+    boss.role = bossApproachesFirst ? 'approaching' : 'retreating';
+    partner.role = bossApproachesFirst ? 'retreating' : 'approaching';
+    boss.magnetVariant = 'red';
+    partner.magnetVariant = 'blue';
+    game.entities.push(partner);
+  }
+
   function startBossIntro(game, width, height) {
     var boss = Spawner.nextBoss(game.spawner, width, height);
     game.currentBoss = boss;
     game.bossIntroStartDistance = boss.distanceFromCenter;
     if (game.firstBossRankSeen === null) { game.firstBossRankSeen = boss.rank; }
     game.entities.push(boss);
+    if (boss.rank === 'jishaku') { spawnMagnetPartner(game, boss, width, height); }
     game.phase = 'BOSS_INTRO';
     game.phaseTimer = BOSS_INTRO_DURATION;
     applyBossAppearGyojiSpeedup(game);
@@ -322,30 +401,49 @@
       Spawner.updateBossEncounterZako(game.spawner, dt, game.entities, width, height, function (zako) {
         game.entities.push(zako);
       });
+      var introPartner = game.currentBoss && game.currentBoss.partner;
       // ボスの登場演出中も、残っている雑魚・行司は止まらずに動き続ける
-      if (updateRoamingEntities(game, dt, game.currentBoss)) { return; }
+      if (updateRoamingEntities(game, dt, game.currentBoss, introPartner)) { return; }
       game.phaseTimer -= dt;
       var t = Math.min(1, 1 - Math.max(0, game.phaseTimer) / BOSS_INTRO_DURATION);
       game.currentBoss.distanceFromCenter = game.bossIntroStartDistance +
         (BOSS_INTRO_TARGET_DISTANCE - game.bossIntroStartDistance) * t;
+      // 前頭(磁石)は相棒も同じ滑り込みタイミングで一緒に登場させる
+      if (introPartner) {
+        introPartner.distanceFromCenter = game.bossIntroStartDistance +
+          (BOSS_INTRO_TARGET_DISTANCE - game.bossIntroStartDistance) * t;
+      }
       if (game.phaseTimer <= 0) {
         game.currentBoss.distanceFromCenter = BOSS_INTRO_TARGET_DISTANCE;
         game.currentBoss.phase = 'active';
         game.currentBoss.spawnedAt = game.elapsedTime;
+        if (introPartner) {
+          introPartner.distanceFromCenter = BOSS_INTRO_TARGET_DISTANCE;
+          introPartner.phase = 'active';
+          introPartner.spawnedAt = game.elapsedTime;
+        }
         game.phase = 'BOSS';
       }
     } else if (game.phase === 'BOSS') {
       var boss2 = game.currentBoss;
+      var partner2 = boss2 && boss2.partner;
       Spawner.updateBossEncounterZako(game.spawner, dt, game.entities, width, height, function (zako) {
         game.entities.push(zako);
       });
-      if (updateRoamingEntities(game, dt, boss2)) { return; }
+      if (updateRoamingEntities(game, dt, boss2, partner2)) { return; }
       if (boss2) {
         Entities.updateEntity(boss2, dt, game.elapsedTime - boss2.spawnedAt);
         applyBossAbilitySideEffects(game, boss2, width, height);
         // 無敵状態(自分が召喚した雑魚が生きている間)を描画側・boss.js側へ伝える
         boss2.invincible = Boss.hasSummonShield(boss2) && hasAliveSummonedZako(game, boss2);
         if (Entities.hasReachedCenter(boss2)) {
+          endGame(game);
+          return;
+        }
+      }
+      if (partner2) {
+        Entities.updateEntity(partner2, dt, game.elapsedTime - partner2.spawnedAt);
+        if (Entities.hasReachedCenter(partner2)) {
           endGame(game);
           return;
         }

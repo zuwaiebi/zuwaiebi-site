@@ -15,7 +15,7 @@
     zakoSpeedGrowthPerSecond: 0.0009,
     zakoSpeedCap: 0.20,
     killsPerBossWave: 15,
-    // ボスを一周(前頭〜横綱)するごとに、次の周でボス出現に必要な撃退数を増やす
+    // ボスを一周(全ランク)するごとに、次の周でボス出現に必要な撃退数を増やす
     killsPerBossWaveGrowthPerLap: 5,
     lapDifficultyMultiplier: 1.25
   };

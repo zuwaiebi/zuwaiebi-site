@@ -37,11 +37,13 @@
     };
   }
 
-  function createBoss(rankKey, lap, lapMultiplier, width, height) {
+  // angleOverrideを指定すると出現角度をランダムにせず固定する(前頭=磁石
+  // ギミックの赤・青を必ず向かい合わせ=角度差πで出現させるためにdosukoi2_game.js側が使う)。
+  function createBoss(rankKey, lap, lapMultiplier, width, height, angleOverride) {
     var Render = global.Dosukoi2.Render;
     var info = Boss.RANK_INFO[rankKey];
     var stats = Boss.statsFor(rankKey, lap, lapMultiplier);
-    var angle = Math.random() * Math.PI * 2;
+    var angle = angleOverride !== undefined ? angleOverride : Math.random() * Math.PI * 2;
     var geometry = Render.computeFieldGeometry(width, height);
     var spawnDistance = Render.computeSpawnDistance(geometry, width, height, angle);
     return {

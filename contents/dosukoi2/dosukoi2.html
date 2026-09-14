@@ -35,6 +35,7 @@
       <p class="story-caption" id="story-caption"></p>
     </div>
     <div class="story-nav">
+      <button id="btn-story-to-title" class="sub-button">タイトルへ</button>
       <button id="btn-story-skip" class="sub-button">スキップ</button>
       <button id="btn-story-next" class="main-button">つぎへ</button>
     </div>
@@ -50,7 +51,10 @@
         <li>一定数を倒すと強いボスが登場する。何度もタップして倒そう。</li>
       </ul>
     </div>
-    <button id="btn-howto-close" class="main-button">はじめる</button>
+    <div class="menu">
+      <button id="btn-howto-close" class="main-button">はじめる</button>
+      <button id="btn-howto-to-title" class="sub-button">タイトルへ</button>
+    </div>
   </div>
 
   <div id="screen-play" class="screen">
@@ -72,7 +76,7 @@
   </div>
 
   <div id="screen-result" class="screen">
-    <h2 id="result-title">ゲームオーバー</h2>
+    <h2 id="result-title">げぇむおーばー</h2>
     <ul class="result-stats" id="result-stats"></ul>
     <p id="result-best" class="result-best"></p>
     <div class="omake" id="omake" hidden>
@@ -92,6 +96,7 @@
   <script src="dosukoi2_spawner.js"></script>
   <script src="dosukoi2_input.js"></script>
   <script src="dosukoi2_render.js"></script>
+  <script src="dosukoi2_ads.js"></script>
   <script src="dosukoi2_state.js"></script>
   <script src="dosukoi2_game.js"></script>
   <script src="dosukoi2_result.js"></script>

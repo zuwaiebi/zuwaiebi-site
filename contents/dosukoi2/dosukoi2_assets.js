@@ -7,6 +7,10 @@
     zako: 'data/images/zako.png',
     oozekiZako: 'data/images/oozeki_zako.png',
     gyoji: 'data/images/gyoji.png',
+    bossJishakuRed: 'data/images/boss_jishaku_red.png',
+    bossJishakuBlue: 'data/images/boss_jishaku_blue.png',
+    bossMakushita: 'data/images/boss_makushita.png',
+    bossJuryo: 'data/images/boss_juryo.png',
     bossMaekashira: 'data/images/boss_maekashira.png',
     bossKomusubi: 'data/images/boss_komusubi.png',
     bossSekiwake: 'data/images/boss_sekiwake.png',
@@ -33,6 +37,8 @@
     miss: 'data/audio/miss_se.mp3',
     horagai: 'data/audio/horagai.mp3',
     crowdCheer: 'data/audio/Crowd Cheer.mp3',
+    metal: 'data/audio/metal.mp3',
+    electricShock: 'data/audio/Electric_Shock.mp3',
     bgmTitle: 'data/audio/title_bgm.mp3',
     bgmMain: 'data/audio/main_bgm.mp3',
     bgmExtra: 'data/audio/extra_bgm.mp3'
@@ -44,6 +50,8 @@
     bossDefeated: 'decision',
     bossApproaching: 'horagai',
     bossVictory: 'crowdCheer',
+    cyborgKnockback: 'metal',
+    cyborgShock: 'electricShock',
     gameOver: 'miss',
     decision: 'decision',
     gameStart: 'gameStart'
@@ -55,6 +63,9 @@
   var loaded = {};
   var audioElements = {};
   var currentBgmEl = null;
+  // タブが非表示/画面ロック等で隠れた際、こちらの都合でBGMを一時停止したかどうか。
+  // 明示的なplayBgm/stopBgm呼び出しとは区別し、復帰時にだけ自動再開する。
+  var bgmPausedByVisibility = false;
 
   function loadOne(key, src) {
     return new Promise(function (resolve) {
@@ -72,6 +83,31 @@
     });
   }
 
+  // 効果音プール(1つの音につき複数のAudio要素を使い回す)のサイズ。
+  // 連打時に前の再生と重ねて鳴らすため、cloneNodeではなく事前生成した
+  // プールを順番に使い回す(詳細はgetAudio/playSoundのコメント参照)。
+  var SE_POOL_SIZE = 4;
+  var sePools = {};
+
+  // preload="auto"を指定した上でload()を呼び、要素生成と同時にダウンロードを
+  // 開始させる。実サーバー配信時、効果音初回再生時にダウンロード待ちで
+  // 再生が遅れる問題への対策(詳細はpreload/playSoundのコメント参照)。
+  function createLoadedAudio(src) {
+    var el = new Audio();
+    el.preload = 'auto';
+    el.src = src;
+    try { el.load(); } catch (e) { /* 一部環境でload()が例外を投げても無視する */ }
+    return el;
+  }
+
+  function buildSePool(key) {
+    var src = ASSET_AUDIO[key];
+    if (!src) { return null; }
+    var nodes = [];
+    for (var i = 0; i < SE_POOL_SIZE; i++) { nodes.push(createLoadedAudio(src)); }
+    return { nodes: nodes, index: 0 };
+  }
+
   function preload() {
     var promises = Object.keys(ASSET_IMAGES).map(function (key) {
       return loadOne(key, ASSET_IMAGES[key]);
@@ -79,6 +115,19 @@
     var storyPromises = ASSET_STORY.map(function (entry, index) {
       return loadOne('story_' + index, entry.image);
     });
+
+    // 効果音・BGMは実際に鳴らす瞬間(初回タップ等)まで読み込みを遅らせず、
+    // ここで先読みを始めておく。ローカルファイルでは気づきにくいが、実際に
+    // webサーバーへ公開して再生すると、遅延読み込みでは初回再生がネットワーク
+    // 待ちで遅れて聞こえることがあるため。
+    Object.keys(SE_MAP).forEach(function (id) {
+      var key = SE_MAP[id];
+      if (key && !sePools[key]) { sePools[key] = buildSePool(key); }
+    });
+    Object.keys(BGM_MAP).forEach(function (mode) {
+      getAudio(BGM_MAP[mode]);
+    });
+
     return Promise.allSettled(promises.concat(storyPromises));
   }
 
@@ -113,7 +162,7 @@
     var src = ASSET_AUDIO[key];
     if (!src) { return null; }
     try {
-      var el = new Audio(src);
+      var el = createLoadedAudio(src);
       audioElements[key] = el;
       return el;
     } catch (e) {
@@ -128,10 +177,15 @@
     try {
       var key = SE_MAP[id];
       if (!key) { return; }
-      var el = getAudio(key);
-      if (!el) { return; }
-      // 複製して鳴らすことで、連打時に前の再生が途切れず重なって鳴るようにする
-      var node = el.cloneNode(true);
+      // 再生の都度cloneNodeで複製すると、複製後に改めて読み込みが走り
+      // (特に実サーバー配信時)再生が遅れることがあるため、preloadで事前に
+      // 用意しておいたプールを使い回す(連打時に前の再生と重ねて鳴らす目的も
+      // これで達成できる)。
+      var pool = sePools[key] || (sePools[key] = buildSePool(key));
+      if (!pool) { return; }
+      var node = pool.nodes[pool.index];
+      pool.index = (pool.index + 1) % pool.nodes.length;
+      node.currentTime = 0;
       node.volume = 0.8;
       var p = node.play();
       if (p && typeof p.catch === 'function') { p.catch(function () {}); }
@@ -144,6 +198,7 @@
       if (!key) { return; }
       var el = getAudio(key);
       if (!el) { return; }
+      bgmPausedByVisibility = false;
       if (currentBgmEl === el && !el.paused) { return; }
       stopBgm();
       el.loop = true;
@@ -156,10 +211,33 @@
 
   function stopBgm() {
     try {
+      bgmPausedByVisibility = false;
       if (currentBgmEl) {
         currentBgmEl.pause();
         currentBgmEl.currentTime = 0;
         currentBgmEl = null;
+      }
+    } catch (e) { /* noop */ }
+  }
+
+  // タブが非表示になったり画面を消したりした際にBGMが鳴りっぱなしにならない
+  // ようにする。stopBgmとは異なり再生位置(currentTime)は保持し、復帰時に
+  // resumeBgmIfHiddenで同じ位置から再開する。
+  function pauseBgmForHidden() {
+    try {
+      if (currentBgmEl && !currentBgmEl.paused) {
+        currentBgmEl.pause();
+        bgmPausedByVisibility = true;
+      }
+    } catch (e) { /* noop */ }
+  }
+
+  function resumeBgmIfHidden() {
+    try {
+      if (currentBgmEl && bgmPausedByVisibility) {
+        bgmPausedByVisibility = false;
+        var p = currentBgmEl.play();
+        if (p && typeof p.catch === 'function') { p.catch(function () {}); }
       }
     } catch (e) { /* noop */ }
   }
@@ -174,6 +252,8 @@
     drawSprite: drawSprite,
     playSound: playSound,
     playBgm: playBgm,
-    stopBgm: stopBgm
+    stopBgm: stopBgm,
+    pauseBgmForHidden: pauseBgmForHidden,
+    resumeBgmIfHidden: resumeBgmIfHidden
   };
 })(window);

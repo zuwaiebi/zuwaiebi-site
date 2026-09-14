@@ -10,6 +10,7 @@
   var Input = Dosukoi2.Input;
   var Result = Dosukoi2.Result;
   var Boss = Dosukoi2.Boss;
+  var AdBlock = Dosukoi2.AdBlock;
 
   var canvas = document.getElementById('game-canvas');
   var ctx = canvas.getContext('2d');
@@ -46,7 +47,9 @@
       bossWrap.hidden = true;
     } else if (game.currentBoss && (game.phase === 'BOSS_INTRO' || game.phase === 'BOSS')) {
       var info = Boss.RANK_INFO[game.currentBoss.rank];
-      rankEl.textContent = info.label + '出現！';
+      // ボスHPバー上の「○○出現！」の文字は表示しない(接近時の警告演出で
+      // 既に番付名を大きく表示しているため、ここでは空にする)
+      rankEl.textContent = '';
       bossWrap.hidden = false;
       document.getElementById('boss-hp-label').textContent = info.label;
       var pct = Math.max(0, game.currentBoss.hp / game.currentBoss.maxHp) * 100;
@@ -69,10 +72,17 @@
     if (currentGame) {
       Render.draw(ctx, cssWidth, cssHeight, currentGame);
     }
+
+    // 十両(広告妨害ボス、内部key: komusubi)の広告連鎖は、DOM要素として本ループから毎フレーム駆動する
+    var komusubiActive = !!(currentGame && currentGame.currentBoss &&
+      currentGame.currentBoss.rank === 'komusubi' && currentGame.phase === 'BOSS');
+    AdBlock.sync(komusubiActive, currentGame ? currentGame.spawner.lap : 0, dt);
+
     requestAnimationFrame(loop);
   }
 
   function startGame(mode) {
+    AdBlock.endEncounter();
     if (document.getElementById('chk-fullscreen').checked) { tryEnterFullscreen(); }
     Assets.playSound('gameStart');
     Assets.playBgm(mode);
@@ -151,6 +161,8 @@
   }
 
   function init() {
+    AdBlock.init(document.getElementById('play-frame'));
+
     // ボタンの配線を最優先で行う。アセット読み込み/BGM再生を先に行うと、
     // 万一そちらで例外が起きた際にボタンが一切反応しなくなってしまうため、
     // 配線を終えてから後段でアセット関連の処理を行う。
@@ -182,6 +194,18 @@
     document.getElementById('btn-story-skip').addEventListener('click', function () {
       Assets.playSound('decision');
       State.show('howto');
+    });
+
+    document.getElementById('btn-story-to-title').addEventListener('click', function () {
+      Assets.playSound('decision');
+      refreshTitle();
+      State.show('title');
+    });
+
+    document.getElementById('btn-howto-to-title').addEventListener('click', function () {
+      Assets.playSound('decision');
+      refreshTitle();
+      State.show('title');
     });
 
     document.getElementById('btn-story-next').addEventListener('click', function () {
@@ -237,11 +261,33 @@
       });
     });
 
+    document.addEventListener('visibilitychange', function () {
+      if (document.hidden) {
+        Assets.pauseBgmForHidden();
+      } else {
+        Assets.resumeBgmIfHidden();
+      }
+    });
+
     requestAnimationFrame(loop);
 
     try { Assets.preload(); } catch (e) { /* 素材読み込みに失敗してもゲーム進行は妨げない */ }
     try { refreshTitle(); } catch (e) { /* noop */ }
     Assets.playBgm('title');
+    armBgmAutoplayFallback();
+  }
+
+  // 多くのブラウザは、ページを開いた直後(ユーザー操作前)のBGM自動再生を
+  // ブロックする。その場合に備え、ページ内で最初に何らかの操作があった
+  // 時点で改めて再生を試みる(以後は不要なので一度実行したら解除する)。
+  function armBgmAutoplayFallback() {
+    function tryStart() {
+      document.removeEventListener('pointerdown', tryStart, true);
+      document.removeEventListener('keydown', tryStart, true);
+      Assets.playBgm('title');
+    }
+    document.addEventListener('pointerdown', tryStart, true);
+    document.addEventListener('keydown', tryStart, true);
   }
 
   document.addEventListener('DOMContentLoaded', init);

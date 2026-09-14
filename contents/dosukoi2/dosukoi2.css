@@ -257,6 +257,43 @@ button, input, select, textarea {
   transition: width 0.15s linear;
 }
 
+/* 小結(広告妨害ボス)が出す邪魔な広告風ウィンドウ。canvasの上に本物のDOM要素
+   として重ね、下の敵をタップできないようにする(input.jsの変更は不要)。
+   #game-canvasと同様にtouch-action: noneを指定し、スマホでの連続タップが
+   ダブルタップズーム等のジェスチャーとして解釈されて×ボタンの反応が
+   失われることがないようにする。 */
+.ad-window {
+  position: absolute;
+  overflow: hidden;
+  border: 3px solid #ffe600;
+  border-radius: 6px;
+  background: #000;
+  touch-action: none;
+}
+
+.ad-window img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.ad-close-btn {
+  position: absolute;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  line-height: 24px;
+  border-radius: 50%;
+  border: 2px solid #fff;
+  background: #e5484d;
+  color: #fff;
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+  touch-action: none;
+}
+
 /* 正方形のプレイ画面の外(黒帯)に表示するロゴ・スコア・ボス撃破数。
    横持ちでは左の黒帯に縦並び、縦持ちでは上の黒帯に横並びで表示する。 */
 .play-outside {

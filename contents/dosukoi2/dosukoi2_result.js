@@ -23,7 +23,7 @@
 
   function show(result) {
     document.getElementById('result-title').textContent =
-      result.mode === 'extra' ? 'ゲームオーバー (EXTRA)' : 'ゲームオーバー';
+      result.mode === 'extra' ? 'げぇむおーばー (EXTRA)' : 'げぇむおーばー';
 
     var statsEl = document.getElementById('result-stats');
     statsEl.innerHTML = '';

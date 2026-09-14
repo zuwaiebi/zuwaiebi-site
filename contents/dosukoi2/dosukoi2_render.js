@@ -21,19 +21,29 @@
     };
   }
 
-  // 角度ごとに「画面矩形の外に出る距離」を計算する。円形のフィールド半径だけで
-  // 出現距離を決めると、横長画面では横方向の出現位置が画面内に収まってしまうため、
-  // 実際のcanvas矩形との交差距離+余白を使い、確実に画面外(不可視)から出現させる。
-  function computeSpawnDistance(geometry, width, height, angle) {
+  // 指定した角度の光線が、canvas矩形(画面端)と交差するまでの距離(px)を返す。
+  function computeBoundaryDistance(width, height, angle) {
     var halfW = width / 2;
     var halfH = height / 2;
     var cos = Math.cos(angle);
     var sin = Math.sin(angle);
     var tHoriz = Math.abs(cos) > 1e-6 ? halfW / Math.abs(cos) : Infinity;
     var tVert = Math.abs(sin) > 1e-6 ? halfH / Math.abs(sin) : Infinity;
-    var boundaryDist = Math.min(tHoriz, tVert);
+    return Math.min(tHoriz, tVert);
+  }
+
+  // 角度ごとに「画面矩形の外に出る距離」を計算する。円形のフィールド半径だけで
+  // 出現距離を決めると、横長画面では横方向の出現位置が画面内に収まってしまうため、
+  // 実際のcanvas矩形との交差距離+余白を使い、確実に画面外(不可視)から出現させる。
+  function computeSpawnDistance(geometry, width, height, angle) {
     var margin = 48; // px。画面端ぎりぎりで湧かず、確実に不可視の位置から出現させる
-    return (boundaryDist + margin) / geometry.fieldRadius;
+    return (computeBoundaryDistance(width, height, angle) + margin) / geometry.fieldRadius;
+  }
+
+  // 関脇(半無敵サイボーグ)を弾き飛ばした先が、画面端(電流が流れる境界)に
+  // 到達したかどうかの判定に使う。出現用の余白を含まない、純粋な境界距離。
+  function computeEdgeDistance(geometry, width, height, angle) {
+    return computeBoundaryDistance(width, height, angle) / geometry.fieldRadius;
   }
 
   var EDGE_MARGIN = 48;
@@ -173,9 +183,25 @@
     ctx.restore();
 
     var hue = (elapsedTime * 90) % 360;
+    var textSize = fitBannerFontSize(ctx, label, width * 0.9, Math.round(Math.min(width, height) * 0.15));
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    // iOS Safariは「グラデーションのfillStyle」と「shadowBlur」を同時に
+    // テキストへ適用すると、文字の下に格子状の壊れた模様が出る既知の不具合が
+    // あるため、光彩(shadow)は単色fillStyleのみの1回目の描画で作り、
+    // グラデーションで塗る本番の文字はshadowを外した2回目の描画で重ねる
+    // (見た目はほぼ変わらないまま、両者が同時に適用される場面を無くす)。
     ctx.save();
     ctx.globalAlpha = 0.95;
-    var textSize = fitBannerFontSize(ctx, label, width * 0.9, Math.round(Math.min(width, height) * 0.15));
+    ctx.fillStyle = 'hsl(' + hue + ', 100%, 70%)';
+    ctx.shadowColor = 'hsl(' + hue + ', 100%, 70%)';
+    ctx.shadowBlur = Math.min(width, height) * 0.09;
+    ctx.fillText(label, width / 2, height / 2);
+    ctx.restore();
+
+    ctx.save();
+    ctx.globalAlpha = 0.95;
     var gradient = ctx.createLinearGradient(width / 2, height / 2 - textSize / 2, width / 2, height / 2 + textSize / 2);
     gradient.addColorStop(0, '#fff6d0');
     gradient.addColorStop(0.5, 'hsl(' + hue + ', 90%, 65%)');
@@ -183,10 +209,6 @@
     ctx.fillStyle = gradient;
     ctx.strokeStyle = '#7a4a00';
     ctx.lineWidth = 5;
-    ctx.shadowColor = 'hsl(' + hue + ', 100%, 70%)';
-    ctx.shadowBlur = Math.min(width, height) * 0.09;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
     ctx.strokeText(label, width / 2, height / 2);
     ctx.fillText(label, width / 2, height / 2);
     ctx.restore();
@@ -202,11 +224,10 @@
     ctx.stroke();
   }
 
-  function fallbackBoss(ctx, x, y, sizePx, rankKey) {
-    var info = Boss.RANK_INFO[rankKey];
+  function fallbackBossShape(ctx, x, y, sizePx, color, letter) {
     ctx.beginPath();
     ctx.arc(x, y, sizePx / 2, 0, Math.PI * 2);
-    ctx.fillStyle = info.color;
+    ctx.fillStyle = color;
     ctx.fill();
     ctx.lineWidth = 3;
     ctx.strokeStyle = '#222';
@@ -215,8 +236,17 @@
     ctx.font = 'bold ' + Math.round(sizePx * 0.4) + 'px ' + BRUSH_FONT_FAMILY;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(info.letter, x, y);
+    ctx.fillText(letter, x, y);
   }
+
+  function fallbackBoss(ctx, x, y, sizePx, rankKey) {
+    var info = Boss.RANK_INFO[rankKey];
+    fallbackBossShape(ctx, x, y, sizePx, info.color, info.letter);
+  }
+
+  // 前頭(赤・青、内部key: jishaku)の色分け。同じrankでも、どちらの個体かで色・文字を変える。
+  var MAGNET_COLORS = { red: '#e5484d', blue: '#3b6fe0' };
+  var MAGNET_LETTERS = { red: '赤', blue: '青' };
 
   function fallbackGyoji(ctx, x, y, sizePx) {
     ctx.save();
@@ -238,23 +268,145 @@
     ctx.fillText('行', x, y);
   }
 
-  // 大関の無敵中(召喚した雑魚が生きている間)は虹色に光らせて分かりやすくする
-  function drawInvincibleGlow(ctx, x, y, sizePx, elapsedTime) {
-    var hue = (elapsedTime * 220) % 360;
+  // 大関の無敵中(召喚した雑魚が生きている間)は虹色に光らせて分かりやすくする。
+  // 関脇(半無敵サイボーグ)は常時、同じ演出を銀色固定(fixedColor指定)で纏う。
+  function drawInvincibleGlow(ctx, x, y, sizePx, elapsedTime, fixedColor) {
+    var color = fixedColor || ('hsl(' + ((elapsedTime * 220) % 360) + ', 100%, 60%)');
     ctx.save();
     ctx.globalAlpha = 0.6 + 0.25 * Math.sin(elapsedTime * 10);
-    ctx.shadowColor = 'hsl(' + hue + ', 100%, 60%)';
+    ctx.shadowColor = color;
     ctx.shadowBlur = sizePx * 0.6;
     ctx.lineWidth = Math.max(3, sizePx * 0.1);
-    ctx.strokeStyle = 'hsl(' + hue + ', 100%, 60%)';
+    ctx.strokeStyle = color;
     ctx.beginPath();
     ctx.arc(x, y, sizePx * 0.58, 0, Math.PI * 2);
     ctx.stroke();
     ctx.restore();
   }
 
+  // シェーダーでよく使われる簡易ハッシュ。同じseedには常に同じ値を返す
+  // (0〜1)ので、「その一瞬のギザギザ形状」を毎フレーム安定して再現しつつ、
+  // seedを変えるだけで別の形状に切り替えられる(=パチパチ弾ける明滅表現に使う)。
+  function pseudoRandom(seed) {
+    var x = Math.sin(seed * 12.9898) * 43758.5453;
+    return x - Math.floor(x);
+  }
+
+  var LIGHTNING_SEGMENTS_PER_EDGE = 9;
+  var LIGHTNING_JITTER_PX = 24;
+  var LIGHTNING_FLICKER_INTERVAL = 0.055; // これより短い間隔で形状を切り替える(パチパチ感)
+
+  // 画面四辺に沿ってギザギザに歪んだ閉路を作る。四隅そのものは動かさず、
+  // 各辺の途中だけを法線方向にランダムへずらすことで、雷のような
+  // 稲妻状の輪郭にする。
+  function buildElectricBorderPoints(width, height, flickerSeed) {
+    var margin = 3;
+    var corners = [
+      { x: margin, y: margin },
+      { x: width - margin, y: margin },
+      { x: width - margin, y: height - margin },
+      { x: margin, y: height - margin }
+    ];
+    var pts = [];
+    var idx = 0;
+    for (var edge = 0; edge < 4; edge++) {
+      var a = corners[edge];
+      var b = corners[(edge + 1) % 4];
+      var dx = b.x - a.x;
+      var dy = b.y - a.y;
+      var len = Math.sqrt(dx * dx + dy * dy) || 1;
+      var nx = -dy / len;
+      var ny = dx / len;
+      for (var s = 0; s < LIGHTNING_SEGMENTS_PER_EDGE; s++) {
+        var t = s / LIGHTNING_SEGMENTS_PER_EDGE;
+        // 角そのものはジッターさせず、辺の中央に近いほど大きく歪ませる
+        var edgeFactor = Math.sin(t * Math.PI);
+        var jitter = (pseudoRandom(idx * 3.71 + flickerSeed * 91.3) - 0.5) * 2 * LIGHTNING_JITTER_PX * edgeFactor;
+        pts.push({
+          x: a.x + dx * t + nx * jitter,
+          y: a.y + dy * t + ny * jitter
+        });
+        idx++;
+      }
+    }
+    return pts;
+  }
+
+  function strokeClosedPath(ctx, pts) {
+    ctx.beginPath();
+    for (var i = 0; i < pts.length; i++) {
+      if (i === 0) { ctx.moveTo(pts[i].x, pts[i].y); } else { ctx.lineTo(pts[i].x, pts[i].y); }
+    }
+    ctx.closePath();
+    ctx.stroke();
+  }
+
+  // 関脇戦中、画面端の四辺に流れる電流の演出。稲妻のようにギザギザに歪んだ
+  // 輪郭を短い間隔で切り替えることでパチパチと弾ける明滅感を出し、外側に淡い
+  // 発光、内側に白い芯を重ねることで実際の電流・放電のような見た目にする。
+  // さらに数本の短いスパーク(枝分かれ)をランダムな位置に添える。
+  // 弾き飛ばされた関脇がここまで届くとダメージが入る。
+  function drawElectricBorder(ctx, width, height, elapsedTime) {
+    var flickerSeed = Math.floor(elapsedTime / LIGHTNING_FLICKER_INTERVAL);
+    var pts = buildElectricBorderPoints(width, height, flickerSeed);
+    var flicker = 0.65 + 0.35 * pseudoRandom(flickerSeed * 1.7);
+
+    ctx.save();
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+
+    // 外側の淡い発光(ぼかし)
+    ctx.globalAlpha = flicker * 0.6;
+    ctx.strokeStyle = '#7fe0ff';
+    ctx.shadowColor = '#7fe0ff';
+    ctx.shadowBlur = 22;
+    ctx.lineWidth = 7;
+    strokeClosedPath(ctx, pts);
+
+    // 内側の白い芯
+    ctx.globalAlpha = flicker;
+    ctx.strokeStyle = '#ffffff';
+    ctx.shadowBlur = 10;
+    ctx.lineWidth = 2;
+    strokeClosedPath(ctx, pts);
+
+    // 輪郭からランダムに飛び出す短いスパーク(枝分かれ)
+    ctx.strokeStyle = '#dff6ff';
+    ctx.shadowBlur = 8;
+    ctx.lineWidth = 1.5;
+    var branchCount = 3 + Math.floor(pseudoRandom(flickerSeed * 5.3) * 3);
+    for (var b = 0; b < branchCount; b++) {
+      var base = pts[Math.floor(pseudoRandom(flickerSeed + b * 13.1) * pts.length)];
+      var angle = pseudoRandom(flickerSeed + b * 27.7) * Math.PI * 2;
+      var sparkLen = 8 + pseudoRandom(flickerSeed + b * 41.9) * 14;
+      ctx.globalAlpha = flicker * (0.5 + 0.5 * pseudoRandom(flickerSeed + b * 8.2));
+      ctx.beginPath();
+      ctx.moveTo(base.x, base.y);
+      ctx.lineTo(base.x + Math.cos(angle) * sparkLen, base.y + Math.sin(angle) * sparkLen);
+      ctx.stroke();
+    }
+
+    ctx.restore();
+  }
+
+  function easeOutCubic(t) {
+    return 1 - Math.pow(1 - t, 3);
+  }
+
+  // 関脇が弾き飛ばされた際、当たり判定上は即座に着地点へ移すが、見た目は
+  // knockbackAnimを使って弧を描きながら移動する様子を見せる(描画専用の位置)。
+  function getVisualPosition(entity) {
+    var anim = entity.patternState && entity.patternState.knockbackAnim;
+    if (!anim) { return Entities.getPosition(entity); }
+    var t = Math.min(1, anim.elapsed / anim.duration);
+    var eased = easeOutCubic(t);
+    var angle = anim.fromAngle + (anim.toAngle - anim.fromAngle) * eased;
+    var distance = anim.fromDistance + (anim.toDistance - anim.fromDistance) * eased;
+    return { nx: Math.cos(angle) * distance, ny: Math.sin(angle) * distance };
+  }
+
   function drawEntity(ctx, geometry, entity, elapsedTime) {
-    var pos2 = Entities.getPosition(entity);
+    var pos2 = getVisualPosition(entity);
     var pos = toPixel(geometry, pos2.nx, pos2.ny);
     var sizePx = entity.size * geometry.fieldRadius;
 
@@ -267,11 +419,21 @@
     } else {
       if (entity.invincible) {
         drawInvincibleGlow(ctx, pos.x, pos.y, sizePx, elapsedTime);
+      } else if (entity.rank === 'sekiwake') {
+        drawInvincibleGlow(ctx, pos.x, pos.y, sizePx, elapsedTime, '#c7d2db');
       }
-      var info = Boss.RANK_INFO[entity.rank];
-      Assets.drawSprite(ctx, info.assetKey, pos.x, pos.y, sizePx, 0, function (c, x, y, s) {
-        fallbackBoss(c, x, y, s, entity.rank);
-      });
+      if (entity.rank === 'jishaku') {
+        var variant = entity.magnetVariant;
+        var assetKey = variant === 'red' ? 'bossJishakuRed' : 'bossJishakuBlue';
+        Assets.drawSprite(ctx, assetKey, pos.x, pos.y, sizePx, 0, function (c, x, y, s) {
+          fallbackBossShape(c, x, y, s, MAGNET_COLORS[variant], MAGNET_LETTERS[variant]);
+        });
+      } else {
+        var info = Boss.RANK_INFO[entity.rank];
+        Assets.drawSprite(ctx, info.assetKey, pos.x, pos.y, sizePx, 0, function (c, x, y, s) {
+          fallbackBoss(c, x, y, s, entity.rank);
+        });
+      }
     }
   }
 
@@ -349,12 +511,18 @@
       drawEntity(ctx, geometry, game.entities[i], game.elapsedTime);
     }
     drawEffects(ctx, geometry, game.effects);
+
+    if (game.currentBoss && game.currentBoss.rank === 'sekiwake' &&
+      (game.phase === 'BOSS_INTRO' || game.phase === 'BOSS')) {
+      drawElectricBorder(ctx, width, height, game.elapsedTime);
+    }
   }
 
   global.Dosukoi2 = global.Dosukoi2 || {};
   global.Dosukoi2.Render = {
     computeFieldGeometry: computeFieldGeometry,
     computeSpawnDistance: computeSpawnDistance,
+    computeEdgeDistance: computeEdgeDistance,
     randomEdgePoint: randomEdgePoint,
     toPixel: toPixel,
     draw: draw
