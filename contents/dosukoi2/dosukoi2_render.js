@@ -268,8 +268,10 @@
     ctx.fillText('行', x, y);
   }
 
-  // 大関の無敵中(召喚した雑魚が生きている間)は虹色に光らせて分かりやすくする。
-  // 関脇(半無敵サイボーグ)は常時、同じ演出を銀色固定(fixedColor指定)で纏う。
+  // 無敵中(召喚した雑魚が生きている間)の横綱(HP25%以下、大関の技を借用中)を
+  // 虹色に光らせて分かりやすくする。関脇(半無敵サイボーグ)は常時、同じ演出を
+  // 銀色固定(fixedColor指定)で纏う。大関自身はもうこの無敵オーラを使わない
+  // (代わりに召喚の瞬間だけ画面全体を灰色にする。drawTimeStopOverlay参照)。
   function drawInvincibleGlow(ctx, x, y, sizePx, elapsedTime, fixedColor) {
     var color = fixedColor || ('hsl(' + ((elapsedTime * 220) % 360) + ', 100%, 60%)');
     ctx.save();
@@ -490,6 +492,21 @@
     }
   }
 
+  // 大関の時間停止中、画面全体に薄い灰色を重ねる。drawWarningの赤い点滅とは
+  // 異なり、雑魚が1体ずつ配置されていく様子が見えるよう、敵の描画より後に
+  // (=敵の上から)半透明で重ねることで「止まった世界がうっすら灰色がかる」
+  // 見た目にする(完全に覆い隠さない)。
+  var TIME_STOP_OVERLAY_ALPHA = 0.55;
+  var TIME_STOP_OVERLAY_COLOR = '#8a8f98';
+
+  function drawTimeStopOverlay(ctx, width, height) {
+    ctx.save();
+    ctx.globalAlpha = TIME_STOP_OVERLAY_ALPHA;
+    ctx.fillStyle = TIME_STOP_OVERLAY_COLOR;
+    ctx.fillRect(0, 0, width, height);
+    ctx.restore();
+  }
+
   function draw(ctx, width, height, game) {
     ctx.clearRect(0, 0, width, height);
 
@@ -511,6 +528,10 @@
       drawEntity(ctx, geometry, game.entities[i], game.elapsedTime);
     }
     drawEffects(ctx, geometry, game.effects);
+
+    if (game.timeStop) {
+      drawTimeStopOverlay(ctx, width, height);
+    }
 
     if (game.currentBoss && game.currentBoss.rank === 'sekiwake' &&
       (game.phase === 'BOSS_INTRO' || game.phase === 'BOSS')) {

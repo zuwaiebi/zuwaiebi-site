@@ -27,6 +27,16 @@
   // 以降のボス戦の間合いを変えないための値。
   var BOSS_INTRO_TARGET_DISTANCE = 1.0;
 
+  // 大関の「時間停止からくり」。召喚のたびにゲーム全体を一時停止し、雑魚を
+  // 1体ずつこの間隔で配置していく(画面外からではなく、いきなり所定の位置に
+  // 出現させる)。詳細はstartOzekiTimeStop/updateOzekiTimeStopのコメント参照。
+  var OZEKI_TIMESTOP_SPAWN_INTERVAL = 0.2;
+  // 雑魚の配置位置。中心(0)から見て端(1.0、通常の登場距離の基準)までの2/3。
+  var OZEKI_TIMESTOP_SUMMON_DISTANCE = 2 / 3;
+  // 最後の1体を配置してから、実際に時間を再開するまでの余韻(秒)。
+  // 0にすると配置完了と同時に動き出してしまい、隊列を見せる間が無くなるため。
+  var OZEKI_TIMESTOP_POST_SPAWN_HOLD = 0.4;
+
   function createGame(mode) {
     return {
       mode: mode,
@@ -47,6 +57,10 @@
       firstBossRankSeen: null,
       firstBossDefeated: false,
       lastDefeatedRankLabel: null,
+      // 大関の時間停止中はnullではなく{queue, spawnTimer, holdTimer, ...}になる
+      // (詳細はstartOzekiTimeStopのコメント参照)。null以外の間、update()は
+      // 冒頭で早期returnし、ゲーム全体(大関含む)が完全に停止する。
+      timeStop: null,
       isOver: false,
       onGameOver: null
     };
@@ -167,8 +181,9 @@
   }
 
   function onBossDamaged(game, boss) {
-    // 大関、および召喚フェーズの横綱は、自分が呼び出した雑魚が生きている間は無敵
-    // (先に雑魚を片付けさせる)
+    // 召喚フェーズの横綱(HP25%以下、大関の技を借用中)は、自分が呼び出した
+    // 雑魚が生きている間は無敵(先に雑魚を片付けさせる)。大関自身はもう
+    // このシールドを持たない(代わりに召喚の瞬間だけゲーム全体が時間停止する)。
     if (Boss.hasSummonShield(boss) && hasAliveSummonedZako(game, boss)) {
       addEffect(game, boss);
       return;
@@ -207,9 +222,9 @@
 
   // 前頭(磁石、赤・青)。近づいている方をタップすると通常の1ダメージが入ると同時に
   // 役割(近づく/遠ざかる)が入れ替わる。遠ざかっている方をタップした場合も
-  // ダメージは入るが、その半分(0.5)のみで、役割の入れ替えは起きない。
+  // ダメージは入るが、その1/4(0.25)のみで、役割の入れ替えは起きない。
   // ダメージは共有HPに入る(タップされた側と相棒の両方のhpを同期させる)。
-  var MAGNET_RETREAT_TAP_DAMAGE = 0.5;
+  var MAGNET_RETREAT_TAP_DAMAGE = 0.25;
 
   function onMagnetTapped(game, entity) {
     var isApproaching = entity.role === 'approaching';
@@ -227,6 +242,9 @@
 
   function onTapAt(game, px, py, canvasWidth, canvasHeight) {
     if (game.isOver) { return; }
+    // 大関の時間停止中はゲーム全体が止まっており、プレイヤーも敵にダメージを
+    // 与えられない(startOzekiTimeStop/updateOzekiTimeStop参照)。
+    if (game.timeStop) { return; }
     var geometry = Render.computeFieldGeometry(canvasWidth, canvasHeight);
     var nx = (px - geometry.centerX) / geometry.fieldRadius;
     var ny = (py - geometry.centerY) / geometry.fieldRadius;
@@ -344,10 +362,68 @@
         game.entities.push(summonedZako);
       }
     }
+    if (boss.patternState.pendingTimeStopSummon) {
+      startOzekiTimeStop(game, boss, width, height);
+    }
+  }
+
+  // 大関の「時間停止からくり」を開始する。以後のupdate()は冒頭でこれを検知し、
+  // updateOzekiTimeStopに処理を譲る(ゲーム全体・大関自身を含め、通常の
+  // フェーズ進行や敵の移動、タップ判定は一切行われなくなる)。
+  function startOzekiTimeStop(game, boss, width, height) {
+    var count = boss.patternState.pendingTimeStopSummon;
+    boss.patternState.pendingTimeStopSummon = 0;
+    if (!count) { return; }
+    var queue = [];
+    for (var i = 0; i < count; i++) {
+      queue.push({ angle: Math.random() * Math.PI * 2, speed: Spawner.currentZakoSpeed(game.spawner) });
+    }
+    game.timeStop = {
+      bossId: boss.id,
+      width: width,
+      height: height,
+      queue: queue,
+      spawnTimer: 0,
+      holdTimer: null
+    };
+    Assets.playSound('timeStop');
+  }
+
+  // 大関の時間停止中、毎フレーム呼ばれる(update()冒頭からの委譲)。雑魚を
+  // OZEKI_TIMESTOP_SPAWN_INTERVALごとに1体ずつ、画面外からではなく
+  // OZEKI_TIMESTOP_SUMMON_DISTANCE(中心から見て端まで2/3)の位置へ直接配置する。
+  // 全員配置し終えたら、少し(OZEKI_TIMESTOP_POST_SPAWN_HOLD秒)間を置いてから
+  // 時間停止を解除する。
+  function updateOzekiTimeStop(game, dt) {
+    var ts = game.timeStop;
+    if (ts.queue.length > 0) {
+      ts.spawnTimer -= dt;
+      if (ts.spawnTimer <= 0) {
+        var next = ts.queue.shift();
+        var zako = Entities.createZako(next.angle, next.speed, ts.width, ts.height, OZEKI_TIMESTOP_SUMMON_DISTANCE);
+        zako.summonedBy = ts.bossId;
+        game.entities.push(zako);
+        Assets.playSound('summon');
+        ts.spawnTimer = OZEKI_TIMESTOP_SPAWN_INTERVAL;
+      }
+      return;
+    }
+    if (ts.holdTimer === null) { ts.holdTimer = OZEKI_TIMESTOP_POST_SPAWN_HOLD; }
+    ts.holdTimer -= dt;
+    if (ts.holdTimer <= 0) {
+      game.timeStop = null;
+      Assets.playSound('timeStart');
+    }
   }
 
   function update(game, dt, width, height) {
     if (game.isOver) { return; }
+    // 大関の時間停止中は、ゲーム全体(大関自身・雑魚・行司・演出タイマー等)を
+    // 完全に停止させる。updateOzekiTimeStop自身のタイマーだけを進める。
+    if (game.timeStop) {
+      updateOzekiTimeStop(game, dt);
+      return;
+    }
     game.elapsedTime += dt;
 
     for (var i = game.effects.length - 1; i >= 0; i--) {
@@ -367,6 +443,7 @@
         game.phase = 'RUSH';
         game.introBannerText = 'のこった！';
         game.introBannerTimer = NOKOTTA_DURATION;
+        Assets.playSound('gameStart');
       }
       return;
     }
@@ -434,8 +511,14 @@
       if (boss2) {
         Entities.updateEntity(boss2, dt, game.elapsedTime - boss2.spawnedAt);
         applyBossAbilitySideEffects(game, boss2, width, height);
+        var boss2HasAliveSummonedZako = hasAliveSummonedZako(game, boss2);
         // 無敵状態(自分が召喚した雑魚が生きている間)を描画側・boss.js側へ伝える
-        boss2.invincible = Boss.hasSummonShield(boss2) && hasAliveSummonedZako(game, boss2);
+        // (大関自身はもうこのシールドを持たないため常にfalseになる。詳細は
+        // Boss.hasSummonShieldのコメント参照)
+        boss2.invincible = Boss.hasSummonShield(boss2) && boss2HasAliveSummonedZako;
+        // 大関(summonAdvance)が「前回の召喚がまだ片付いていない間は新たな
+        // 召喚を控える」ために参照する(旧来のentity.invincibleとは無関係)
+        boss2.patternState.hasLiveSummonedZako = boss2HasAliveSummonedZako;
         if (Entities.hasReachedCenter(boss2)) {
           endGame(game);
           return;

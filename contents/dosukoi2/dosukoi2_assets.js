@@ -39,6 +39,9 @@
     crowdCheer: 'data/audio/Crowd Cheer.mp3',
     metal: 'data/audio/metal.mp3',
     electricShock: 'data/audio/Electric_Shock.mp3',
+    summon: 'data/audio/summon.mp3',
+    timeStop: 'data/audio/time_stop.wav',
+    timeStart: 'data/audio/time_start.wav',
     bgmTitle: 'data/audio/title_bgm.mp3',
     bgmMain: 'data/audio/main_bgm.mp3',
     bgmExtra: 'data/audio/extra_bgm.mp3'
@@ -54,7 +57,10 @@
     cyborgShock: 'electricShock',
     gameOver: 'miss',
     decision: 'decision',
-    gameStart: 'gameStart'
+    gameStart: 'gameStart',
+    summon: 'summon',
+    timeStop: 'timeStop',
+    timeStart: 'timeStart'
   };
 
   var BGM_MAP = { title: 'bgmTitle', normal: 'bgmMain', extra: 'bgmExtra' };

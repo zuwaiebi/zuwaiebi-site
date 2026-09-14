@@ -9,7 +9,7 @@ html, body {
 }
 
 /* ボタン等のフォームコントロールはブラウザ標準でbodyのfont-familyを
-   継承しないため、明示的に継承させる(「はじめる」「EXTRA」等のボタン文字にも
+   継承しないため、明示的に継承させる(「取組開始」「EXTRA」等のボタン文字にも
    毛筆風フォントを適用するため) */
 button, input, select, textarea {
   font-family: inherit;

@@ -12,10 +12,20 @@
   // 円形のフィールド半径だけで計算すると、横長画面では横方向が画面内に収まって
   // しまい「画面外から出現」にならないため。
 
-  function createZako(angle, referenceSpeed, width, height) {
-    var Render = global.Dosukoi2.Render;
-    var geometry = Render.computeFieldGeometry(width, height);
-    var spawnDistance = Render.computeSpawnDistance(geometry, width, height, angle);
+  // distanceOverrideを指定すると、画面外からの出現ではなく、指定した
+  // distanceFromCenter(中心からの距離。1.0が通常の出現距離の基準)へ
+  // いきなり配置する(大関の時間停止からくりが、画面外からではなく中心から
+  // 見て端まで2/3の位置へ雑魚を配置するために使う)。速度は通常の出現同様、
+  // 距離に比例させ、基準距離1.0での所要時間を基準にした中心到達所要時間を保つ。
+  function createZako(angle, referenceSpeed, width, height, distanceOverride) {
+    var spawnDistance;
+    if (distanceOverride !== undefined) {
+      spawnDistance = distanceOverride;
+    } else {
+      var Render = global.Dosukoi2.Render;
+      var geometry = Render.computeFieldGeometry(width, height);
+      spawnDistance = Render.computeSpawnDistance(geometry, width, height, angle);
+    }
     // 出現角度によって出現距離(spawnDistance)は変わる(横長画面では左右からの
     // 出現の方が遠い)。速度を出現距離に比例させることで、基準距離1.0での
     // 所要時間を基準に、どの角度から出現しても中心到達までの所要時間が一定になる。

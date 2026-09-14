@@ -29,6 +29,10 @@
     // 弾き返すのみで、画面端(電流が流れる境界)まで弾き飛ばすと電撃ダメージが
     // 入る(dosukoi2_game.js側)。
     sekiwake: { label: '関脇', letter: '関', color: '#b0b8c0', baseHp: 8, baseSpeed: 0.045, pattern: 'cyborgAdvance', assetKey: 'bossSekiwake' },
+    // 大関: 一定間隔で雑魚を大量召喚する。召喚の瞬間はゲーム全体の時間が止まり、
+    // 灰色の画面の中、雑魚が中心から見て端まで2/3の位置へ0.2秒間隔で
+    // 次々に配置されていく(演出・実処理の詳細はsummonAdvanceのコメント、
+    // 時間停止そのものはdosukoi2_game.jsのstartOzekiTimeStop/updateOzekiTimeStop参照)。
     ozeki: { label: '大関', letter: '大', color: '#db6d28', baseHp: 14, baseSpeed: 0.068, pattern: 'summonAdvance', assetKey: 'bossOzeki' },
     yokozuna: { label: '横綱', letter: '横', color: '#f85149', baseHp: 30, baseSpeed: 0.075, pattern: 'yokozunaPhases', assetKey: 'bossYokozuna' }
   };
@@ -51,16 +55,26 @@
     if (entity.distanceFromCenter < 0) { entity.distanceFromCenter = 0; }
   }
 
-  // 大関、および横綱が召喚フェーズ(HP25%以下)にいる間は「雑魚シールド」を持つ。
-  // 自分が召喚した雑魚が生きている間は無敵になり(dosukoi2_game.js側で判定)、
-  // 新たな召喚も控える(下のsummonAdvanceがentity.invincibleを見て判断する)。
+  // 横綱が召喚フェーズ(HP25%以下、大関の技を借りている間)にいる間は「雑魚シールド」を
+  // 持つ。自分が召喚した雑魚が生きている間は無敵になり(dosukoi2_game.js側で判定)、
+  // 新たな召喚も控える(下のsummonAdvanceLegacyAuraがentity.invincibleを見て判断する)。
+  //
+  // 大関自身はもうこのシールド(無敵のオーラ)を持たない。以前は
+  // `if (entity.rank === 'ozeki') { return true; }` をここに置き、大関を
+  // 「自分が召喚した雑魚が生きている間ずっと無敵」にしていたが、現在は
+  // 召喚の瞬間だけゲーム全体の時間を止める演出(summonAdvance+
+  // dosukoi2_game.jsのstartOzekiTimeStop/updateOzekiTimeStop)に置き換えた。
+  // 元の無敵オーラ仕様に戻したい場合は、上のif文を復活させ、かつ
+  // RANK_INFO.ozeki.patternを'summonAdvanceLegacyAura'に変更すればよい
+  // (summonAdvanceLegacyAuraは旧実装のまま残してある)。
   function hasSummonShield(entity) {
-    if (entity.rank === 'ozeki') { return true; }
     if (entity.rank === 'yokozuna') { return (entity.hp / entity.maxHp) <= 0.25; }
     return false;
   }
 
-  // 大関(summonAdvance)が雑魚を召喚した直後に歩みを止める時間(秒)
+  // 大関(summonAdvanceLegacyAura、および横綱の借用技)が雑魚を召喚した直後に
+  // 歩みを止める時間(秒)。現在の大関(summonAdvance)は召喚のたびに
+  // ゲーム全体を時間停止させるため、この一時停止は使わない。
   var SUMMON_PAUSE_DURATION = 1.0;
 
   // 幕下のワープ先が元の位置に近すぎないよう、最低限これだけ角度を離す(ラジアン)
@@ -115,9 +129,11 @@
   // 全く動けなくなる。登場位置より少し外側まで動けるようにしておく。
   var MAGNET_RETREAT_SPEED = 0.035;
   var MAGNET_RETREAT_MAX_DISTANCE = 1.15;
-  var MAGNET_APPROACH_BASE_SPEED = 0.045;
+  // 初速・HP減少時の加速幅ともにさらに引き上げ済み
+  // (旧値: BASE_SPEED=0.045→0.075、HP_SPEED_BONUS=0.09→0.16)。
+  var MAGNET_APPROACH_BASE_SPEED = 0.10;
   var MAGNET_APPROACH_LAP_GROWTH = 0.02;
-  var MAGNET_APPROACH_HP_SPEED_BONUS = 0.09;
+  var MAGNET_APPROACH_HP_SPEED_BONUS = 0.24;
 
   var PATTERNS = {
     // 序ノ口: 大きく左右に何度も揺れながら直進する
@@ -169,13 +185,43 @@
       clampDistance(entity);
     },
 
-    // 大関(および召喚フェーズの横綱): 登場した瞬間に1回目の召喚を行い、以降も
-    // 少し進むごとに雑魚を大量召喚しつつ中心へ近づく(実際の召喚処理は
-    // pendingSummonCountを見てdosukoi2_game.js側が行う)。召喚数は周回ごとに
-    // 4→16体まで増える。召喚するたびにコンマ数秒だけ歩みを止める(隙が生まれる)。
-    // 自分が召喚した雑魚がまだ生きている間(entity.invincible、game.js側で毎フレーム
-    // 更新)は無敵になるとともに、新たな召喚も中断する(雑魚を延々と積み増ししない)。
+    // 大関: 登場した瞬間に1回目の召喚を行い、以降も少し進むごとに雑魚を
+    // 大量召喚しつつ中心へ近づく。召喚の合図(pendingTimeStopSummon)を
+    // 立てるだけで、実際の召喚(ゲーム全体の時間停止・雑魚の等間隔配置・
+    // 効果音)はdosukoi2_game.js側(startOzekiTimeStop/updateOzekiTimeStop)が
+    // 行う。召喚数は周回ごとに4→16体まで増える(旧仕様から変更なし)。
+    // 前回召喚した雑魚がまだ生きている間(entity.patternState.hasLiveSummonedZako、
+    // game.js側で毎フレーム更新)は新たな召喚を控える(雑魚を延々と積み増ししない
+    // ための間隔調整で、以前の「無敵のオーラ」とは無関係)。
     summonAdvance: function (entity, dt) {
+      entity.distanceFromCenter -= entity.speed * dt;
+      clampDistance(entity);
+
+      if (entity.patternState.hasLiveSummonedZako) {
+        // 召喚済みの雑魚がまだ残っている間は、次の召喚までの間隔をリセットし続ける。
+        // こうすることで、雑魚を片付けた直後から改めて間隔分の猶予が生まれる。
+        entity.patternState.lastSummonDistance = entity.distanceFromCenter;
+        return;
+      }
+
+      var lap = entity.lap || 0;
+      var summonInterval = Math.max(0.12, 0.22 - lap * 0.02);
+      var isFirstCall = entity.patternState.lastSummonDistance === undefined;
+      if (isFirstCall) {
+        entity.patternState.lastSummonDistance = entity.distanceFromCenter;
+      }
+      // 登場した瞬間(1回目の呼び出し)は無条件で召喚し、以降は間隔分進むごとに召喚する
+      if (isFirstCall || entity.patternState.lastSummonDistance - entity.distanceFromCenter >= summonInterval) {
+        entity.patternState.lastSummonDistance = entity.distanceFromCenter;
+        entity.patternState.pendingTimeStopSummon = Math.min(16, 4 + lap * 2);
+      }
+    },
+
+    // 大関の旧仕様(無敵のオーラ)。現在は使われていないが、いつでも戻せるように
+    // そのまま残してある(戻し方はhasSummonShieldのコメント参照)。横綱がHP25%
+    // 以下で「大関の技を借りる」際は、大関自身の仕様変更後もこちらの旧仕様の
+    // ままにしてある(横綱は無敵時間などのズルはしない、という設計を踏襲するため)。
+    summonAdvanceLegacyAura: function (entity, dt) {
       if ((entity.patternState.summonPauseTimer || 0) > 0) {
         entity.patternState.summonPauseTimer -= dt;
         return;
@@ -275,7 +321,9 @@
       } else if (hpRatio > 0.25) {
         PATTERNS.spiral(entity, dt, elapsed);
       } else {
-        PATTERNS.summonAdvance(entity, dt, elapsed);
+        // 大関の技を借りる場面では、大関自身の現行仕様(時間停止)ではなく
+        // 旧仕様(無敵のオーラ)のまま据え置く(理由はhasSummonShieldのコメント参照)。
+        PATTERNS.summonAdvanceLegacyAura(entity, dt, elapsed);
       }
     }
   };
