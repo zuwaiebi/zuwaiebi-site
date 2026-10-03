@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>スーパー麻雀</title>
+<meta name="description" content="スーパー麻雀 3〜4人で遊べるオンライン対戦麻雀">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Yusei+Magic&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+<link rel="stylesheet" href="super_mahjong.css">
+</head>
+<body>
+  <div id="status-bar" class="status-bar" hidden></div>
+  <div id="toast" class="toast" hidden></div>
+
+  <!-- ロビー -->
+  <div id="screen-lobby" class="screen active">
+    <div class="panel lobby">
+      <h1 class="logo">スーパー麻雀</h1>
+      <div class="field">
+        <label for="lobby-name">名前とアイコン</label>
+        <div class="profile-row">
+          <button id="lobby-icon" class="icon-button" type="button" title="アイコンを選ぶ"></button>
+          <input id="lobby-name" type="text" maxlength="12" placeholder="名前（12文字まで）">
+        </div>
+      </div>
+      <div class="field">
+        <label for="bgm-select">BGM（対局中に流れます）</label>
+        <div class="profile-row">
+          <select id="bgm-select"></select>
+          <button id="bgm-preview" class="sub-button bgm-preview" type="button">▶ 試聴</button>
+        </div>
+      </div>
+      <div class="field volume-row">
+        <label>BGMの音量 <input id="bgm-vol" type="range" min="0" max="100" step="5"></label>
+        <label>効果音の音量 <input id="se-vol" type="range" min="0" max="100" step="5"></label>
+      </div>
+
+      <section class="lobby-box">
+        <h2>部屋に参加する</h2>
+        <div class="join-row">
+          <input id="join-code" type="text" maxlength="5" placeholder="部屋コード" autocomplete="off">
+          <button id="btn-join" class="main-button">参加</button>
+        </div>
+      </section>
+
+      <section class="lobby-box">
+        <h2>部屋を作る</h2>
+        <form id="create-form" class="rule-form" onsubmit="return false">
+          <label>人数
+            <select id="create-players"><option value="4">4人（四麻）</option><option value="3">3人（三麻）</option></select>
+          </label>
+          <label>長さ
+            <select id="create-length"><option value="hanchan">半荘戦</option><option value="tonpuu">東風戦</option><option value="ikkyoku">一局戦</option></select>
+          </label>
+          <label>持ち点
+            <input id="create-start" type="number" min="1000" max="100000" step="1000" value="25000">
+          </label>
+          <label>1手の時間 <select id="create-perturn"></select></label>
+          <label>持ち時間 <select id="create-bank"></select></label>
+          <label class="check"><input id="create-red" type="checkbox" checked> 赤ドラ</label>
+          <label class="check"><input id="create-kuitan" type="checkbox" checked> 喰いタン</label>
+          <label class="check"><input id="create-tobi" type="checkbox" checked> 飛び</label>
+          <label class="check"><input id="create-cards" type="checkbox" checked> カードを使う</label>
+        </form>
+        <p class="note">三麻は萬子・筒子・索子・字牌すべてを使い、チーなし・北抜きあり・ツモ損です。</p>
+        <button id="btn-create" class="main-button">部屋を作る</button>
+      </section>
+      <p class="back-link"><a href="../../index.html">トップに戻る</a></p>
+    </div>
+  </div>
+
+  <!-- 待機室 -->
+  <div id="screen-room" class="screen">
+    <div class="panel lobby">
+      <h1 class="logo logo--small">スーパー麻雀</h1>
+      <section class="lobby-box">
+        <h2>部屋コード <span id="room-code" class="room-code"></span></h2>
+        <button id="btn-copy-link" class="sub-button">招待リンクをコピー</button>
+        <ul id="room-seats" class="seat-list"></ul>
+        <p id="room-rules-text" class="rules-text"></p>
+        <form id="room-form" class="rule-form" onsubmit="return false" hidden>
+          <label>人数
+            <select id="room-players"><option value="4">4人（四麻）</option><option value="3">3人（三麻）</option></select>
+          </label>
+          <label>長さ
+            <select id="room-length"><option value="hanchan">半荘戦</option><option value="tonpuu">東風戦</option><option value="ikkyoku">一局戦</option></select>
+          </label>
+          <label>持ち点
+            <input id="room-start" type="number" min="1000" max="100000" step="1000">
+          </label>
+          <label>1手の時間 <select id="room-perturn"></select></label>
+          <label>持ち時間 <select id="room-bank"></select></label>
+          <label class="check"><input id="room-red" type="checkbox"> 赤ドラ</label>
+          <label class="check"><input id="room-kuitan" type="checkbox"> 喰いタン</label>
+          <label class="check"><input id="room-tobi" type="checkbox"> 飛び</label>
+          <label class="check"><input id="room-cards" type="checkbox"> カードを使う</label>
+        </form>
+        <p id="room-wait-msg" class="note">ホストの開始を待っています…</p>
+        <div class="button-row">
+          <button id="btn-leave" class="sub-button">部屋を出る</button>
+          <button id="btn-start" class="main-button">対局開始</button>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <!-- フルパワー選択 -->
+  <div id="screen-pregame" class="screen">
+    <div class="panel pregame">
+      <h1 class="logo logo--small">フルパワーを選ぶ</h1>
+      <p class="note-light">相棒になるカードを1枚選んでください。手札とは別に、対局中に使えます。</p>
+      <p id="fp-wait" class="note-light"></p>
+      <div id="fp-grid" class="fp-grid"></div>
+      <div class="button-row button-row--center"><button class="sub-button" data-exit>対局から退出する</button></div>
+    </div>
+  </div>
+
+  <!-- 対局 -->
+  <div id="screen-game" class="screen">
+    <div id="table" class="table">
+      <div id="seat-top" class="seat seat--top" hidden><div class="seat__head"></div><div class="seat__melds"></div><div class="seat__river"></div></div>
+      <div id="seat-left" class="seat seat--left" hidden><div class="seat__head"></div><div class="seat__melds"></div><div class="seat__river"></div></div>
+      <div id="seat-right" class="seat seat--right" hidden><div class="seat__head"></div><div class="seat__melds"></div><div class="seat__river"></div></div>
+      <div class="center">
+        <div id="center-label" class="center__label"></div>
+        <div id="center-sticks" class="center__sticks"></div>
+        <div id="center-wall" class="center__wall"></div>
+        <div class="center__dora"><span>ドラ表示</span><div id="center-dora" class="tiles-row"></div></div>
+        <div id="center-cards" class="center__cards"></div>
+        <div id="center-effects" class="center__effects"></div>
+      </div>
+      <div id="seat-bottom" class="seat seat--bottom" hidden><div class="seat__head"></div><div class="seat__melds"></div><div class="seat__river"></div></div>
+    </div>
+
+    <div class="my-area">
+      <div id="call-actions" class="call-actions"></div>
+      <div class="my-bar">
+        <div id="my-info" class="my-info"></div>
+        <div id="my-timer" class="my-timer"></div>
+        <div id="action-hint" class="action-hint"></div>
+      </div>
+      <div id="riichi-waits" class="riichi-waits"></div>
+      <div id="my-cards" class="my-cards"></div>
+      <div class="my-tiles">
+        <div id="my-hand" class="my-hand"></div>
+        <div id="my-melds" class="my-melds"></div>
+      </div>
+      <div id="my-alt" class="my-alt" hidden>
+        <span class="my-alt__label">もう一方の手牌</span>
+        <div id="my-alt-hand" class="my-alt__hand"></div>
+        <div id="my-alt-melds" class="my-melds"></div>
+      </div>
+      <div id="actions" class="actions"></div>
+      <div class="options">
+        <label><input id="opt-oneclick" type="checkbox"> ワンクリックで打牌</label>
+        <label><input id="opt-nocall" type="checkbox"> 鳴かない<span class="opt-note">（ロン以外は自動スキップ）</span></label>
+        <button id="log-toggle" class="small-button log-toggle">ログ</button>
+        <button id="btn-mute" class="small-button" title="音を消す">🔊</button>
+        <button class="small-button exit-button" data-exit>退出</button>
+        <span id="log-latest" class="log-latest"></span>
+      </div>
+      <div id="log-panel" class="log-panel" hidden><ul id="log-list"></ul></div>
+    </div>
+
+    <div id="chooser" class="chooser" hidden></div>
+    <div id="prompt-box" class="prompt-box" hidden><div id="prompt-body" class="prompt"></div></div>
+    <button id="prompt-peek" class="prompt-peek" hidden><span class="prompt-peek__label"></span><span class="prompt-peek__timer"></span></button>
+    <div id="card-play" class="card-play" hidden></div>
+    <div id="fx-layer" class="fx-layer" hidden></div>
+    <div id="pile-box" class="overlay" hidden>
+      <div class="overlay__box">
+        <h2 class="result-title">捨て場</h2>
+        <div id="pile-body" class="pile-body"></div>
+        <button id="pile-close" class="sub-button">閉じる</button>
+      </div>
+    </div>
+
+    <div id="result" class="overlay" hidden>
+      <div class="overlay__box">
+        <div id="result-body"></div>
+        <button id="btn-ready" class="main-button">次の局へ</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 最終結果 -->
+  <div id="screen-final" class="screen">
+    <div class="panel lobby">
+      <h1 class="logo logo--small">終局</h1>
+      <div id="final-body"></div>
+      <p id="final-wait" class="note">ホストが部屋に戻すと、続けて対局できます。</p>
+      <div class="button-row">
+        <button id="btn-final-leave" class="sub-button">ロビーへ</button>
+        <button id="btn-back-room" class="main-button">部屋に戻る（もう一局）</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="card-detail" class="overlay card-detail" hidden><div id="card-detail-body" class="card-detail__body"></div></div>
+
+  <!-- アイコンを選ぶ -->
+  <div id="icon-picker" class="overlay icon-picker" hidden>
+    <div class="overlay__box icon-picker__box">
+      <h2 class="result-title">アイコンを選ぶ</h2>
+      <input id="icon-filter" type="text" placeholder="カード名で絞り込み" autocomplete="off">
+      <div id="icon-grid" class="icon-grid"></div>
+      <div class="button-row button-row--center">
+        <button id="icon-random" class="sub-button">ランダム</button>
+        <button id="icon-close" class="main-button">閉じる</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 途中退出の確認 -->
+  <div id="exit-box" class="overlay exit-box" hidden>
+    <div class="overlay__box">
+      <h2 class="result-title">対局から退出しますか？</h2>
+      <p id="exit-text" class="exit-text"></p>
+      <div class="button-row button-row--center">
+        <button id="exit-cancel" class="sub-button">キャンセル</button>
+        <button id="exit-ok" class="main-button">退出する</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/sm_cards_data.js"></script>
+  <script src="js/sm_bgm_data.js"></script>
+  <script src="js/sm_tiles.js"></script>
+  <script src="js/sm_cards.js"></script>
+  <script src="js/sm_icons.js"></script>
+  <script src="js/sm_fx.js"></script>
+  <script src="js/sm_net.js"></script>
+  <script src="js/sm_audio.js"></script>
+  <script src="js/sm_lobby.js"></script>
+  <script src="js/sm_table.js"></script>
+  <script src="js/sm_input.js"></script>
+  <script src="js/sm_prompt.js"></script>
+  <script src="js/sm_log.js"></script>
+  <script src="js/sm_result.js"></script>
+  <script src="js/sm_main.js"></script>
+</body>
+</html>

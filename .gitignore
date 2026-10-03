@@ -3,3 +3,5 @@
 contents/cube/data/
 #どす恋で使う画像を作るための作業フォルダであり、gitでは追跡しない。
 contents/dosukoi2/data/images/wip/
+# スーパー麻雀のBGMはGitHubに置かず、本番(スマホの~/site)へ直接コピーする。
+contents/super_mahjong/data/bgm/
