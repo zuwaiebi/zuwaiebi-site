@@ -15,6 +15,7 @@
   let bgm = null;       // 対局中のBGM
   let preview = null;   // タイトルでの試聴
   let inGame = false;
+  let held = false;     // 和了してから次の局が始まるまで一時停止している
   let blocked = null;   // ブラウザに自動再生を止められた音（次に画面を触った時に流す）
 
   function load() {
@@ -55,14 +56,25 @@
     if (!settings.bgm) { stopBgm(); return; }
     if (bgm && bgm.dataset.file === settings.bgm) {
       bgm.volume = volume('bgm');
-      if (bgm.paused) tryPlay(bgm);
+      if (bgm.paused && !held) tryPlay(bgm);
       return;
     }
     stopBgm();
     bgm = newTrack(settings.bgm);
-    tryPlay(bgm);
+    if (!held) tryPlay(bgm);
   }
   function stopBgm() { stopAudio(bgm); bgm = null; }
+
+  /** 和了した時に一時停止し、次の局が始まったら続きから流す */
+  function holdBgm(on) {
+    if (held === Boolean(on)) return;
+    held = Boolean(on);
+    if (!bgm) return;
+    if (held) {
+      bgm.pause();
+      if (blocked === bgm) blocked = null;
+    } else if (inGame) tryPlay(bgm);
+  }
 
   // ---- タイトルでの試聴 ----
   function stopPreview() {
@@ -83,7 +95,11 @@
   function onScreen(id) {
     const game = id === 'screen-pregame' || id === 'screen-game';
     if (id !== 'screen-lobby') stopPreview();
-    if (game) { inGame = true; startBgm(); } else if (inGame) { inGame = false; stopBgm(); }
+    if (game) {
+      if (!inGame) held = false;
+      inGame = true;
+      startBgm();
+    } else if (inGame) { inGame = false; held = false; stopBgm(); }
   }
 
   // ---- 効果音（同じ音を重ねて鳴らせるよう3つずつ用意） ----
@@ -149,5 +165,5 @@
     document.addEventListener('keydown', resume, true);
   }
 
-  SM.Audio = { init, onScreen, se, LIST };
+  SM.Audio = { init, onScreen, se, holdBgm, LIST };
 })();

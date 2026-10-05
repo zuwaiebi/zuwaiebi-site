@@ -6,6 +6,9 @@
   const TIME_OPTIONS = [[0, '無制限'], [10, '10秒'], [15, '15秒'], [20, '20秒'], [30, '30秒'], [60, '60秒']];
   const BANK_OPTIONS = [[0, 'なし'], [30, '30秒'], [60, '60秒'], [120, '120秒'], [300, '300秒']];
 
+  // 山札のカード枚数（既定と違う分だけ）。部屋を作る時の設定は覚えておき、待機室では部屋の設定を使う
+  const counts = { create: {}, room: {} };
+
   function fillSelect(sel, opts) {
     sel.innerHTML = opts.map(([v, t]) => `<option value="${v}">${t}</option>`).join('');
   }
@@ -19,9 +22,11 @@
       kuitan: f('kuitan').checked,
       startPoints: Number(f('start').value),
       tobi: f('tobi').checked,
+      renchan: f('renchan').checked,
       perTurn: Number(f('perturn').value),
       bank: Number(f('bank').value),
       cards: f('cards').checked,
+      cardCounts: counts[prefix],
     };
   }
 
@@ -33,9 +38,14 @@
     f('kuitan').checked = r.kuitan;
     f('start').value = String(r.startPoints);
     f('tobi').checked = r.tobi;
+    f('renchan').checked = Boolean(r.renchan);
     f('perturn').value = String(r.perTurn);
     f('bank').value = String(r.bank);
     f('cards').checked = r.cards !== false;
+  }
+
+  function showCountsText(prefix) {
+    $(`${prefix}-card-counts-text`).textContent = SM.Deck.summary(counts[prefix], readRules(prefix));
   }
 
   function setupRuleForm(prefix, onChange) {
@@ -45,7 +55,21 @@
       $(`${prefix}-start`).value = $(`${prefix}-players`).value === '3' ? '35000' : '25000';
     });
     const form = $(`${prefix}-form`);
-    form.addEventListener('change', () => onChange && onChange(readRules(prefix)));
+    form.addEventListener('change', () => {
+      showCountsText(prefix);
+      if (onChange) onChange(readRules(prefix));
+    });
+    // カード枚数設定: カードの一覧から枚数を変える
+    $(`${prefix}-card-counts`).addEventListener('click', () => SM.Deck.open(counts[prefix], {
+      editable: true,
+      rules: readRules(prefix),
+      onChange: (c) => {
+        counts[prefix] = c;
+        if (prefix === 'create') SM.Deck.save(c);
+        showCountsText(prefix);
+        if (onChange) onChange(readRules(prefix));
+      },
+    }));
   }
 
   function rulesText(r) {
@@ -57,8 +81,9 @@
       r.red ? '赤あり' : '赤なし',
       r.kuitan ? '喰いタンあり' : '喰いタンなし',
       r.tobi ? '飛びあり' : '飛びなし',
+      r.renchan ? '連荘あり' : '連荘なし',
       t,
-      r.cards === false ? 'カードなし' : 'カードあり',
+      r.cards === false ? 'カードなし' : `カードあり（${SM.Deck.summary(r.cardCounts, r)}）`,
     ].join(' / ');
   }
 
@@ -72,8 +97,12 @@
     showIcon();
     iconBtn.addEventListener('click', () => SM.Icons.openPicker((id) => { showIcon(); SM.Net.setIcon(id); }));
 
+    counts.create = SM.Deck.loadSaved();
     setupRuleForm('create');
     setupRuleForm('room', (rules) => SM.Net.send({ type: 'setRules', rules }));
+    showCountsText('create');
+    // ホスト以外は山札のカードを見るだけ
+    $('room-card-counts-show').addEventListener('click', () => SM.Deck.open(counts.room, { editable: false, rules: lastRules }));
 
     $('btn-create').addEventListener('click', () => {
       SM.Net.setName(nameInput.value.trim().slice(0, 12));
@@ -101,12 +130,18 @@
     });
   }
 
+  let lastRules = null;
   function renderRoom(room) {
     $('room-code').textContent = room.code;
     $('room-rules-text').textContent = rulesText(room.rules);
     const host = room.youAreHost;
+    lastRules = room.rules;
+    counts.room = room.rules.cardCounts || {};
     $('room-form').hidden = !host;
+    $('room-card-counts-view').hidden = host || room.rules.cards === false;
     if (host && document.activeElement?.closest?.('#room-form') == null) writeRules('room', room.rules);
+    if (host) showCountsText('room');
+    else SM.Deck.refresh(counts.room, room.rules);
     $('btn-start').hidden = !host;
     $('btn-start').disabled = room.seats.some((s) => !s);
     $('room-wait-msg').hidden = host;

@@ -8,6 +8,15 @@
   let overrides = {};
   const kindOf = (id) => (overrides[id] !== undefined ? overrides[id] : id >> 2);
   const isRedId = (id) => overrides[id] === undefined && (id === 16 || id === 52 || id === 88);
+  // ドラになる牌種、カードの効果でドラになっている牌（ワイマール憲法の1・9など）、
+  // カードの効果で別の牌として扱っている牌 { 牌ID: 牌種 / 'J'（オールマイティ牌） }
+  let doraKinds = new Set();
+  let doraTiles = new Set();
+  let asKinds = {};
+  // 光沢・切り替えの周期。描き直した牌どうしでも動きがそろうよう、周期の途中から始める
+  const SHINE_MS = 3600;
+  const FADE_MS = 4000;
+  const phase = (period) => `${-(Date.now() % period)}ms`;
 
   function nameOf(id, useRed) {
     const k = kindOf(id);
@@ -105,6 +114,12 @@
     if (name === 'mask') {
       body = '<rect x="1" y="1" width="58" height="78" rx="7" fill="#e9e4d6" stroke="#b9ad92" stroke-width="2"/>'
         + '<text x="30" y="54" font-size="38" text-anchor="middle" fill="#8a826f" font-weight="700">？</text>';
+    } else if (name === 'joker') {
+      // オールマイティ牌（どの牌としても扱える）
+      body = '<rect x="1" y="1" width="58" height="78" rx="7" fill="#fbf7ec" stroke="#b9ad92" stroke-width="2"/>'
+        + ['#e74c3c', '#f39c12', '#27ae60', '#2980b9'].map((c, i) => `<circle cx="30" cy="43" r="${21 - i * 4.5}" fill="none" stroke="${c}" stroke-width="3"/>`).join('')
+        + '<text x="30" y="51" font-size="20" text-anchor="middle" fill="#8e44ad" font-weight="700">★</text>'
+        + '<text x="30" y="17" font-size="11" text-anchor="middle" fill="#8e44ad" font-weight="700" font-family="sans-serif">ALL</text>';
     } else if (name === 'back') {
       body = '<rect x="1" y="1" width="58" height="78" rx="7" fill="#e58a2c" stroke="#9b5513" stroke-width="2"/>'
         + '<rect x="7" y="7" width="46" height="66" rx="4" fill="none" stroke="#ffd29a" stroke-width="1.5"/>';
@@ -158,17 +173,43 @@
   /**
    * 牌要素を作る
    * @param {number|null} id 牌ID（null で裏向き）
-   * @param {object} o { red:boolean, small, tiny, sideways, cls }
+   * @param {object} o { red:boolean, size, sideways, cls, mask, plain, treat }
+   *   plain: ドラの光沢・別の牌として扱う表示を付けない（ドラ表示牌など）
+   *   treat: 和了画面などで決まった扱い { kind: この牌種として見せる（無ければ元の牌）, dora: カードの効果でドラ }。
+   *          卓の情報（別の牌として扱う表示・カードの効果のドラ）の代わりに使う
    */
   function el(id, o = {}) {
-    const name = o.mask ? 'mask' : (id === null || id === undefined ? 'back' : nameOf(id, o.red !== false));
-    const d = build(name, o);
+    const known = !o.mask && id !== null && id !== undefined;
+    const useRed = o.red !== false;
+    const fixed = known && !o.plain && o.treat ? o.treat : null;
+    const shown = fixed && typeof fixed.kind === 'number' ? fixed.kind : null;
+    const name = o.mask ? 'mask' : !known ? 'back' : shown !== null ? shownName(id, shown, useRed) : nameOf(id, useRed);
+    const as = known && !o.plain && !fixed ? asKinds[id] : undefined;
+    const asName = as === undefined ? null : as === 'J' ? 'joker' : kindNameOf(as);
+    const d = build(name, { ...o, as: asName });
     if (id !== null && id !== undefined) {
       d.dataset.id = id;
       // 同じ牌を光らせる時の目印（赤5も普通の5と同じ牌種。？の牌は牌種を持たせない）
-      if (!o.mask) { d.title = LABEL(name); d.dataset.k = kindOf(id); }
+      if (known) {
+        d.title = LABEL(name) + (asName ? `（${asName === 'joker' ? 'オールマイティ牌' : LABEL(asName)}として扱う）` : '')
+          + (shown !== null ? `（元は${LABEL(nameOf(id, useRed))}）` : '');
+        d.dataset.k = shown !== null ? shown : kindOf(id);
+      }
+    }
+    // ドラの牌（扱っている牌種で判定。赤5は赤ドラありの時。カードの効果でドラになっている牌も）
+    const k = shown !== null ? shown : typeof as === 'number' ? as : kindOf(id);
+    const cardDora = fixed ? Boolean(fixed.dora) : doraTiles.has(id);
+    if (known && !o.plain && ((useRed && isRedId(id)) || doraKinds.has(k) || cardDora)) {
+      d.classList.add('is-dora');
+      d.style.setProperty('--shine-delay', phase(SHINE_MS));
     }
     return d;
+  }
+
+  /** 牌 id を牌種 k として見せる時の名前（赤5を別の色の5として扱うなら、その色の赤5） */
+  function shownName(id, k, useRed) {
+    if (useRed && isRedId(id) && k < 27 && k % 9 === 4) return `0${SUITS[Math.floor(k / 9)]}`;
+    return kindNameOf(k);
   }
 
   /** 牌種から牌要素を作る（宣言した牌の種類など。牌IDの差し替えの影響を受けない） */
@@ -183,14 +224,26 @@
   function build(name, o) {
     const d = document.createElement('div');
     d.className = 'tile' + (o.size ? ` tile--${o.size}` : '') + (o.sideways ? ' tile--side' : '') + (o.cls ? ` ${o.cls}` : '');
+    d.appendChild(faceEl(name));
+    if (o.as) {
+      // 別の牌として扱っている牌: 元の牌と扱っている牌（オールマイティ牌）をフェードで切り替える
+      const alt = faceEl(o.as);
+      alt.classList.add('tile__face--as');
+      d.appendChild(alt);
+      d.classList.add('is-as');
+      d.style.setProperty('--fade-delay', phase(FADE_MS));
+    }
+    return d;
+  }
+
+  function faceEl(name) {
     const inner = document.createElement('div');
     inner.className = 'tile__face';
-    if (useImages && name !== 'mask') {
+    if (useImages && name !== 'mask' && name !== 'joker') {
       inner.classList.add('is-image');
       imageFace(inner, name);
     } else inner.innerHTML = svg(name);
-    d.appendChild(inner);
-    return d;
+    return inner;
   }
 
   // ---- 同じ牌を光らせる ----
@@ -242,5 +295,12 @@
     label: (id, red) => LABEL(nameOf(id, red)),
     kindLabel: (k) => LABEL(kindNameOf(k)),
     setOverrides(map) { overrides = map || {}; },
+    /** 卓の情報から、ドラの牌種・カードの効果でドラになっている牌・別の牌として扱っている牌を受け取る */
+    setView(game) {
+      overrides = game.tiles || {};
+      doraKinds = new Set(game.doraKinds || []);
+      doraTiles = new Set(game.doraTiles || []);
+      asKinds = game.asKinds || {};
+    },
   };
 })();

@@ -12,10 +12,11 @@
     return s ? s.name : '（退出）';
   };
 
-  function tilesRow(ids, red, extraCls) {
+  // plain: ドラの光沢などを付けない（ドラ表示牌）。tileOpts: 牌ごとに足す表示の指定
+  function tilesRow(ids, red, extraCls, plain, tileOpts) {
     const row = document.createElement('div');
     row.className = `tiles-row ${extraCls || ''}`;
-    ids.forEach((t) => row.appendChild(SM.Tiles.el(t, { red, size: 'sm' })));
+    ids.forEach((t) => row.appendChild(SM.Tiles.el(t, { red, size: 'sm', plain, ...(tileOpts ? tileOpts(t) : {}) })));
     return row;
   }
 
@@ -50,17 +51,24 @@
       box.appendChild(title);
       const hand = document.createElement('div');
       hand.className = 'result-hand';
-      hand.appendChild(tilesRow(r.hand, red));
-      const win = tilesRow([r.winTile], red, 'win-tile');
+      // カードの効果で別の牌として使った牌（クソミドリ・宮永咲など）はその牌で見せ、その並びで並べる。
+      // カードの効果でドラになった牌（ワイマール憲法の1・9など）も光らせる
+      const asKinds = r.asKinds || {};
+      const cardDora = new Set(r.doraTiles || []);
+      const treat = (t) => ({ treat: { kind: asKinds[t], dora: cardDora.has(t) } });
+      const used = (t) => (asKinds[t] !== undefined ? asKinds[t] : SM.Tiles.kindOf(t));
+      const handIds = r.hand.some((t) => asKinds[t] !== undefined) ? r.hand.slice().sort((a, b) => used(a) - used(b) || a - b) : r.hand;
+      hand.appendChild(tilesRow(handIds, red, '', false, treat));
+      const win = tilesRow([r.winTile], red, 'win-tile', false, treat);
       hand.appendChild(win);
-      r.melds.forEach((m) => hand.appendChild(SM.Table.meldEl(m, r.winner, room.seats.length, red, 'sm')));
+      r.melds.forEach((m) => hand.appendChild(SM.Table.meldEl(m, r.winner, room.seats.length, red, 'sm', treat)));
       if (r.kita.length) hand.appendChild(tilesRow(r.kita, red, 'kita'));
       box.appendChild(hand);
 
       const dora = document.createElement('div');
       dora.className = 'result-dora';
-      dora.append('ドラ表示 ', tilesRow(r.doraIndicators, red));
-      if (r.uraIndicators.length) dora.append('　裏ドラ表示 ', tilesRow(r.uraIndicators, red));
+      dora.append('ドラ表示 ', tilesRow(r.doraIndicators, red, '', true));
+      if (r.uraIndicators.length) dora.append('　裏ドラ表示 ', tilesRow(r.uraIndicators, red, '', true));
       box.appendChild(dora);
 
       const yaku = document.createElement('ul');
@@ -80,6 +88,13 @@
       const nagashi = (r.nagashi || []).map((s) => nameOf(room, s)).join('・');
       title.textContent = `${result.label}　${REASON[r.reason] || '流局'}${nagashi ? `（流し満貫: ${nagashi}）` : ''}`;
       box.appendChild(title);
+      // 連荘なしでも、一巡目の途中流局は親がそのままでやり直す
+      if (r.redo && !room.rules.renchan) {
+        const note = document.createElement('p');
+        note.className = 'note';
+        note.textContent = '一巡目の途中流局なので、親はそのままでやり直します（本場+1）。';
+        box.appendChild(note);
+      }
       if (r.reason === 'exhaustive') {
         const list = document.createElement('div');
         list.className = 'tenpai-list';

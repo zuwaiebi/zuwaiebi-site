@@ -115,5 +115,45 @@
     show(box, 1800);
   }
 
-  SM.Fx = { dice, rps };
+  // ---- 切った牌を比べる（勝利宣言鬼丸「覇」） ----
+  /** 誰がどの牌を切ったかを並べ、主役（e.seat）の牌を目立たせて結果を出す */
+  function compare(e, red) {
+    const box = document.createElement('div');
+    box.className = 'fx-box fx-compare';
+    const title = document.createElement('div');
+    title.className = 'fx-rps__title';
+    title.textContent = e.title || '';
+    box.appendChild(title);
+    const row = document.createElement('div');
+    row.className = 'fx-compare__row';
+    e.entries.forEach((x, i) => {
+      const col = document.createElement('div');
+      col.className = `fx-compare__entry${x.seat === e.seat ? ' is-main' : ''}`;
+      col.style.animationDelay = `${i * 0.15}s`;
+      const tile = document.createElement('div');
+      tile.className = 'fx-compare__tile';
+      if (x.tile === null || x.tile === undefined) tile.textContent = '—';
+      else tile.appendChild(SM.Tiles.el(x.tile, { red, size: 'hand' }));
+      col.appendChild(tile);
+      const num = document.createElement('div');
+      num.className = 'fx-compare__num';
+      const isNum = x.kind !== null && x.kind !== undefined && x.kind < 27;
+      num.textContent = isNum ? String((x.kind % 9) + 1) : '数牌でない';
+      if (!isNum) num.classList.add('is-none');
+      col.appendChild(num);
+      const name = document.createElement('div');
+      name.className = 'fx-rps__name';
+      name.appendChild(SM.Icons.nameTag(x.seat));
+      col.appendChild(name);
+      row.appendChild(col);
+    });
+    box.appendChild(row);
+    const result = document.createElement('div');
+    result.className = `fx-rps__result${e.win ? '' : ' is-lose'}`;
+    result.textContent = e.text || '';
+    box.appendChild(result);
+    show(box, 2600);
+  }
+
+  SM.Fx = { dice, rps, compare };
 })();

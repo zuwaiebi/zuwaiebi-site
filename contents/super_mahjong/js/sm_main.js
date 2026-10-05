@@ -4,6 +4,7 @@
   const $ = (id) => document.getElementById(id);
   const state = { room: null, game: null };
   let leavingUntil = 0;    // 退出を送った直後に届く途中の卓の情報は無視する
+  let logGame = null;      // ログに出している対局（部屋コードと、その部屋で何回目の対局か）
 
   function show(id) {
     document.querySelectorAll('.screen').forEach((s) => s.classList.toggle('active', s.id === id));
@@ -39,6 +40,15 @@
     const room = m.room;
     state.room = room;
     if (room.error) toast(`エラーで対局が終了しました: ${room.error}`);
+    if (room.state !== 'waiting') {
+      SM.Deck.close();
+      // 新しく対局を始めたら前の対局のログを消す（同じ対局に入り直した時は残す）
+      const key = `${room.code}:${room.gameNo}`;
+      if (key !== logGame) {
+        SM.Log.clear();
+        logGame = key;
+      }
+    }
     if (room.state === 'waiting') {
       SM.Result.hideRound();
       SM.Prompt.hide();
@@ -66,8 +76,11 @@
       SM.Table.showEvents(m.game, m.events);
       SM.Prompt.update(m.game.prompt, m.game.timeLeft);
     }
-    if (room.state === 'result' && m.result) SM.Result.showRound(room, m.game, m.result);
-    else SM.Result.hideRound();
+    if (room.state === 'result' && m.result) {
+      SM.Result.showRound(room, m.game, m.result);
+      // 和了の結果を見ている間はBGMを止めておく（途中から入り直した時も）
+      if (m.result.result && m.result.result.type === 'agari') SM.Audio.holdBgm(true);
+    } else SM.Result.hideRound();
   }
 
   // 途中退出: 確認してから部屋を出る。席はCPUが引き継ぎ、部屋コードを入れ直すと戻れる
@@ -81,6 +94,7 @@
     const code = state.room ? state.room.code : '';
     $('exit-box').hidden = true;
     SM.Cards.hideDetail();
+    SM.Deck.close();
     SM.Prompt.hide();
     SM.Result.hideRound();
     $('pile-box').hidden = true;
@@ -100,6 +114,7 @@
     SM.Cards.init();
     SM.Icons.init();
     SM.Audio.init();
+    SM.Deck.init();
     SM.Lobby.init();
     SM.Input.init();
     SM.Prompt.init();

@@ -107,6 +107,35 @@ input[type=text], input[type=number], select {
 .icon-choice__name { font-size: 10px; line-height: 1.2; width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .icon-choice.is-current { border-color: var(--accent); background: #fff3cf; }
 
+/* カード枚数設定 */
+.card-count-row { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; }
+.card-count-row__text { font-size: 12px; color: #666; }
+#room-card-counts-view { margin: 0 0 10px; }
+.card-counts { z-index: 52; }
+.card-counts__box { width: min(900px, 100%); height: min(760px, 100%); display: flex; flex-direction: column; gap: 8px; overflow: hidden; }
+.card-counts__box .result-title { margin: 0; }
+.card-counts__box .button-row { margin-top: 0; }
+.card-counts__bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 12px; }
+.card-counts__total { font-weight: 800; }
+.card-counts__bar input { flex: 1; min-width: 160px; max-width: 280px; }
+.card-counts__note { margin: 0; font-size: 12px; color: #666; text-align: left; }
+.card-counts__grid {
+  flex: 1; min-height: 0; overflow-y: auto; align-content: start; padding: 4px 2px;
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap: 10px 8px; justify-items: center;
+}
+.card-count { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+.card-count .card--mini { --cw: 76px; }
+.card-count__n { font-size: 13px; font-weight: 800; }
+.card-count.is-changed .card-count__n { color: #c25a00; }
+/* 0枚のカードは灰色 */
+.card-count.is-zero .card { filter: grayscale(1); opacity: 0.45; }
+.card-count.is-zero .card-count__n { color: #999; }
+.card-count-edit { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 6px 14px; color: #fff; font-weight: 800; font-size: 18px; }
+.card-count-edit__step { width: 52px; height: 52px; border: none; border-radius: 50%; background: var(--accent); color: #2b1a00; font-size: 28px; font-weight: 900; line-height: 1; cursor: pointer; }
+.card-count-edit__step:disabled { background: #777; color: #ccc; cursor: default; }
+.card-count-edit__n { min-width: 4em; text-align: center; font-size: 24px; }
+.card-count-edit__def { flex-basis: 100%; text-align: center; font-size: 12px; font-weight: 600; color: #ddd; }
+
 /* ---------- 牌 ---------- */
 .tile {
   --w: 28px;
@@ -129,6 +158,33 @@ input[type=text], input[type=number], select {
   position: absolute; left: 50%; top: 50%;
   width: var(--w); height: calc(var(--w) * 4 / 3);
   transform: translate(-50%, -50%) rotate(90deg);
+}
+/* 別の牌として扱っている牌: 元の牌と扱っている牌（オールマイティ牌）がゆっくり入れ替わる */
+.tile__face--as { opacity: 0; pointer-events: none; animation: tileAs 4s ease-in-out infinite; animation-delay: var(--fade-delay, 0s); }
+.tile:not(.tile--side) > .tile__face--as { position: absolute; left: 0; top: 0; }
+@keyframes tileAs { 0%, 32% { opacity: 0; } 46%, 82% { opacity: 1; } 96%, 100% { opacity: 0; } }
+/* ドラの牌: 一定の間隔で金色の光沢が走り、縁がほのかに光る（白い牌の上でも見えるよう金色の筋にする） */
+.tile.is-dora::after {
+  content: ''; position: absolute; inset: 0; z-index: 1; pointer-events: none;
+  border-radius: 12% / 9%;
+  background: linear-gradient(115deg, transparent 33%, #ffd75a00 37%, #ffc23c99 44%, #fff4cff2 50%, #ffc23c99 56%, #ffd75a00 63%, transparent 67%) no-repeat;
+  background-size: 300% 100%;
+  box-shadow: 0 0 6px 2px #ffd34dbb;
+  opacity: 0;
+  animation: doraShine 3.6s ease-in-out infinite;
+  animation-delay: var(--shine-delay, 0s);
+}
+.tile--side.is-dora::after { border-radius: 9% / 12%; }
+@keyframes doraShine {
+  0% { background-position: 100% 0; opacity: 0; }
+  4% { opacity: 1; }
+  28% { opacity: 1; }
+  32% { background-position: 0% 0; opacity: 0; }
+  100% { background-position: 0% 0; opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tile.is-dora::after { animation: none; opacity: 0.35; background-position: 50% 0; }
+  .tile__face--as { animation-duration: 8s; }
 }
 .tiles-row { display: inline-flex; align-items: flex-end; vertical-align: middle; }
 
@@ -200,13 +256,27 @@ input[type=text], input[type=number], select {
 }
 .call-actions .action-button { pointer-events: auto; font-size: 20px; padding: 12px 30px; box-shadow: 0 4px 14px #000b, 0 0 0 2px #fff6; }
 .call-actions .action-button.is-sub { background: #5d6b62; }
+/* カードの効果で自分の手牌から選ぶ時: 選択ウィンドウの代わりに自分の領域の上に出す案内 */
+.hand-pick {
+  position: absolute; left: 8px; bottom: calc(100% + 8px); z-index: 21; max-width: calc(100% - 16px);
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 6px 10px;
+  background: #2b1d0ef2; color: #fff; border: 2px solid var(--accent); border-radius: 12px; box-shadow: 0 6px 20px #000b;
+}
+.hand-pick__title { font-weight: 800; }
+.hand-pick__hint { font-size: 12px; color: #e8dcc0; }
+.hand-pick__timer { font-size: 12px; font-weight: 700; color: var(--accent); }
+.hand-pick__timer:empty { display: none; }
+.hand-pick .main-button, .hand-pick .sub-button { padding: 6px 16px; }
+.my-hand .tile.is-pickable { filter: drop-shadow(0 0 4px var(--accent)); }
+.my-hand .tile.is-pickable.is-selected { outline: 3px solid #e67e22; outline-offset: 0; border-radius: 4px; }
 .my-bar { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 13px; min-height: 18px; }
 .my-info .furiten { color: var(--danger); font-weight: 700; }
 .my-timer { color: var(--accent); font-weight: 700; }
 .my-timer.is-urgent { color: var(--danger); }
 .action-hint { color: var(--muted); margin-left: auto; }
 .riichi-waits { font-size: 12px; color: var(--accent); min-height: 16px; }
-.my-tiles { display: flex; align-items: flex-end; justify-content: space-between; gap: 8px; padding-top: 12px; overflow-x: auto; }
+/* 選んだ牌が持ち上がっても上が切れないだけの余白 */
+.my-tiles { display: flex; align-items: flex-end; justify-content: space-between; gap: 8px; padding-top: 17px; overflow-x: auto; }
 .my-hand { display: flex; align-items: flex-end; }
 .my-hand .tile { cursor: pointer; transition: transform 0.08s; }
 .my-hand .tile.is-drawn { margin-left: calc(var(--hand-w) * 0.35); }
@@ -327,6 +397,8 @@ input[type=text], input[type=number], select {
 }
 .card__text p { margin: 0.15em 0; }
 .card__flavor { font-style: italic; color: #444; }
+/* フルパワー共通のルールの注釈: 灰色で本文よりやや小さく */
+.card__text .card__note { color: #777; font-size: 0.86em; line-height: 1.35; margin-top: 0.4em; }
 .card--mini .card__name, .card--tiny .card__name { min-height: calc(var(--cw) * 0.24); }
 .card--tiny .card__name { font-size: calc(var(--cw) * 0.17 * var(--ns, 1)); white-space: normal; word-break: break-all; }
 /* テキストを省略した表示（手札・場・選択肢など）: カードタイプを下端に寄せ、空いた分イラストを大きく */
@@ -369,9 +441,9 @@ input[type=text], input[type=number], select {
 .log-panel { max-height: 28vh; overflow-y: auto; background: #0005; border-radius: 6px; margin-top: 4px; }
 .log-panel ul { margin: 0; padding: 6px 10px 6px 24px; font-size: 12px; }
 
-/* 選択ウィンドウ */
+/* 選択ウィンドウ（画面の上に出す。手牌や手札は下に見えたまま） */
 .prompt-box {
-  position: fixed; left: 50%; bottom: 12px; transform: translateX(-50%); z-index: 50;
+  position: fixed; left: 50%; top: 12px; transform: translateX(-50%); z-index: 50;
   width: min(720px, calc(100vw - 24px)); max-height: 72vh; overflow-y: auto;
   background: var(--card); color: var(--card-ink); border-radius: 12px; padding: 14px;
   box-shadow: 0 10px 30px #000a;
@@ -401,7 +473,10 @@ input[type=text], input[type=number], select {
 .prompt-item__cap { font-size: 11px; max-width: 90px; text-align: center; }
 .prompt-item.is-selected, .prompt-item--card.is-selected .card { outline: 3px solid #e67e22; outline-offset: 2px; }
 .prompt-item--tile.is-selected { transform: translateY(-8px); }
-.prompt__actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 10px; }
+/* 選べない牌は灰色で見せるだけ */
+.prompt-item--tile.is-disabled { cursor: default; filter: grayscale(1) brightness(0.62); opacity: 0.75; }
+.prompt__actions { display: flex; gap: 10px; justify-content: flex-end; align-items: center; margin-top: 10px; }
+.prompt__note { margin-right: auto; font-size: 13px; color: #8a5a00; font-weight: 700; }
 .prompt__timer { text-align: right; font-size: 12px; color: #a33; min-height: 14px; }
 
 /* カードをプレイした時の表示 */
@@ -471,7 +546,18 @@ input[type=text], input[type=number], select {
 .fx-rps__name .picon { --pi: 24px; }
 .fx-rps__handname { font-size: 12px; color: #ddd; }
 .fx-rps__vs { font-size: 22px; font-weight: 900; color: var(--danger); }
-.fx-rps__result { font-size: 20px; font-weight: 900; color: #ffd36b; }
+.fx-rps__result { font-size: 20px; font-weight: 900; color: #ffd36b; text-align: center; }
+.fx-rps__result.is-lose { color: #ddd; font-size: 17px; }
+/* 切った牌を比べる（勝利宣言鬼丸「覇」） */
+.fx-compare__row { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px 18px; }
+.fx-compare__entry { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 72px; padding: 8px 6px; border-radius: 10px; background: #ffffff14; animation: compareIn 0.35s ease-out both; }
+.fx-compare__entry.is-main { background: #ffd36b33; box-shadow: 0 0 0 2px #ffd36b; }
+.fx-compare__tile { min-height: calc(var(--hand-w) * 4 / 3); display: flex; align-items: center; font-size: 22px; }
+.fx-compare__tile .tile { --w: min(48px, var(--hand-w) * 1.1); }
+.fx-compare__num { font-size: 20px; font-weight: 900; color: #ffd36b; line-height: 1; }
+.fx-compare__entry:not(.is-main) .fx-compare__num { color: #fff; }
+.fx-compare__num.is-none { font-size: 12px; font-weight: 700; color: #ccc; }
+@keyframes compareIn { from { transform: translateY(14px); opacity: 0; } to { transform: none; opacity: 1; } }
 @keyframes rpsLeft { from { transform: translateX(-60px) rotate(-20deg); opacity: 0; } to { transform: none; opacity: 1; } }
 @keyframes rpsRight { from { transform: translateX(60px) rotate(20deg); opacity: 0; } to { transform: none; opacity: 1; } }
 @keyframes cardpop { from { transform: scale(0.6) rotate(-4deg); opacity: 0; } to { transform: none; opacity: 1; } }
@@ -530,7 +616,7 @@ input[type=text], input[type=number], select {
   .my-cards__label { position: absolute; top: 0; left: 4px; writing-mode: horizontal-tb; font-size: 10px; white-space: nowrap; }
   .my-cards__fp { position: relative; }
   .my-cards__fp .my-cards__label { top: -14px; left: auto; right: 0; }
-  .my-tiles { padding-top: 8px; }
+  .my-tiles { padding-top: 16px; }
   .actions { min-height: 40px; gap: 6px; padding-top: 4px; }
   .action-button { padding: 8px 16px; font-size: 15px; }
   .call-actions { right: 6px; gap: 8px; }

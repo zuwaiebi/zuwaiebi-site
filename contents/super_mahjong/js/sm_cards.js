@@ -11,12 +11,17 @@
 
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
-  function formatText(text) {
-    return text.split('\n').map((line) => {
+  // フルパワー共通のルールの注釈（テキストの最後に灰色の小さい文字で足す）
+  const FULL_NOTE = '（フルパワーをプレイした手番の間は捨牌以外の一切の行動を行えない。）';
+
+  function formatText(def) {
+    const lines = def.text.split('\n').map((line) => {
       const t = line.trim();
       if (/^\*.*\*$/.test(t)) return `<p class="card__flavor">${esc(t.slice(1, -1))}</p>`;
       return `<p>${esc(t)}</p>`;
-    }).join('');
+    });
+    if (def.typeKey === 'full') lines.push(`<p class="card__note">${esc(FULL_NOTE)}</p>`);
+    return lines.join('');
   }
 
   function typeBadge(def) {
@@ -46,7 +51,7 @@
       d.innerHTML = `<div class="card__name" style="--ns:${nameScale}">${esc(def.name)}</div>`
         + `<div class="card__art">${def.img ? `<img src="${IMG_DIR}${encodeURIComponent(def.img)}" alt="" loading="lazy" draggable="false">` : ''}</div>`
         + `<div class="card__type">${typeBadge(def)}</div>`
-        + (size === 'full' ? `<div class="card__text">${formatText(def.text)}</div>` : '');
+        + (size === 'full' ? `<div class="card__text">${formatText(def)}</div>` : '');
       d.title = def.name;
     }
     if (o.onClick) {
@@ -59,12 +64,13 @@
     return d;
   }
 
-  /** カードの詳細を大きく表示する。actions: [{label, cls, onClick}] */
+  /** カードの詳細を大きく表示する。actions: [{label, cls, onClick}]、extra: カードの下に出す要素（枚数の増減など） */
   function showDetail(cid, o = {}) {
     const box = $('card-detail');
     const body = $('card-detail-body');
     body.innerHTML = '';
     body.appendChild(el(cid, { size: 'full', detail: false }));
+    if (o.extra) body.appendChild(o.extra);
     const acts = document.createElement('div');
     acts.className = 'card-detail__actions';
     for (const a of o.actions || []) {

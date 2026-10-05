@@ -8,6 +8,7 @@
   let selected = new Set();
   let deadline = null;
   let peeking = false;     // 手牌・手札を確かめるために一時的に隠している
+  let hand = null;         // 自分の手牌から選ぶ問い合わせ（ウィンドウを出さず、画面の手牌を押して選ぶ）
 
   function send(prompt, answer) {
     if (answeredId === prompt.id) return;
@@ -20,6 +21,7 @@
     $('prompt-box').hidden = true;
     current = null;
     setPeek(false);
+    endHandPick();
   }
 
   /** 選択ウィンドウを一時的に隠す／戻す（隠している間は画面上部に「戻る」ボタン） */
@@ -58,7 +60,9 @@
     if (it.tile !== undefined) {
       e = SM.Tiles.el(it.tile, { size: 'hand', mask: it.tile === null, red: SM.Main.state.game ? SM.Main.state.game.red : true });
       e.classList.add('prompt-item', 'prompt-item--tile');
-      e.addEventListener('click', () => onPick(i, e));
+      // 選べない牌は灰色で見せるだけ
+      if (it.disabled) e.classList.add('is-disabled');
+      else e.addEventListener('click', () => onPick(i, e));
       return e;
     }
     e = document.createElement('button');
@@ -78,6 +82,13 @@
     if (current && current.id === p.id) return;
     current = p;
     selected = new Set();
+    // 自分の手牌から選ぶ時は、ウィンドウを出さずに画面の手牌から選ばせる
+    if (p.handPick) {
+      $('prompt-box').hidden = true;
+      startHandPick(p);
+      return;
+    }
+    endHandPick();
     const box = $('prompt-box');
     const body = $('prompt-body');
     body.innerHTML = '';
@@ -148,6 +159,17 @@
         no.textContent = '使わない';
         no.addEventListener('click', () => send(p, { pick: [] }));
         acts.appendChild(no);
+      } else if (max === 0) {
+        // 選べるものが1つもない（灰色だけ）: 見せるだけ見せて、選ばずに終わる
+        const note = document.createElement('div');
+        note.className = 'prompt__note';
+        note.textContent = '選べるものがありません';
+        acts.appendChild(note);
+        const end = document.createElement('button');
+        end.className = 'main-button';
+        end.textContent = '選ばずに終了';
+        end.addEventListener('click', () => send(p, { pick: [] }));
+        acts.appendChild(end);
       } else {
         if (max > 1 || min === 0) {
           confirmBtn.className = 'main-button';
@@ -183,11 +205,101 @@
   }
 
   function tick() {
+    const text = deadline === null || !current ? '' : `残り ${Math.max(0, Math.ceil((deadline - performance.now()) / 1000))}秒`;
+    const ht = $('hand-pick-timer');
+    if (ht) ht.textContent = text;
     const el = $('prompt-timer');
     if (!el) return;
-    const text = deadline === null || !current ? '' : `残り ${Math.max(0, Math.ceil((deadline - performance.now()) / 1000))}秒`;
     el.textContent = text;
     $('prompt-peek').querySelector('.prompt-peek__timer').textContent = text;
+  }
+
+  // ---- 自分の手牌から選ぶ（ウィンドウを出さず、画面の手牌を押して選ぶ） ----
+  function startHandPick(p) {
+    const byTile = new Map();
+    (p.items || []).forEach((it, i) => { if (!it.disabled && it.tile !== null && it.tile !== undefined) byTile.set(it.tile, i); });
+    hand = { p, byTile, sel: new Set(), min: p.min ?? 1, max: p.max ?? 1 };
+    renderHandPick();
+    SM.Table.rerender();
+  }
+
+  function endHandPick() {
+    if (!hand) return;
+    hand = null;
+    const bar = $('hand-pick');
+    bar.hidden = true;
+    bar.innerHTML = '';
+    SM.Table.rerender();
+  }
+
+  /** 手牌の牌を飾る（sm_input から）。手牌から選んでいる最中でなければ false を返す */
+  function decorateHandPick(el, t) {
+    if (!hand) return false;
+    const i = hand.byTile.get(t);
+    if (i === undefined) { el.classList.add('is-disabled'); return true; }
+    el.classList.add('is-pickable');
+    if (hand.sel.has(i)) el.classList.add('is-selected');
+    el.addEventListener('click', () => pickHandTile(i));
+    return true;
+  }
+
+  function pickHandTile(i) {
+    if (!hand) return;
+    const { p, sel, min, max } = hand;
+    if (max === 1 && min <= 1) {
+      // 1枚だけ選ぶ時: ワンクリックの設定なら押した牌で決定、そうでなければ選んだ牌をもう一度押すと決定
+      if (sel.has(i) || SM.Input.oneClick()) { send(p, { pick: [i] }); return; }
+      sel.clear();
+      sel.add(i);
+    } else if (sel.has(i)) sel.delete(i);
+    else if (sel.size < max) sel.add(i);
+    renderHandPick();
+    SM.Table.rerender();
+  }
+
+  function renderHandPick() {
+    const bar = $('hand-pick');
+    bar.innerHTML = '';
+    const { p, sel, min, max } = hand;
+    const single = max === 1 && min <= 1;
+    const src = document.createElement('span');
+    src.className = 'prompt__source';
+    src.textContent = sourceLine(p);
+    if (p.source && p.source.cid) {
+      src.classList.add('is-clickable');
+      src.addEventListener('click', () => SM.Cards.showDetail(p.source.cid));
+    }
+    bar.appendChild(src);
+    const title = document.createElement('span');
+    title.className = 'hand-pick__title';
+    title.textContent = `${p.title || '手牌から選んでください'}${max > 1 ? `（${sel.size}/${max}）` : ''}`;
+    bar.appendChild(title);
+    const hint = document.createElement('span');
+    hint.className = 'hand-pick__hint';
+    hint.textContent = single && !SM.Input.oneClick() ? '手牌を選んでもう一度押すと決定' : '手牌を押して選ぶ';
+    bar.appendChild(hint);
+    const timer = document.createElement('span');
+    timer.id = 'hand-pick-timer';
+    timer.className = 'hand-pick__timer';
+    bar.appendChild(timer);
+    if (min === 0) {
+      const skip = document.createElement('button');
+      skip.className = 'sub-button';
+      skip.textContent = '選ばない';
+      skip.addEventListener('click', () => send(p, { pick: [] }));
+      bar.appendChild(skip);
+    }
+    // 1枚だけ選ぶ時のワンクリックでは押した牌で決まるので、決定ボタンは要らない
+    if (!(single && SM.Input.oneClick())) {
+      const ok = document.createElement('button');
+      ok.className = 'main-button';
+      ok.textContent = '決定';
+      ok.disabled = sel.size < Math.max(min, 1) || sel.size > max;
+      ok.addEventListener('click', () => send(p, { pick: [...sel] }));
+      bar.appendChild(ok);
+    }
+    bar.hidden = false;
+    tick();
   }
 
   // ---- フルパワー選択 ----
@@ -219,5 +331,5 @@
     $('prompt-peek').addEventListener('click', () => setPeek(false));
   }
 
-  SM.Prompt = { init, update, hide, showPregame, sendAnswer: send };
+  SM.Prompt = { init, update, hide, showPregame, sendAnswer: send, decorateHandPick };
 })();

@@ -25,12 +25,17 @@
     return next === (game.dir !== -1) ? '下家' : '上家';
   }
 
-  function meldEl(m, seat, n, red, size) {
+  // tileOpts: 牌ごとに足す表示の指定（和了画面の treat など）
+  function meldEl(m, seat, n, red, size, tileOpts) {
     const wrap = document.createElement('div');
     wrap.className = `meld${m.type === 'akan' ? ' meld--akan' : ''}`;
     const tiles = m.tiles.slice();
+    const opt = (t, o) => (tileOpts && t !== null ? { ...o, ...tileOpts(t) } : o);
     if (m.type === 'ankan' || m.from === null || m.from === undefined) {
-      tiles.forEach((t, i) => wrap.appendChild(T().el(m.type === 'ankan' && (i === 0 || i === 3) ? null : t, { red, size })));
+      tiles.forEach((t, i) => {
+        const id = m.type === 'ankan' && (i === 0 || i === 3) ? null : t;
+        wrap.appendChild(T().el(id, opt(id, { red, size })));
+      });
       return wrap;
     }
     // 鳴いた牌を横向きにし、鳴いた相手の方向に置く（上家=左, 対面=中, 下家=右）
@@ -45,10 +50,10 @@
       if (t === called) {
         const holder = document.createElement('div');
         holder.className = 'meld__called';
-        holder.appendChild(T().el(t, { red, size, sideways: true }));
-        if (m.added !== null && m.added !== undefined) holder.appendChild(T().el(m.added, { red, size, sideways: true }));
+        holder.appendChild(T().el(t, opt(t, { red, size, sideways: true })));
+        if (m.added !== null && m.added !== undefined) holder.appendChild(T().el(m.added, opt(m.added, { red, size, sideways: true })));
         wrap.appendChild(holder);
-      } else if (t !== undefined) wrap.appendChild(T().el(t, { red, size }));
+      } else if (t !== undefined) wrap.appendChild(T().el(t, opt(t, { red, size })));
     });
     return wrap;
   }
@@ -170,15 +175,13 @@
     dora.innerHTML = '';
     for (let i = 0; i < Math.max(5, game.doraIndicators.length); i++) {
       const t = game.doraIndicators[i];
-      dora.appendChild(T().el(t === undefined ? null : t, { red: game.red, size: 'sm' }));
+      dora.appendChild(T().el(t === undefined ? null : t, { red: game.red, size: 'sm', plain: true }));
     }
     const cards = $('center-cards');
     cards.hidden = !game.cardsEnabled;
     if (game.cardsEnabled) {
+      // 山札の残り枚数は対局中は非公開（サーバーも送らない）
       cards.innerHTML = '';
-      const deck = document.createElement('span');
-      deck.textContent = `山札 ${game.deckCount}枚`;
-      cards.appendChild(deck);
       const pile = document.createElement('button');
       pile.className = 'small-button';
       pile.textContent = `捨て場 ${game.discardPile.length}枚`;
@@ -255,7 +258,7 @@
   function render(game, room) {
     lastGame = game;
     lastRoom = room;
-    T().setOverrides(game.tiles);
+    T().setView(game);
     const table = $('table');
     table.dataset.players = game.n;
     ['bottom', 'right', 'top', 'left'].forEach((pos) => { $(`seat-${pos}`).hidden = true; });
@@ -319,7 +322,12 @@
         SM.Fx.dice(e.seat, e.values, e.label);
       } else if (e.type === 'rps') {
         SM.Fx.rps(e.a, e.b, e.ha, e.hb);
+      } else if (e.type === 'compare') {
+        SM.Fx.compare(e, game.red);
       }
+      // 和了したら次の局が始まるまでBGMを止める
+      if (e.type === 'end' && e.result && e.result.type === 'agari') SM.Audio.holdBgm(true);
+      else if (e.type === 'deal') SM.Audio.holdBgm(false);
       if (text && seat !== undefined) shout(game, seat, text);
       const snd = soundOf(e);
       if (snd) sounds.add(snd);

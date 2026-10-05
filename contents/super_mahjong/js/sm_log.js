@@ -31,7 +31,10 @@
       case 'payment': return `${who(e.from)} → ${who(e.to)} ${e.amount}点`;
       case 'dice': return `${who(e.seat)}のサイコロ: ${e.values.join(' ・ ')}${e.label ? `（${e.label}）` : ''}`;
       case 'rps': return `じゃんけん ${who(e.a)} ${HAND[e.ha]} ー ${HAND[e.hb]} ${who(e.b)}`;
-      case 'deckRefill': return '山札を新しく用意した';
+      case 'compare': {
+        const list = e.entries.map((x) => `${who(x.seat)} ${x.kind === null || x.kind === undefined ? '—' : SM.Tiles.kindLabel(x.kind)}`).join(' / ');
+        return `${e.title}: ${list}${e.text ? `（${e.text}）` : ''}`;
+      }
       case 'agariCanceled': return `${who(e.seat)}の和了は取り消された`;
       case 'callCanceled': return `${who(e.seat)}の鳴きは取り消された`;
       case 'reflect': return `${who(e.seat)}の${cardName(e.cid)}が跳ね返した`;
@@ -53,6 +56,14 @@
     if (latest) latest.textContent = t;
   }
 
+  /** ログを空にする（新しく対局を始めた時に、前の対局の分を消す） */
+  function clear() {
+    const box = $('log-list');
+    if (box) box.innerHTML = '';
+    const latest = $('log-latest');
+    if (latest) latest.textContent = '';
+  }
+
   function init() {
     $('log-toggle').addEventListener('click', () => {
       const box = $('log-panel');
@@ -60,5 +71,5 @@
     });
   }
 
-  SM.Log = { init, add };
+  SM.Log = { init, add, clear };
 })();

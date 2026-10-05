@@ -64,6 +64,8 @@
   }
 
   function decorateHandTile(el, t) {
+    // カードの効果で手牌から選んでいる最中（選び方は sm_prompt）
+    if (SM.Prompt.decorateHandPick(el, t)) return;
     const can = riichiMode ? riichiSet.has(t) : discardSet.has(t);
     if (!sent() && (discardSet.size || riichiSet.size)) el.classList.toggle('is-disabled', !can);
     if (t === selected) el.classList.add('is-selected');
@@ -179,13 +181,7 @@
       }));
     }
     if (has('kyuushu').length) box.appendChild(button('九種九牌', '', () => sendAction({ type: 'kyuushu' })));
-    const fp = has('fullPower')[0];
-    if (fp) {
-      const def = SM.Cards.def(fp.cid);
-      box.appendChild(button(`フルパワー《${def ? def.name : ''}》`, 'is-full', () => SM.Cards.showDetail(fp.cid, {
-        actions: [{ label: 'プレイする', onClick: () => sendAction({ type: 'fullPower' }) }],
-      })));
-    }
+    // フルパワーはボタンではなく、手札の横のフルパワーの画像を押してプレイする（renderMyCards）
     for (const a of has('ability')) box.appendChild(button(a.label, 'is-ability', () => sendAction({ type: 'ability', iid: a.iid })));
     if (has('endTurn').length) box.appendChild(button('手番を終える', 'is-sub', () => sendAction({ type: 'endTurn' })));
     const d = has('discard')[0];
@@ -223,13 +219,19 @@
     }
     const me = game.players[game.you];
     if (me.fp) {
+      // 他のカードと同じく、画像を押して詳しく見てからプレイする
+      const canFp = !sent() && actions.some((a) => a.type === 'fullPower');
       const wrap = document.createElement('div');
       wrap.className = 'my-cards__fp';
       const cap = document.createElement('div');
       cap.className = 'my-cards__label';
       cap.textContent = me.fp.playable ? 'フルパワー（使える）' : (me.fp.cooldown ? `フルパワー（あと${me.fp.cooldown}ツモ番）` : 'フルパワー');
       wrap.appendChild(cap);
-      wrap.appendChild(SM.Cards.el(me.fp.cid, { size: 'mini', cls: me.fp.playable ? '' : 'is-dim' }));
+      wrap.appendChild(SM.Cards.el(me.fp.cid, {
+        size: 'mini',
+        cls: canFp ? 'is-playable' : me.fp.playable ? '' : 'is-dim',
+        onClick: () => SM.Cards.showDetail(me.fp.cid, canFp ? { actions: [{ label: 'このフルパワーをプレイする', onClick: () => sendAction({ type: 'fullPower' }) }] } : {}),
+      }));
       box.appendChild(wrap);
     }
   }
@@ -259,5 +261,5 @@
     SM.Table.rerender();
   }
 
-  SM.Input = { init, update, decorateHandTile, onRejected };
+  SM.Input = { init, update, decorateHandTile, onRejected, oneClick };
 })();
