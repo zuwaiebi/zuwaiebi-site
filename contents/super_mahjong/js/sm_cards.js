@@ -52,7 +52,6 @@
         + `<div class="card__art">${def.img ? `<img src="${IMG_DIR}${encodeURIComponent(def.img)}" alt="" loading="lazy" draggable="false">` : ''}</div>`
         + `<div class="card__type">${typeBadge(def)}</div>`
         + (size === 'full' ? `<div class="card__text">${formatText(def)}</div>` : '');
-      d.title = def.name;
     }
     if (o.onClick) {
       d.classList.add('is-clickable');

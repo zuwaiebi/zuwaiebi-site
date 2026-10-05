@@ -123,7 +123,6 @@
       const b = document.createElement('button');
       b.type = 'button';
       b.className = `icon-choice${it.id === current ? ' is-current' : ''}`;
-      b.title = it.name;
       b.appendChild(el(it.id));
       const cap = document.createElement('span');
       cap.className = 'icon-choice__name';

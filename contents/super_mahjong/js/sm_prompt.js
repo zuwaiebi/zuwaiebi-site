@@ -36,25 +36,32 @@
   function sourceLine(p) {
     const name = p.source && p.source.name ? p.source.name : '';
     if (!name) return '';
-    return name.startsWith('《') || name === '割り込み' || name === 'フルパワー選択' ? name : `《${name}》の効果`;
+    const base = name.startsWith('《') || name === '割り込み' || name === 'フルパワー選択' ? name : `《${name}》の効果`;
+    // 割り込み: どのカードの処理で出たウィンドウか
+    return p.about && p.about.name ? `${base}　《${p.about.name}》の処理` : base;
   }
+  /** ウィンドウの見出しを押した時に詳しく見るカード */
+  const sourceCid = (p) => (p.source && p.source.cid) || (p.about && p.about.cid) || null;
 
   function itemEl(p, it, i, onPick) {
     let e;
     if (it.cid !== undefined) {
-      e = SM.Cards.el(it.cid, { size: 'mini', onClick: () => onPick(i, e) });
-      if (it.label && it.owner !== undefined) {
+      // cid が null のカードは裏向き（モンティホール問題のダミーなど）。選べないカードは灰色で見せるだけ
+      e = SM.Cards.el(it.cid, it.disabled ? { size: 'mini', detail: false } : { size: 'mini', onClick: () => onPick(i, e) });
+      const caption = it.caption !== undefined ? it.caption : it.label && it.owner !== undefined ? it.label : null;
+      if (caption !== null) {
         const wrap = document.createElement('div');
-        wrap.className = 'prompt-item prompt-item--card';
+        wrap.className = `prompt-item prompt-item--card${it.disabled ? ' is-disabled' : ''}`;
         wrap.appendChild(e);
         const cap = document.createElement('div');
         cap.className = 'prompt-item__cap';
-        cap.textContent = it.label;
+        cap.textContent = caption;
         wrap.appendChild(cap);
-        wrap.addEventListener('click', () => onPick(i, wrap));
+        if (!it.disabled) wrap.addEventListener('click', () => onPick(i, wrap));
         return wrap;
       }
       e.classList.add('prompt-item');
+      if (it.disabled) e.classList.add('is-disabled');
       return e;
     }
     if (it.tile !== undefined) {
@@ -101,9 +108,9 @@
     const src = document.createElement('div');
     src.className = 'prompt__source';
     src.textContent = sourceLine(p);
-    if (p.source && p.source.cid) {
+    if (sourceCid(p)) {
       src.classList.add('is-clickable');
-      src.addEventListener('click', () => SM.Cards.showDetail(p.source.cid));
+      src.addEventListener('click', () => SM.Cards.showDetail(sourceCid(p)));
     }
     body.appendChild(src);
     const title = document.createElement('div');
@@ -265,9 +272,9 @@
     const src = document.createElement('span');
     src.className = 'prompt__source';
     src.textContent = sourceLine(p);
-    if (p.source && p.source.cid) {
+    if (sourceCid(p)) {
       src.classList.add('is-clickable');
-      src.addEventListener('click', () => SM.Cards.showDetail(p.source.cid));
+      src.addEventListener('click', () => SM.Cards.showDetail(sourceCid(p)));
     }
     bar.appendChild(src);
     const title = document.createElement('span');

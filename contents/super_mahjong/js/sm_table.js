@@ -249,16 +249,26 @@
     }
 
     const info = $('my-info');
-    const parts = [];
-    if (!me.masked && me.waits && me.waits.length) parts.push(`待ち: ${me.waits.map((k) => T().kindLabel(k)).join(' ')}`);
-    if (me.furiten) parts.push('<span class="furiten">フリテン</span>');
-    info.innerHTML = parts.join('　');
+    info.innerHTML = '';
+    const addInfo = (text, cls) => {
+      if (info.childNodes.length) info.append('　');
+      const span = document.createElement('span');
+      if (cls) span.className = cls;
+      span.textContent = text;
+      info.appendChild(span);
+    };
+    if (!me.masked && me.waits && me.waits.length) addInfo(`待ち: ${me.waits.map((k) => T().kindLabel(k)).join(' ')}`);
+    if (me.furiten) addInfo('フリテン', 'furiten');
+    // カードの効果で和了れない時（ヤギ・他家の光の護封剣など）も、フリテンと同じように出す
+    if (me.noWin && me.noWin.length) addInfo(`和了れない（${me.noWin.map((n) => `《${n}》`).join('')}）`, 'furiten');
   }
 
   function render(game, room) {
     lastGame = game;
     lastRoom = room;
     T().setView(game);
+    // 他の人が割り込み・鳴きを考えている間（自分は何も聞かれていない時）は、画面の中央に「他プレイヤーが思考中…」
+    $('thinking').hidden = !(game.othersThinking && !game.prompt);
     const table = $('table');
     table.dataset.players = game.n;
     ['bottom', 'right', 'top', 'left'].forEach((pos) => { $(`seat-${pos}`).hidden = true; });

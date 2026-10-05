@@ -297,8 +297,13 @@ input[type=text], input[type=number], select {
   border: none; border-radius: 22px; padding: 10px 22px; font-weight: 800; font-size: 16px;
   background: #f4efe0; color: #222; box-shadow: 0 2px 0 #0006;
 }
-.action-button.is-win { background: var(--danger); color: #fff; }
-.action-button.is-riichi { background: var(--accent); color: #2b1a00; }
+/* ロン・ツモ＝赤、リーチ＝オレンジ、ポン＝青、チー＝緑、カン（亜空槓も）＝紫、抜き＝黄 */
+.action-button.is-win { background: #d7322a; color: #fff; }
+.action-button.is-riichi { background: #f0821e; color: #2b1400; }
+.action-button.is-pon { background: #2a66d4; color: #fff; }
+.action-button.is-chi { background: #23843f; color: #fff; }
+.action-button.is-kan { background: #8a3fb0; color: #fff; }
+.action-button.is-kita { background: #f4d02a; color: #2b2300; }
 .action-button.is-sub { background: #8a978e; color: #fff; }
 .options { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 16px; font-size: 12px; color: var(--muted); padding-top: 4px; }
 .exit-box { z-index: 58; }
@@ -627,3 +632,18 @@ input[type=text], input[type=number], select {
   .opt-note { display: none; }
   .log-latest { max-width: 100%; }
 }
+
+/* 選べないカード（モンティホール問題で表向きにした《ヤギ》など）: 灰色で見せるだけ */
+.prompt-item--card.is-disabled, .card.prompt-item.is-disabled { filter: grayscale(1); opacity: 0.5; cursor: not-allowed; }
+
+/* 他の人が割り込み・鳴きを考えている間の表示（画面の中央でゆっくり点滅）。
+   割り込みの間はプレイされたカードも中央に出ているので、その上に重ねる（サイコロなどの演出・選択ウィンドウよりは下） */
+.thinking {
+  position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 46;
+  padding: 10px 26px; border-radius: 24px; background: #000b; color: #fff;
+  font-weight: 800; font-size: 18px; letter-spacing: 0.05em; white-space: nowrap; pointer-events: none;
+  animation: thinkingFade 1.6s ease-in-out infinite;
+}
+.thinking[hidden] { display: none; }
+@keyframes thinkingFade { 0%, 100% { opacity: 0.25; } 50% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .thinking { animation: none; } }

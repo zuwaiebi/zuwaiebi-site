@@ -52,10 +52,10 @@
             <select id="create-players"><option value="4">4人（四麻）</option><option value="3">3人（三麻）</option></select>
           </label>
           <label>長さ
-            <select id="create-length"><option value="hanchan">半荘戦</option><option value="tonpuu">東風戦</option><option value="ikkyoku">一局戦</option></select>
+            <select id="create-length"><option value="hanchan">半荘戦</option><option value="tonpuu" selected>東風戦</option><option value="ikkyoku">一局戦</option></select>
           </label>
           <label>持ち点
-            <input id="create-start" type="number" min="1000" max="100000" step="1000" value="25000">
+            <input id="create-start" type="number" min="1000" max="100000" step="1000" value="35000">
           </label>
           <label>1手の時間 <select id="create-perturn"></select></label>
           <label>持ち時間 <select id="create-bank"></select></label>
@@ -63,7 +63,6 @@
           <label class="check"><input id="create-kuitan" type="checkbox" checked> 喰いタン</label>
           <label class="check"><input id="create-tobi" type="checkbox" checked> 飛び</label>
           <label class="check"><input id="create-renchan" type="checkbox"> 連荘</label>
-          <label class="check"><input id="create-cards" type="checkbox" checked> カードを使う</label>
           <div class="card-count-row"><button id="create-card-counts" class="sub-button" type="button">カード枚数設定</button><span id="create-card-counts-text" class="card-count-row__text"></span></div>
         </form>
         <p class="note">三麻は萬子・筒子・索子・字牌すべてを使い、チーなし・北抜きあり・ツモ損です。連荘なしでは親が和了・聴牌しても親が流れます（一巡目の途中流局だけはやり直し）。</p>
@@ -98,7 +97,6 @@
           <label class="check"><input id="room-kuitan" type="checkbox"> 喰いタン</label>
           <label class="check"><input id="room-tobi" type="checkbox"> 飛び</label>
           <label class="check"><input id="room-renchan" type="checkbox"> 連荘</label>
-          <label class="check"><input id="room-cards" type="checkbox"> カードを使う</label>
           <div class="card-count-row"><button id="room-card-counts" class="sub-button" type="button">カード枚数設定</button><span id="room-card-counts-text" class="card-count-row__text"></span></div>
         </form>
         <div id="room-card-counts-view" class="card-count-row" hidden><button id="room-card-counts-show" class="sub-button" type="button">山札のカードを見る</button></div>
@@ -124,6 +122,8 @@
 
   <!-- 対局 -->
   <div id="screen-game" class="screen">
+    <!-- 他の人が割り込み・鳴きを考えている間に出す -->
+    <div id="thinking" class="thinking" hidden>他プレイヤーが思考中…</div>
     <div id="table" class="table">
       <div id="seat-top" class="seat seat--top" hidden><div class="seat__head"></div><div class="seat__melds"></div><div class="seat__river"></div></div>
       <div id="seat-left" class="seat seat--left" hidden><div class="seat__head"></div><div class="seat__melds"></div><div class="seat__river"></div></div>

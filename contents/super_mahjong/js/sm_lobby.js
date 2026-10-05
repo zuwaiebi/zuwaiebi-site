@@ -25,7 +25,6 @@
       renchan: f('renchan').checked,
       perTurn: Number(f('perturn').value),
       bank: Number(f('bank').value),
-      cards: f('cards').checked,
       cardCounts: counts[prefix],
     };
   }
@@ -41,7 +40,6 @@
     f('renchan').checked = Boolean(r.renchan);
     f('perturn').value = String(r.perTurn);
     f('bank').value = String(r.bank);
-    f('cards').checked = r.cards !== false;
   }
 
   function showCountsText(prefix) {
@@ -52,7 +50,7 @@
     fillSelect($(`${prefix}-perturn`), TIME_OPTIONS);
     fillSelect($(`${prefix}-bank`), BANK_OPTIONS);
     $(`${prefix}-players`).addEventListener('change', () => {
-      $(`${prefix}-start`).value = $(`${prefix}-players`).value === '3' ? '35000' : '25000';
+      $(`${prefix}-start`).value = $(`${prefix}-players`).value === '3' ? '45000' : '35000';
     });
     const form = $(`${prefix}-form`);
     form.addEventListener('change', () => {
@@ -83,7 +81,7 @@
       r.tobi ? '飛びあり' : '飛びなし',
       r.renchan ? '連荘あり' : '連荘なし',
       t,
-      r.cards === false ? 'カードなし' : `カードあり（${SM.Deck.summary(r.cardCounts, r)}）`,
+      r.cards === false ? 'カードなし' : SM.Deck.summary(r.cardCounts, r),
     ].join(' / ');
   }
 

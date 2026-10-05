@@ -138,6 +138,7 @@
     const tile = prompt.tile;
     const name = (s) => SM.Main.seatName(s);
 
+    // 色: ロン・ツモ＝赤、リーチ＝オレンジ、ポン＝青、チー＝緑、カン（亜空槓も）＝紫、抜き＝黄
     if (has('tsumo').length) top.appendChild(button('ツモ', 'is-win', () => sendAction({ type: 'tsumo' })));
     if (has('ron').length) top.appendChild(button('ロン', 'is-win', () => sendAction({ type: 'ron' })));
     if (has('riichi').length) {
@@ -150,23 +151,23 @@
     }
     const pon = has('pon')[0];
     if (pon) {
-      top.appendChild(button('ポン', '', () => {
+      top.appendChild(button('ポン', 'is-pon', () => {
         if (pon.options.length === 1) sendAction({ type: 'pon', option: 0 });
         else chooser('どの牌でポンしますか', pon.options.map((o) => ({ tiles: [...o, tile] })), (i) => sendAction({ type: 'pon', option: i }));
       }));
     }
     const chi = has('chi')[0];
     if (chi) {
-      top.appendChild(button('チー', '', () => {
+      top.appendChild(button('チー', 'is-chi', () => {
         if (chi.options.length === 1) sendAction({ type: 'chi', option: 0 });
         else chooser('どの形でチーしますか', chi.options.map((o) => ({ tiles: [...o, tile] })), (i) => sendAction({ type: 'chi', option: i }));
       }));
     }
-    if (has('minkan').length) top.appendChild(button('カン', '', () => sendAction({ type: 'minkan' })));
-    if (has('akan').length) top.appendChild(button('亜空槓', '', () => sendAction({ type: 'akan' })));
+    if (has('minkan').length) top.appendChild(button('カン', 'is-kan', () => sendAction({ type: 'minkan' })));
+    if (has('akan').length) top.appendChild(button('亜空槓', 'is-kan', () => sendAction({ type: 'akan' })));
     const kans = [...has('ankan'), ...has('kakan')];
     if (kans.length) {
-      top.appendChild(button('カン', '', () => {
+      top.appendChild(button('カン', 'is-kan', () => {
         if (kans.length === 1) sendAction({ ...kans[0] });
         else {
           chooser('どの牌でカンしますか', kans.map((k) => ({ tiles: [kindTile(k.kind)], label: k.target !== undefined ? `${name(k.target)}のポンに` : '' })), (i) => sendAction({ ...kans[i] }));
@@ -175,7 +176,7 @@
     }
     const kitas = has('kita');
     if (kitas.length) {
-      top.appendChild(button('抜き', '', () => {
+      top.appendChild(button('抜き', 'is-kita', () => {
         if (kitas.length === 1) sendAction({ ...kitas[0] });
         else chooser('どの牌を抜きますか', kitas.map((k) => ({ tiles: [kindTile(k.kind)] })), (i) => sendAction({ ...kitas[i] }));
       }));

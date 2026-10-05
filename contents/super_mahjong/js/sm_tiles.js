@@ -189,12 +189,8 @@
     const d = build(name, { ...o, as: asName });
     if (id !== null && id !== undefined) {
       d.dataset.id = id;
-      // 同じ牌を光らせる時の目印（赤5も普通の5と同じ牌種。？の牌は牌種を持たせない）
-      if (known) {
-        d.title = LABEL(name) + (asName ? `（${asName === 'joker' ? 'オールマイティ牌' : LABEL(asName)}として扱う）` : '')
-          + (shown !== null ? `（元は${LABEL(nameOf(id, useRed))}）` : '');
-        d.dataset.k = shown !== null ? shown : kindOf(id);
-      }
+      // 同じ牌を光らせる時の目印（赤5も普通の5と同じ牌種。？の牌は牌種を持たせない）。カーソルを合わせても文字は出さない
+      if (known) d.dataset.k = shown !== null ? shown : kindOf(id);
     }
     // ドラの牌（扱っている牌種で判定。赤5は赤ドラありの時。カードの効果でドラになっている牌も）
     const k = shown !== null ? shown : typeof as === 'number' ? as : kindOf(id);
@@ -216,7 +212,6 @@
   function kindEl(k, o = {}) {
     const name = kindNameOf(k);
     const d = build(name, o);
-    d.title = LABEL(name);
     d.dataset.k = k;
     return d;
   }
