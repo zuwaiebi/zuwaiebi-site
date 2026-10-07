@@ -46,6 +46,9 @@
       const key = `${room.code}:${room.gameNo}`;
       if (key !== logGame) {
         SM.Log.clear();
+        // 前の対局で答えた問い合わせの番号を覚えたままだと、新しい対局の問い合わせを答え済みと取り違えることがある
+        SM.Prompt.reset();
+        SM.Input.reset();
         logGame = key;
       }
     }

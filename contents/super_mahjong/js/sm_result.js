@@ -38,7 +38,12 @@
     return table;
   }
 
+  // 他家の手牌にあった変化した牌・赤ドラは、結果に入っている情報で描く
   function showRound(room, game, result) {
+    SM.Tiles.withKnown(result.result, () => renderRound(room, game, result));
+  }
+
+  function renderRound(room, game, result) {
     const box = $('result-body');
     box.innerHTML = '';
     const r = result.result;

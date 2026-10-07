@@ -262,5 +262,8 @@
     SM.Table.rerender();
   }
 
-  SM.Input = { init, update, decorateHandTile, onRejected, oneClick };
+  /** 新しい対局が始まった時: 前の対局で送った問い合わせの覚えを消す */
+  function reset() { sentId = null; prompt = null; }
+
+  SM.Input = { init, update, reset, decorateHandTile, onRejected, oneClick };
 })();

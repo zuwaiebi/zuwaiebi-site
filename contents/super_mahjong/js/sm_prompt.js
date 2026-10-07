@@ -115,7 +115,7 @@
     body.appendChild(src);
     const title = document.createElement('div');
     title.className = 'prompt__title';
-    title.textContent = p.title || '';
+    SM.Cards.linkify(title, p.title || '');
     body.appendChild(title);
     // 割り込み: プレイされたカードの使用者が何を選んだか（それを見て使うか決める）
     const line = p.subject ? SM.Icons.targetLine(p.subject.seat, p.subject.shown) : null;
@@ -279,7 +279,7 @@
     bar.appendChild(src);
     const title = document.createElement('span');
     title.className = 'hand-pick__title';
-    title.textContent = `${p.title || '手牌から選んでください'}${max > 1 ? `（${sel.size}/${max}）` : ''}`;
+    SM.Cards.linkify(title, `${p.title || '手牌から選んでください'}${max > 1 ? `（${sel.size}/${max}）` : ''}`);
     bar.appendChild(title);
     const hint = document.createElement('span');
     hint.className = 'hand-pick__hint';
@@ -333,10 +333,19 @@
     });
   }
 
+  /** 新しい対局が始まった時: 前の対局で答えた問い合わせの覚えを消す（番号が重なっても選べるように） */
+  function reset() {
+    answeredId = null;
+    current = null;
+    endHandPick();
+    $('prompt-box').hidden = true;
+    $('fp-grid').dataset.pid = '';
+  }
+
   function init() {
     setInterval(tick, 250);
     $('prompt-peek').addEventListener('click', () => setPeek(false));
   }
 
-  SM.Prompt = { init, update, hide, showPregame, sendAnswer: send, decorateHandPick };
+  SM.Prompt = { init, update, hide, reset, showPregame, sendAnswer: send, decorateHandPick };
 })();

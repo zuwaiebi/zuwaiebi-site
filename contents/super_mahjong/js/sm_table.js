@@ -198,7 +198,7 @@
     for (const e of game.effects) {
       const li = document.createElement('div');
       li.className = 'effect-chip';
-      li.textContent = `${e.owner !== null && e.owner !== undefined ? `${SM.Main.seatName(e.owner)}: ` : ''}${e.name}${e.desc ? `（${e.desc}）` : ''}`;
+      SM.Cards.linkify(li, `${e.owner !== null && e.owner !== undefined ? `${SM.Main.seatName(e.owner)}: ` : ''}${e.name}${e.desc ? `（${e.desc}）` : ''}`);
       eff.appendChild(li);
     }
   }
@@ -254,7 +254,7 @@
       if (info.childNodes.length) info.append('　');
       const span = document.createElement('span');
       if (cls) span.className = cls;
-      span.textContent = text;
+      SM.Cards.linkify(span, text);
       info.appendChild(span);
     };
     if (!me.masked && me.waits && me.waits.length) addInfo(`待ち: ${me.waits.map((k) => T().kindLabel(k)).join(' ')}`);

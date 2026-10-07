@@ -49,11 +49,11 @@
     const box = $('log-list');
     if (!box) return;
     const li = document.createElement('li');
-    li.textContent = t;
+    SM.Cards.linkify(li, t);
     box.prepend(li);
     while (box.children.length > MAX) box.lastChild.remove();
     const latest = $('log-latest');
-    if (latest) latest.textContent = t;
+    if (latest) SM.Cards.linkify(latest, t);
   }
 
   /** ログを空にする（新しく対局を始めた時に、前の対局の分を消す） */
