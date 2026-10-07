@@ -58,6 +58,7 @@
     view = { counts: { ...(counts || {}) }, editable: Boolean(o.editable), onChange: o.onChange || null, rules: o.rules || null };
     $('card-counts-filter').value = '';
     $('card-counts-reset').hidden = !view.editable;
+    $('card-counts-zero').hidden = !view.editable;
     $('card-counts-note').textContent = view.editable
       ? 'カードを押すと、テキストを見ながら枚数を変えられます。0枚のカードは山札に入らず、ランダムにカードが出る効果でも出ません。'
       : '今の部屋の山札です（変えられるのはホストだけです）。';
@@ -105,6 +106,23 @@
       grid.appendChild(item);
     }
     $('card-counts-total').textContent = summary(view.counts, view.rules);
+    // すべて0枚の時だけ「すべて1枚にする」に切り替える
+    $('card-counts-zero').textContent = allZero(view.counts) ? 'すべて1枚にする' : 'すべて0枚にする';
+  }
+
+  /** 山札に入るカードがすべて0枚か */
+  function allZero(counts) {
+    return CARDS.every((c) => countOf(counts, c) === 0);
+  }
+
+  /** すべてのカードを n 枚にする */
+  function setAll(n) {
+    if (!view || !view.editable) return;
+    const out = {};
+    for (const c of CARDS) out[c.id] = n;
+    view.counts = clean(out);
+    if (view.onChange) view.onChange({ ...view.counts });
+    render();
   }
 
   /** カード（テキスト付き）を大きく出し、その下の −・＋ で枚数を変える */
@@ -150,6 +168,11 @@
       view.counts = {};
       if (view.onChange) view.onChange({});
       render();
+    });
+    // すべて0枚にする（すべて0枚の時は、すべて1枚にする）
+    $('card-counts-zero').addEventListener('click', () => {
+      if (!view || !view.editable) return;
+      setAll(allZero(view.counts) ? 1 : 0);
     });
   }
 

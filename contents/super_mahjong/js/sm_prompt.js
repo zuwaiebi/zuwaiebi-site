@@ -203,7 +203,8 @@
   }
 
   function update(prompt, timeLeft) {
-    if (!prompt || prompt.kind === 'turn' || prompt.kind === 'call') {
+    // monty: モンティホール問題の盤で選ぶ問い合わせ（sm_monty が受け持つ）
+    if (!prompt || prompt.kind === 'turn' || prompt.kind === 'call' || prompt.monty) {
       if (current) hide();
       return;
     }
@@ -347,5 +348,5 @@
     $('prompt-peek').addEventListener('click', () => setPeek(false));
   }
 
-  SM.Prompt = { init, update, hide, reset, showPregame, sendAnswer: send, decorateHandPick };
+  SM.Prompt = { init, update, hide, reset, showPregame, sendAnswer: send, decorateHandPick, isAnswered: (p) => Boolean(p) && answeredId === p.id };
 })();

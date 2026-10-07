@@ -17,6 +17,10 @@
   let doraKinds = new Set();
   let doraTiles = new Set();
   let asKinds = {};
+  // 黄金の国ジパング: すべての牌がドラ（手牌・河・副露・抜き北・ドラ表示牌など、見えている牌をすべて光らせる）
+  let allDora = false;
+  // オールマイティ牌に変化した牌の牌種（大器晩成など）
+  const JOKER = 38;
   // 光沢・切り替えの周期。描き直した牌どうしでも動きがそろうよう、周期の途中から始める
   const SHINE_MS = 3600;
   const FADE_MS = 4000;
@@ -32,7 +36,8 @@
   const FLOWER = ['春', '夏', '秋', '冬'];
   const LABEL = (name) => {
     if (name === 'mask') return '？';
-    const red = name.endsWith('r') ? '(赤)' : '';
+    // 赤ドラは「3mr」のように3文字目が r（オールマイティ牌は jokerr）
+    const red = name === 'jokerr' || (name.length === 3 && name[2] === 'r') ? '(赤)' : '';
     if (name.startsWith('joker')) return `オールマイティ${red}`;
     const n = Number(name[0]), s = name[1];
     if (s === 'f') return FLOWER[n - 1] + red;
@@ -206,7 +211,7 @@
     // ドラの牌（扱っている牌種で判定。赤5は赤ドラありの時。カードの効果でドラになっている牌も）
     const k = shown !== null ? shown : typeof as === 'number' ? as : kindOf(id);
     const cardDora = fixed ? Boolean(fixed.dora) : doraTiles.has(id);
-    if (known && !o.plain && (red || doraKinds.has(k) || cardDora)) {
+    if (known && (allDora || (!o.plain && (red || doraKinds.has(k) || cardDora)))) {
       d.classList.add('is-dora');
       d.style.setProperty('--shine-delay', phase(SHINE_MS));
     }
@@ -289,7 +294,7 @@
     highlight(id === null || id === undefined ? null : kindOf(id));
   }
 
-  function kindNameOf(k) { return k >= 34 ? `${k - 33}f` : kindName(k); }
+  function kindNameOf(k) { return k === JOKER ? 'joker' : k >= 34 ? `${k - 33}f` : kindName(k); }
   SM.Tiles = {
     el, kindEl, nameOf, kindName, kindOf, probeImages, HONOR, initHighlight, highlight, highlightSelected,
     label: (id, red) => LABEL(nameOf(id, red)),
@@ -299,6 +304,7 @@
     setView(game) {
       overrides = game.tiles || {};
       reds = new Set(game.reds || []);
+      allDora = Boolean(game.allDora);
       doraKinds = new Set(game.doraKinds || []);
       doraTiles = new Set(game.doraTiles || []);
       asKinds = game.asKinds || {};

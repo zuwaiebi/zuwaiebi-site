@@ -97,6 +97,13 @@
     const body = $('card-detail-body');
     body.innerHTML = '';
     body.appendChild(el(cid, { size: 'full', detail: false }));
+    // 場のパワーのメモ（唯我独尊で宣言した種類・タイルフォースで選んだ牌など）
+    if (o.note) {
+      const note = document.createElement('p');
+      note.className = 'card-detail__note';
+      linkify(note, o.note);
+      body.appendChild(note);
+    }
     if (o.extra) body.appendChild(o.extra);
     const acts = document.createElement('div');
     acts.className = 'card-detail__actions';

@@ -43,6 +43,49 @@
     SM.Tiles.withKnown(result.result, () => renderRound(room, game, result));
   }
 
+  /** 和了1人分（見出し・手牌・ドラ表示・役・点数） */
+  function agariBlock(box, room, r, red, roundLabel) {
+    const title = document.createElement('h2');
+    title.className = 'result-title';
+    title.textContent = `${roundLabel}　${nameOf(room, r.winner)} ${r.isTsumo ? 'ツモ' : `ロン（放銃: ${nameOf(room, r.loser)}）`}`;
+    box.appendChild(title);
+    const hand = document.createElement('div');
+    hand.className = 'result-hand';
+    // カードの効果で別の牌として使った牌（クソミドリ・宮永咲など）はその牌で見せ、その並びで並べる。
+    // カードの効果でドラになった牌（ワイマール憲法の1・9など）も光らせる
+    const asKinds = r.asKinds || {};
+    const cardDora = new Set(r.doraTiles || []);
+    const treat = (t) => ({ treat: { kind: asKinds[t], dora: cardDora.has(t) } });
+    const used = (t) => (asKinds[t] !== undefined ? asKinds[t] : SM.Tiles.kindOf(t));
+    const handIds = r.hand.some((t) => asKinds[t] !== undefined) ? r.hand.slice().sort((a, b) => used(a) - used(b) || a - b) : r.hand;
+    hand.appendChild(tilesRow(handIds, red, '', false, treat));
+    const win = tilesRow([r.winTile], red, 'win-tile', false, treat);
+    hand.appendChild(win);
+    r.melds.forEach((m) => hand.appendChild(SM.Table.meldEl(m, r.winner, room.seats.length, red, 'sm', treat)));
+    if (r.kita.length) hand.appendChild(tilesRow(r.kita, red, 'kita'));
+    box.appendChild(hand);
+
+    const dora = document.createElement('div');
+    dora.className = 'result-dora';
+    dora.append('ドラ表示 ', tilesRow(r.doraIndicators, red, '', true));
+    if (r.uraIndicators.length) dora.append('　裏ドラ表示 ', tilesRow(r.uraIndicators, red, '', true));
+    box.appendChild(dora);
+
+    const yaku = document.createElement('ul');
+    yaku.className = 'yaku-list';
+    r.yaku.forEach((y) => {
+      const li = document.createElement('li');
+      li.innerHTML = `<span></span><span>${y.han}翻</span>`;
+      li.firstChild.textContent = y.name;
+      yaku.appendChild(li);
+    });
+    box.appendChild(yaku);
+    const pts = document.createElement('p');
+    pts.className = 'result-points';
+    pts.textContent = r.han >= 13 ? `${r.han}翻 ${r.limit}　${r.label}` : `${r.fu}符 ${r.han}翻${r.limit ? ` ${r.limit}` : ''}　${r.label}`;
+    box.appendChild(pts);
+  }
+
   function renderRound(room, game, result) {
     const box = $('result-body');
     box.innerHTML = '';
@@ -52,43 +95,13 @@
     title.className = 'result-title';
 
     if (r.type === 'agari') {
-      title.textContent = `${result.label}　${nameOf(room, r.winner)} ${r.isTsumo ? 'ツモ' : `ロン（放銃: ${nameOf(room, r.loser)}）`}`;
+      agariBlock(box, room, r, red, result.label);
+      // 同時に和了した人（勝利宣言鬼丸「覇」）も順に出す
+      for (const m of r.more || []) SM.Tiles.withKnown(m, () => agariBlock(box, room, m, red, result.label));
+    } else if (r.type === 'tobi') {
+      // 飛びありの部屋で、局の途中に持ち点がマイナスになって終わった時
+      title.textContent = `${result.label}　飛び（${(r.seats || []).map((s) => nameOf(room, s)).join('・')}）`;
       box.appendChild(title);
-      const hand = document.createElement('div');
-      hand.className = 'result-hand';
-      // カードの効果で別の牌として使った牌（クソミドリ・宮永咲など）はその牌で見せ、その並びで並べる。
-      // カードの効果でドラになった牌（ワイマール憲法の1・9など）も光らせる
-      const asKinds = r.asKinds || {};
-      const cardDora = new Set(r.doraTiles || []);
-      const treat = (t) => ({ treat: { kind: asKinds[t], dora: cardDora.has(t) } });
-      const used = (t) => (asKinds[t] !== undefined ? asKinds[t] : SM.Tiles.kindOf(t));
-      const handIds = r.hand.some((t) => asKinds[t] !== undefined) ? r.hand.slice().sort((a, b) => used(a) - used(b) || a - b) : r.hand;
-      hand.appendChild(tilesRow(handIds, red, '', false, treat));
-      const win = tilesRow([r.winTile], red, 'win-tile', false, treat);
-      hand.appendChild(win);
-      r.melds.forEach((m) => hand.appendChild(SM.Table.meldEl(m, r.winner, room.seats.length, red, 'sm', treat)));
-      if (r.kita.length) hand.appendChild(tilesRow(r.kita, red, 'kita'));
-      box.appendChild(hand);
-
-      const dora = document.createElement('div');
-      dora.className = 'result-dora';
-      dora.append('ドラ表示 ', tilesRow(r.doraIndicators, red, '', true));
-      if (r.uraIndicators.length) dora.append('　裏ドラ表示 ', tilesRow(r.uraIndicators, red, '', true));
-      box.appendChild(dora);
-
-      const yaku = document.createElement('ul');
-      yaku.className = 'yaku-list';
-      r.yaku.forEach((y) => {
-        const li = document.createElement('li');
-        li.innerHTML = `<span></span><span>${y.han}翻</span>`;
-        li.firstChild.textContent = y.name;
-        yaku.appendChild(li);
-      });
-      box.appendChild(yaku);
-      const pts = document.createElement('p');
-      pts.className = 'result-points';
-      pts.textContent = r.han >= 13 ? `${r.han}翻 ${r.limit}　${r.label}` : `${r.fu}符 ${r.han}翻${r.limit ? ` ${r.limit}` : ''}　${r.label}`;
-      box.appendChild(pts);
     } else {
       const nagashi = (r.nagashi || []).map((s) => nameOf(room, s)).join('・');
       title.textContent = `${result.label}　${REASON[r.reason] || '流局'}${nagashi ? `（流し満貫: ${nagashi}）` : ''}`;

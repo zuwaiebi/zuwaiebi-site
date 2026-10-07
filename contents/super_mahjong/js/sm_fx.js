@@ -132,13 +132,16 @@
       col.style.animationDelay = `${i * 0.15}s`;
       const tile = document.createElement('div');
       tile.className = 'fx-compare__tile';
-      if (x.tile === null || x.tile === undefined) tile.textContent = '—';
+      // label: 牌を切らずにツモ和了した人など
+      if (x.label) tile.textContent = x.label;
+      else if (x.tile === null || x.tile === undefined) tile.textContent = '—';
       else tile.appendChild(SM.Tiles.el(x.tile, { red, size: 'hand' }));
+      if (x.label) tile.classList.add('is-label');
       col.appendChild(tile);
       const num = document.createElement('div');
       num.className = 'fx-compare__num';
       const isNum = x.kind !== null && x.kind !== undefined && x.kind < 27;
-      num.textContent = isNum ? String((x.kind % 9) + 1) : '数牌でない';
+      num.textContent = x.label ? '' : isNum ? String((x.kind % 9) + 1) : '数牌でない';
       if (!isNum) num.classList.add('is-none');
       col.appendChild(num);
       const name = document.createElement('div');

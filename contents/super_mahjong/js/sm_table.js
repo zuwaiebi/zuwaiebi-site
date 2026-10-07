@@ -116,7 +116,8 @@
     field.hidden = !game.cardsEnabled;
     for (let i = 0; i < 5; i++) {
       const c = p.cards.field[i];
-      if (c) field.appendChild(SM.Cards.el(c.cid, { size: 'tiny' }));
+      // タイルフォースが有効なパワーは緑の縁。詳細にはメモ（唯我独尊の宣言など）も出す
+      if (c) field.appendChild(SM.Cards.el(c.cid, { size: 'tiny', cls: c.force ? 'is-force' : '', onClick: () => SM.Cards.showDetail(c.cid, { note: c.note }) }));
       else {
         const e = document.createElement('div');
         e.className = 'card card--tiny card--empty';
@@ -218,8 +219,10 @@
     const hand = $('my-hand');
     hand.innerHTML = '';
     const input = SM.Input;
+    // タイルフォースが有効なパワーで選んでいる牌は緑の縁
+    const forced = new Set(me.forceTiles || []);
     const make = (t, extraCls) => {
-      const e = T().el(t, { red: game.red, size: 'hand', cls: extraCls, mask: me.masked });
+      const e = T().el(t, { red: game.red, size: 'hand', cls: `${extraCls}${forced.has(t) ? ' is-force' : ''}`, mask: me.masked });
       input.decorateHandTile(e, t);
       return e;
     };
@@ -318,7 +321,12 @@
       if (e.type === 'riichi') text = 'リーチ';
       else if (e.type === 'call') text = SHOUT[e.call];
       else if (e.type === 'kita') text = '抜き';
-      else if (e.type === 'end' && e.result.type === 'agari') { text = e.result.isTsumo ? 'ツモ' : 'ロン'; seat = e.result.winner; }
+      else if (e.type === 'end' && e.result.type === 'agari') {
+        text = e.result.isTsumo ? 'ツモ' : 'ロン';
+        seat = e.result.winner;
+        // 同時に和了した人（勝利宣言鬼丸「覇」）にも発声を出す
+        for (const m of e.result.more || []) shout(game, m.winner, m.isTsumo ? 'ツモ' : 'ロン');
+      }
       else if (e.type === 'cardPlay') {
         const who = SM.Main.seatName(e.seat);
         SM.Cards.showPlayed(e.cid, `${who}${e.reaction ? 'の割り込み' : 'がプレイ'}`, SM.Icons.targetLine(e.seat, e.shown, e.reactTo));

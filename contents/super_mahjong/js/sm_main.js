@@ -55,6 +55,7 @@
     if (room.state === 'waiting') {
       SM.Result.hideRound();
       SM.Prompt.hide();
+      SM.Monty.update(null);
       SM.Lobby.renderRoom(room);
       show('screen-room');
       return;
@@ -62,6 +63,7 @@
     if (room.state === 'finished') {
       SM.Result.hideRound();
       SM.Prompt.hide();
+      SM.Monty.update(null);
       SM.Result.showFinal(room, m.ranking || [], m.scores);
       show('screen-final');
       return;
@@ -78,6 +80,7 @@
       SM.Table.render(m.game, room);
       SM.Table.showEvents(m.game, m.events);
       SM.Prompt.update(m.game.prompt, m.game.timeLeft);
+      SM.Monty.update(m.game);
     }
     if (room.state === 'result' && m.result) {
       SM.Result.showRound(room, m.game, m.result);
@@ -99,6 +102,7 @@
     SM.Cards.hideDetail();
     SM.Deck.close();
     SM.Prompt.hide();
+    SM.Monty.update(null);
     SM.Result.hideRound();
     $('pile-box').hidden = true;
     $('card-play').hidden = true;
@@ -121,6 +125,7 @@
     SM.Lobby.init();
     SM.Input.init();
     SM.Prompt.init();
+    SM.Monty.init();
     SM.Log.init();
     SM.Result.init();
     $('pile-box').addEventListener('click', (e) => { if (e.target.id === 'pile-box' || e.target.id === 'pile-close') $('pile-box').hidden = true; });

@@ -114,7 +114,9 @@ input[type=text], input[type=number], select {
 .card-counts { z-index: 52; }
 .card-counts__box { width: min(900px, 100%); height: min(760px, 100%); display: flex; flex-direction: column; gap: 8px; overflow: hidden; }
 .card-counts__box .result-title { margin: 0; }
-.card-counts__box .button-row { margin-top: 0; }
+.card-counts__box .button-row { margin-top: 0; flex-wrap: wrap; }
+/* ボタンの文字は折り返さず、入らない分は次の行へ（スマホ） */
+.card-counts__box .button-row button { white-space: nowrap; }
 .card-counts__bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 12px; }
 .card-counts__total { font-weight: 800; }
 .card-counts__bar input { flex: 1; min-width: 160px; max-width: 280px; }
@@ -567,6 +569,37 @@ input[type=text], input[type=number], select {
 @keyframes rpsRight { from { transform: translateX(60px) rotate(20deg); opacity: 0; } to { transform: none; opacity: 1; } }
 @keyframes cardpop { from { transform: scale(0.6) rotate(-4deg); opacity: 0; } to { transform: none; opacity: 1; } }
 .card-detail { z-index: 55; }
+/* モンティホール問題の盤: 全員に見せ、仕掛けられた人だけが選べる。表向きにする時はその場で回転してめくる */
+.monty { position: fixed; inset: 0; z-index: 48; display: flex; align-items: center; justify-content: center; background: #0008; padding: 12px; }
+.monty__box {
+  width: min(560px, calc(100vw - 24px)); background: var(--card); color: var(--card-ink);
+  border-radius: 12px; padding: 14px 16px; box-shadow: 0 10px 30px #000a; text-align: center;
+}
+.monty__title { font-weight: 700; margin: 8px 0 4px; }
+.monty__row { --mw: min(130px, 26vw); display: flex; gap: min(18px, 3vw); justify-content: center; margin: 12px 0 6px; }
+.monty__slot { perspective: 900px; display: flex; flex-direction: column; align-items: center; gap: 6px; transition: transform 0.15s, filter 0.3s; }
+.monty__card { position: relative; width: var(--mw); aspect-ratio: 573 / 803; transform-style: preserve-3d; transition: transform 0.75s ease-in-out; }
+.monty__card.is-flipped { transform: rotateY(180deg); }
+.monty__card.no-anim { transition: none; }
+.monty__face { position: absolute; inset: 0; backface-visibility: hidden; -webkit-backface-visibility: hidden; }
+.monty__face--front { transform: rotateY(180deg); }
+.monty__face .card { --cw: var(--mw); }
+.monty__cap { font-size: 13px; }
+.monty__slot.is-pickable { cursor: pointer; }
+.monty__slot.is-pickable:hover { transform: translateY(-4px); }
+.monty__slot.is-picked .monty__card { outline: 3px solid #e67e22; outline-offset: 3px; border-radius: 4px; }
+/* めくれた《ヤギ》は選べないので、表の面だけ灰色（めくっている途中の裏面は色のまま） */
+.monty__slot.is-disabled .monty__face--front { filter: grayscale(1) brightness(0.85); }
+/* 場のパワーのメモ（唯我独尊で宣言した種類など） */
+.card-detail__note { margin: 0; padding: 6px 12px; border-radius: 6px; background: #fffbe8; color: #333; font-size: 14px; max-width: min(92vw, 360px); }
+/* タイルフォース: 有効な間、選んでいる手牌と対応するパワーを緑で縁取る */
+.tile.is-force::before {
+  content: ''; position: absolute; inset: 0; z-index: 2; pointer-events: none;
+  border: 3px solid #2ecc71; border-radius: 12% / 9%;
+}
+.card.is-force { outline: 3px solid #2ecc71; outline-offset: 1px; }
+/* 比べる演出で牌の代わりに出す文字（ツモ和了） */
+.fx-compare__tile.is-label { font-weight: 700; color: #e74c3c; font-size: 20px; }
 /* 《カード名》: 押すとそのカードの詳細を出す */
 .card-link { cursor: pointer; text-decoration: underline dotted; text-underline-offset: 0.2em; }
 .card-link:hover { text-decoration-style: solid; }
