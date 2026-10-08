@@ -5,3 +5,5 @@ contents/cube/data/
 contents/dosukoi2/data/images/wip/
 # スーパー麻雀のBGMはGitHubに置かず、本番(スマホの~/site)へ直接コピーする。
 contents/super_mahjong/data/bgm/
+# スーパー麻雀のメモ（長い指示や仕様の下書きをtxtで渡すための場所）は、gitでは追跡しない。
+contents/super_mahjong/memo/

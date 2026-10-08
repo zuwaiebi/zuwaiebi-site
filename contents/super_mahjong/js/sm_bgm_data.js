@@ -95,5 +95,17 @@ window.SM_BGM = [
   {
     "file": "24.Last regrets(20世紀カノソ).mp3",
     "title": "Last regrets(20世紀カノソ)"
+  },
+  {
+    "file": "25.こんちきしょうめ.mp3",
+    "title": "こんちきしょうめ"
+  },
+  {
+    "file": "26.とげとげタルめいろ.mp3",
+    "title": "とげとげタルめいろ"
+  },
+  {
+    "file": "27.Vampire Killer.mp3",
+    "title": "Vampire Killer"
   }
 ];

@@ -260,6 +260,8 @@
       SM.Cards.linkify(span, text);
       info.appendChild(span);
     };
+    // デッキ構築戦: 自分の山札の残り枚数（尽きたら次に引く時に作り直す）
+    if (me.deckLeft !== undefined) addInfo(`山札 残り${me.deckLeft}枚`, 'deck-left');
     if (!me.masked && me.waits && me.waits.length) addInfo(`待ち: ${me.waits.map((k) => T().kindLabel(k)).join(' ')}`);
     if (me.furiten) addInfo('フリテン', 'furiten');
     // カードの効果で和了れない時（ヤギ・他家の光の護封剣など）も、フリテンと同じように出す
@@ -342,6 +344,8 @@
         SM.Fx.rps(e.a, e.b, e.ha, e.hb);
       } else if (e.type === 'compare') {
         SM.Fx.compare(e, game.red);
+      } else if (e.type === 'roulette') {
+        SM.Fx.roulette(e);
       }
       // 和了したら次の局が始まるまでBGMを止める
       if (e.type === 'end' && e.result && e.result.type === 'agari') SM.Audio.holdBgm(true);

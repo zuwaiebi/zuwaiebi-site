@@ -42,6 +42,7 @@
     if (room.error) toast(`エラーで対局が終了しました: ${room.error}`);
     if (room.state !== 'waiting') {
       SM.Deck.close();
+      SM.Decks.close();
       // 新しく対局を始めたら前の対局のログを消す（同じ対局に入り直した時は残す）
       const key = `${room.code}:${room.gameNo}`;
       if (key !== logGame) {
@@ -101,6 +102,7 @@
     $('exit-box').hidden = true;
     SM.Cards.hideDetail();
     SM.Deck.close();
+    SM.Decks.close();
     SM.Prompt.hide();
     SM.Monty.update(null);
     SM.Result.hideRound();
@@ -122,6 +124,9 @@
     SM.Icons.init();
     SM.Audio.init();
     SM.Deck.init();
+    SM.Decks.init();
+    SM.Achievements.init();
+    SM.CardList.init();
     SM.Lobby.init();
     SM.Input.init();
     SM.Prompt.init();
@@ -141,6 +146,8 @@
     });
     SM.Net.on('lobby', () => { leavingUntil = 0; show('screen-lobby'); });
     SM.Net.on('room', onRoom);
+    // 実績の達成・累計の記録（サーバーが判定して、その人にだけ送ってくる）
+    SM.Net.on('achievements', (m) => SM.Achievements.apply(m.list));
     SM.Net.on('error', (m) => { toast(m.message); SM.Input.onRejected(); });
     SM.Net.on('kicked', () => { toast('部屋から退出させられました'); show('screen-lobby'); });
     SM.Net.on('welcome', (m) => { if (!$('lobby-name').value) $('lobby-name').value = m.name; });

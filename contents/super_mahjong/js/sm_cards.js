@@ -5,7 +5,7 @@
 
   const DEFS = new Map((window.SM_CARDS || []).map((c) => [c.id, c]));
   const TYPE_COLOR = {
-    power: '#0070C0', full: '#FF0000', plus: '#00B050', event: '#FFC000', happening: '#7030A0',
+    power: '#0070C0', full: '#FF0000', plus: '#00B050', event: '#FFC000', happening: '#7030A0', random: '#5f6b7a',
   };
   const IMG_DIR = 'data/card_img/';
 
@@ -195,5 +195,8 @@
     $('card-play').addEventListener('click', () => { $('card-play').hidden = true; });
   }
 
-  SM.Cards = { el, def: (cid) => DEFS.get(cid), showDetail, hideDetail, showPlayed, showTriggered, init, TYPE_COLOR, linkify, linkHtml };
+  /** カードではないが、カードと同じ見た目・詳細で出すもの（デッキの「ランダム」）を足す。カード一覧・《》のリンクには出ない */
+  function register(def) { DEFS.set(def.id, def); }
+
+  SM.Cards = { el, def: (cid) => DEFS.get(cid), showDetail, hideDetail, showPlayed, showTriggered, init, TYPE_COLOR, linkify, linkHtml, register };
 })();

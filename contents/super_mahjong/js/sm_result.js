@@ -169,5 +169,6 @@
     $('btn-final-leave').addEventListener('click', () => SM.Net.send({ type: 'leaveRoom' }));
   }
 
-  SM.Result = { init, showRound, hideRound, showFinal };
+  // agariBlock: 和了1つ分の表示（統計のいちばん翻数の高い和了でも使う）
+  SM.Result = { init, showRound, hideRound, showFinal, agariBlock };
 })();

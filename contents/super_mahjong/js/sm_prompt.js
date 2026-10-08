@@ -12,8 +12,9 @@
 
   function send(prompt, answer) {
     if (answeredId === prompt.id) return;
+    // 接続が切れていて送れなかった時は答えていない扱いにする（つながり直すと同じ問い合わせが届くので、選び直せる）
+    if (!SM.Net.send({ type: 'answer', promptId: prompt.id, answer })) return;
     answeredId = prompt.id;
-    SM.Net.send({ type: 'answer', promptId: prompt.id, answer });
     hide();
   }
 
@@ -328,7 +329,12 @@
     p.items.forEach((it, i) => {
       const e = SM.Cards.el(it.cid, {
         size: 'mini',
-        onClick: () => SM.Cards.showDetail(it.cid, { actions: [{ label: 'これに決める', onClick: () => { answeredId = null; send(p, { pick: [i] }); showPregame({ prompt: null, waitingFor: pg.waitingFor }, room); } }] }),
+        onClick: () => SM.Cards.showDetail(it.cid, { actions: [{ label: 'これに決める', onClick: () => {
+          answeredId = null;
+          send(p, { pick: [i] });
+          // 送れた時だけ待つ表示にする（接続が切れていて送れなければ、そのまま選び直せる）
+          if (answeredId === p.id) showPregame({ prompt: null, waitingFor: pg.waitingFor }, room);
+        } }] }),
       });
       grid.appendChild(e);
     });

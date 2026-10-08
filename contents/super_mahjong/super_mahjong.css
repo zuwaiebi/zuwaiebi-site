@@ -37,6 +37,8 @@ button:disabled { cursor: default; opacity: 0.6; }
   position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 60;
   background: rgba(0, 0, 0, 0.85); color: #fff; padding: 10px 18px; border-radius: 8px; font-size: 14px;
   max-width: calc(100vw - 32px);
+  /* 知らせるだけなので、下にあるボタン（画面の下の方の保存など）を押す邪魔をしない */
+  pointer-events: none;
 }
 
 /* ---------- ロビー・待機室 ---------- */
@@ -106,6 +108,15 @@ input[type=text], input[type=number], select {
 .icon-choice .picon { --pi: 64px; }
 .icon-choice__name { font-size: 10px; line-height: 1.2; width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .icon-choice.is-current { border-color: var(--accent); background: #fff3cf; }
+/* 実績の報酬のアイコン: 手に入れていないものは灰色で選べない */
+.icon-grid__head { grid-column: 1 / -1; margin-top: 4px; text-align: left; font-size: 13px; font-weight: 800; color: #555; }
+.icon-choice.is-locked { opacity: 0.6; }
+.icon-choice.is-locked .picon { filter: grayscale(1); }
+/* 画像がまだ無い報酬のアイコン（名前の1文字目） */
+.picon--text {
+  display: inline-flex; align-items: center; justify-content: center;
+  background: #b5651d; color: #fff; font-weight: 800; font-size: calc(var(--pi) * 0.55); line-height: 1;
+}
 
 /* カード枚数設定 */
 .card-count-row { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; }
@@ -390,6 +401,9 @@ input[type=text], input[type=number], select {
 }
 .card__art { width: 100%; aspect-ratio: 570 / 310; overflow: hidden; background: #eee; }
 .card__art img { width: 100%; height: 100%; object-fit: cover; display: block; }
+/* デッキの「ランダム」（イラストの代わりに？） */
+.card[data-type="random"] .card__art { display: flex; align-items: center; justify-content: center; background: repeating-linear-gradient(135deg, #eef1f6 0 6px, #e1e6ee 6px 12px); }
+.card[data-type="random"] .card__art::after { content: '？'; font-weight: 900; line-height: 1; color: #5f6b7a; font-size: calc(var(--cw) * 0.3); }
 .card__type { margin-top: calc(var(--cw) * 0.035); }
 .card__badge {
   display: inline-block; color: #fff;
@@ -543,6 +557,17 @@ input[type=text], input[type=number], select {
 @keyframes dieLand { 0% { transform: scale(1.25); } 100% { transform: scale(1); } }
 .fx-dice__total { font-size: 22px; font-weight: 900; color: #ffd36b; min-height: 1.2em; }
 .fx-rps__title { font-weight: 800; letter-spacing: 0.2em; color: #ffd36b; }
+/* ルーレット（名前が順に光って止まる。新世界より） */
+.fx-roulette__row { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; padding: 6px 0; max-width: 520px; }
+.fx-roulette__cell {
+  padding: 10px 14px; border-radius: 12px; background: #ffffff14; border: 2px solid #ffffff30; font-weight: 800;
+  transition: background 0.06s, transform 0.06s, box-shadow 0.06s;
+}
+.fx-roulette__cell .picon { --pi: 26px; }
+.fx-roulette__cell.is-lit { background: #ffd34d; color: #222; border-color: #fff8; transform: scale(1.06); box-shadow: 0 0 18px #ffd34daa; }
+.fx-roulette__cell.is-hit { animation: rouletteHit 0.5s ease-out; }
+@keyframes rouletteHit { 0% { transform: scale(1.35); box-shadow: 0 0 40px #ffd34d; } 100% { transform: scale(1.06); } }
+.fx-roulette__result { min-height: 1.3em; }
 .fx-rps__row { display: flex; align-items: center; gap: 16px; }
 .fx-rps__side { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 96px; }
 .fx-rps__side.is-left { animation: rpsLeft 0.45s ease-out both; }
@@ -683,3 +708,175 @@ input[type=text], input[type=number], select {
 .thinking[hidden] { display: none; }
 @keyframes thinkingFade { 0%, 100% { opacity: 0.25; } 50% { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .thinking { animation: none; } }
+
+/* ---------- デッキ構築戦のデッキ ---------- */
+/* 待機室: 自分のデッキを選ぶ・席ごとのデッキの準備 */
+.room-deck { margin: 10px 0; padding: 10px; border-radius: 8px; background: #f3eddc; }
+.room-deck__label { display: block; font-size: 13px; font-weight: 700; margin-bottom: 4px; }
+.room-deck__row { display: flex; gap: 8px; align-items: center; }
+.room-deck__row select { flex: 1; min-width: 0; }
+.room-deck__row button { flex: none; white-space: nowrap; padding: 8px 12px; }
+.room-deck__status { margin: 6px 0 0; font-size: 12px; }
+.room-start-note { color: #c0392b; margin: 6px 0 0; }
+.seat-row__main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.seat-row__deck { font-size: 12px; color: #666; padding-left: 36px; word-break: break-all; }
+.room-deck__status.is-ok, .seat-row__deck.is-ok { color: #1c7a3e; }
+.room-deck__status.is-ng, .seat-row__deck.is-ng { color: #c0392b; }
+
+/* デッキ一覧 */
+.decks { z-index: 51; }
+.decks__box { width: min(720px, 100%); display: flex; flex-direction: column; gap: 10px; }
+.decks__box .result-title { margin: 0; }
+.decks__box .button-row { margin-top: 0; flex-wrap: wrap; }
+.decks__box .button-row button, .deck-edit__box .button-row button { white-space: nowrap; }
+.decks__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; text-align: left; }
+.deck-row { display: flex; gap: 10px; align-items: flex-start; padding: 8px; border-radius: 8px; background: #fff; border: 1px solid #0001; }
+.deck-row--empty { color: #666; font-size: 13px; }
+.deck-row__fp.card--mini { --cw: 56px; flex: none; }
+.deck-row__fp--none {
+  flex: none; width: 56px; aspect-ratio: 573 / 803; padding: 2px; border: 2px dashed #0003; border-radius: 4px;
+  display: flex; align-items: center; justify-content: center; text-align: center; font-size: 10px; color: #888;
+}
+.deck-row__info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.deck-row__name { font-weight: 800; font-size: 16px; word-break: break-all; }
+.deck-row__sub { font-size: 12px; color: #555; }
+.deck-row__status { font-size: 12px; }
+.deck-row__status.is-ok { color: #1c7a3e; }
+.deck-row__status.is-ng { color: #c0392b; }
+.deck-row__actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 2px; }
+
+/* デッキ編集（カード枚数設定と同じ一覧に、−・＋ を付ける） */
+.deck-edit { z-index: 52; }
+.deck-edit__box { width: min(900px, 100%); }
+.deck-edit__head { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.deck-edit__head input { flex: 1; min-width: 140px; }
+.deck-edit__fp {
+  display: inline-flex; align-items: center; gap: 6px; max-width: 100%; padding: 4px 10px 4px 4px;
+  border: 2px solid var(--accent); border-radius: 8px; background: #fff7e0; color: #333; font-weight: 700; font-size: 13px; text-align: left;
+}
+.deck-edit__fp.is-none { padding: 8px 12px; border-style: dashed; color: #b5651d; }
+.deck-edit__fp .card--tiny { --cw: 30px; flex: none; }
+.deck-edit__summary { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; text-align: left; }
+.deck-edit__types { font-size: 12px; font-weight: 600; color: #555; }
+.deck-edit__check { font-size: 12px; font-weight: 700; }
+.deck-edit__check.is-ok { color: #1c7a3e; }
+.deck-edit__check.is-ng { color: #c0392b; }
+.deck-edit__msg { margin: 0; padding: 4px 8px; border-radius: 6px; background: #fff3cd; color: #7a4b00; font-size: 12px; text-align: left; }
+.deck-edit__only { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; white-space: nowrap; }
+.card-counts__bar .deck-edit__only input { flex: none; min-width: 0; max-width: none; margin: 0; }
+.deck-edit__grid { grid-template-columns: repeat(auto-fill, minmax(88px, 1fr)); }
+.deck-edit__empty { grid-column: 1 / -1; color: #666; font-size: 13px; }
+.deck-card { position: relative; }
+.deck-card__ctrl { display: flex; align-items: center; gap: 2px; }
+.deck-card__ctrl .card-count__n { min-width: 2.6em; text-align: center; }
+.deck-card__step {
+  width: 28px; height: 28px; padding: 0; border: none; border-radius: 50%;
+  background: var(--accent); color: #2b1a00; font-size: 18px; font-weight: 900; line-height: 1;
+}
+.deck-card__step:disabled { background: #ccc; color: #888; }
+.deck-card.is-over .card-count__n { color: #c0392b; }
+.deck-card__tag {
+  position: absolute; top: 18px; left: 50%; transform: translateX(-50%); padding: 1px 5px; border-radius: 4px;
+  background: #c0392bdd; color: #fff; font-size: 10px; font-weight: 700; white-space: nowrap; pointer-events: none;
+}
+.card-count-edit__def.is-over { color: #ff8a80; }
+
+/* デッキのフルパワーを選ぶ */
+.deck-fp { z-index: 53; }
+.deck-fp__box { width: min(900px, 100%); height: min(760px, 100%); display: flex; flex-direction: column; gap: 8px; overflow: hidden; }
+.deck-fp__box .result-title { margin: 0; }
+.deck-fp__box .button-row { margin-top: 0; }
+.deck-fp__grid { flex: 1; min-height: 0; overflow-y: auto; align-content: flex-start; padding: 4px 2px; }
+.deck-fp__grid .card { --cw: 96px; }
+.deck-fp__grid .card.is-current { outline: 3px solid #e67e22; outline-offset: 2px; }
+
+/* デッキをテキストで書き出す・読み込む */
+.deck-text { z-index: 54; }
+.deck-text__box { width: min(560px, 100%); display: flex; flex-direction: column; gap: 8px; }
+.deck-text__box .result-title { margin: 0; }
+.deck-text__area { width: 100%; min-height: 220px; padding: 8px; border: 1px solid #0003; border-radius: 6px; font: 13px/1.5 monospace; resize: vertical; }
+
+/* ---------- ロビーのメニュー（対戦・デッキ構築・実績…） ---------- */
+.menu-tabs { display: grid; grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); gap: 6px; margin: 0 0 14px; }
+.menu-tab {
+  padding: 10px 6px; border: 2px solid #ffffff40; border-radius: 10px; background: #0003;
+  color: var(--ink); font-weight: 800; font-size: 14px; white-space: nowrap;
+}
+.menu-tab.is-active { background: var(--accent); border-color: var(--accent); color: #2b1a00; }
+/* 準備中: 灰色で押せない */
+.menu-tab:disabled { opacity: 1; background: #0002; border-color: #ffffff1a; color: #ffffff59; }
+.decks__actions { margin-top: 10px; flex-wrap: wrap; }
+.decks__actions button { white-space: nowrap; }
+
+/* ---------- 実績 ---------- */
+.ach-count { margin-left: 6px; font-size: 15px; color: #b5651d; }
+.ach-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; text-align: left; }
+.ach-item { padding: 10px; border: 1px solid #0001; border-radius: 8px; background: #fff; }
+.ach-item.is-got { border-color: var(--accent); background: #fff8e1; }
+.ach-item__head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; }
+.ach-item__no { font-size: 12px; color: #999; }
+.ach-item__name { flex: 1; min-width: 0; font-weight: 800; word-break: break-all; }
+.ach-item__state { font-size: 12px; color: #999; white-space: nowrap; }
+.ach-item.is-got .ach-item__state { color: #1c7a3e; font-weight: 700; }
+.ach-item__cond { margin: 4px 0; font-size: 13px; color: #333; white-space: pre-line; }
+.ach-item__progress { display: flex; align-items: center; gap: 8px; margin: 0 0 4px; font-size: 12px; color: #555; }
+.ach-bar { flex: 0 1 180px; height: 6px; border-radius: 3px; background: #0001; overflow: hidden; }
+.ach-bar span { display: block; height: 100%; background: var(--accent); }
+.ach-item__reward { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 12px; color: #555; }
+.ach-item__reward .picon { --pi: 26px; }
+.ach-item:not(.is-got) .ach-item__reward .picon { filter: grayscale(1); opacity: 0.6; }
+
+/* 達成した時の知らせ: 上から下りてきて、少しして上がって消える（押す邪魔はしない） */
+.ach-popup {
+  position: fixed; top: 10px; left: 50%; z-index: 70; pointer-events: none;
+  display: flex; align-items: center; gap: 12px; width: max-content; min-width: min(320px, calc(100vw - 32px)); max-width: calc(100vw - 32px);
+  padding: 10px 18px 10px 12px; border: 2px solid var(--accent); border-radius: 12px;
+  background: linear-gradient(135deg, #3b2a05, #160f01); color: #fff; box-shadow: 0 8px 24px #000a;
+  transform: translate(-50%, calc(-100% - 20px)); transition: transform 0.45s cubic-bezier(0.2, 0.8, 0.3, 1.15);
+}
+.ach-popup.is-in { transform: translate(-50%, 0); }
+.ach-popup__icon { flex: none; font-size: 36px; line-height: 1; }
+.ach-popup__icon .picon { --pi: 48px; }
+.ach-popup__body { min-width: 0; }
+.ach-popup__label { font-size: 12px; font-weight: 800; letter-spacing: 0.1em; color: var(--accent); }
+.ach-popup__name { font-size: 16px; font-weight: 800; word-break: break-all; }
+.ach-popup__reward { font-size: 12px; color: #ddd; }
+@media (prefers-reduced-motion: reduce) { .ach-popup { transition: none; } }
+
+/* ---------- カード一覧 ---------- */
+.cardlist-count { margin-left: 6px; font-size: 15px; color: #b5651d; }
+.cardlist-q { width: 100%; }
+.cardlist-types { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 12px; }
+.cardlist-type {
+  display: inline-flex; align-items: center; gap: 5px; padding: 6px 12px;
+  border: 2px solid #0002; border-radius: 999px; background: #fff; color: #333; font-size: 13px; font-weight: 700;
+}
+/* カードタイプの色の印（カードの下の帯と同じ色） */
+.cardlist-type::before { content: ''; width: 9px; height: 9px; border-radius: 50%; background: var(--tc); }
+.cardlist-type[data-type="all"]::before { display: none; }
+.cardlist-type.is-on { border-color: var(--accent); background: var(--accent); color: #2b1a00; }
+.cardlist-type__n { font-size: 11px; font-weight: 600; color: #888; }
+.cardlist-type.is-on .cardlist-type__n { color: #6b4a00; }
+.cardlist-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(78px, 1fr)); gap: 10px 8px; justify-items: center; }
+.cardlist-grid .card--mini { --cw: 76px; }
+.cardlist-empty { grid-column: 1 / -1; margin: 8px 0; color: #666; font-size: 13px; }
+
+/* ---------- 統計 ---------- */
+/* いちばん翻数の高い和了（結果の画面と同じ表示） */
+.stats-best__none { margin: 0; color: #666; font-size: 13px; }
+.stats-best__hand { overflow-x: auto; }
+.stats-best__foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin-top: 4px; }
+.stats-best__date { font-size: 12px; color: #666; }
+.stats-share { padding: 8px 18px; background: #111; color: #fff; }
+/* 記録の一覧: ▶の付いた項目を押すと、内訳（下の階層）が開く */
+.stats-list { text-align: left; font-size: 14px; }
+.stat-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 7px 4px; border-bottom: 1px solid #0001; }
+.stat-row__label { min-width: 0; }
+.stat-row__value { flex: none; max-width: 55%; font-weight: 800; text-align: right; word-break: break-all; }
+.stat-group > summary { cursor: pointer; list-style: none; }
+.stat-group > summary::-webkit-details-marker { display: none; }
+.stat-group > summary .stat-row__label::before { content: '▶'; display: inline-block; width: 1.2em; font-size: 11px; color: #b5651d; transition: transform 0.15s; }
+.stat-group[open] > summary .stat-row__label::before { transform: rotate(90deg); }
+.stat-row--leaf .stat-row__label { padding-left: 1.2em; }
+.stat-children { padding-left: 1.1em; border-left: 2px solid #f2b33d55; margin-left: 0.45em; }
+.stat-children .stat-row { font-size: 13px; }

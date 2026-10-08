@@ -1,4 +1,4 @@
-// 演出: サイコロを投げる・じゃんけんでお互いに何を出したか
+// 演出: サイコロを投げる・じゃんけんでお互いに何を出したか・ルーレット（新世界より）
 // 画面の操作の邪魔をしないよう、クリックは下に通す（#fx-layer は pointer-events: none）
 (function () {
   const SM = (window.SuperMahjong = window.SuperMahjong || {});
@@ -6,10 +6,12 @@
 
   let timer = null;
   let rollTimer = null;
+  let spinTimer = null;
   function show(node, ms) {
     const layer = $('fx-layer');
     clearTimeout(timer);
     clearInterval(rollTimer);
+    clearTimeout(spinTimer);
     layer.innerHTML = '';
     layer.appendChild(node);
     layer.hidden = false;
@@ -158,5 +160,55 @@
     show(box, 2600);
   }
 
-  SM.Fx = { dice, rps, compare };
+  // ---- ルーレット（新世界より） ----
+  const SPIN_MS = 2300;   // 光が移っていく時間（サーバーの ROULETTE_MS はこれと、止まった人を見せる時間）
+  /**
+   * プレイヤーの名前を並べ、光る名前が何周か移りながらだんだん遅くなり、決まった人（e.result）で止まる。
+   * e: { seat: 使った人, seats: 並べる席, result: 決まった席, label }
+   */
+  function roulette(e) {
+    const box = document.createElement('div');
+    box.className = 'fx-box fx-roulette';
+    box.appendChild(caption(e.seat, `のルーレット${e.label ? `（${e.label}）` : ''}`));
+    const row = document.createElement('div');
+    row.className = 'fx-roulette__row';
+    const cells = e.seats.map((seat) => {
+      const c = document.createElement('div');
+      c.className = 'fx-roulette__cell';
+      c.appendChild(SM.Icons.nameTag(seat));
+      row.appendChild(c);
+      return c;
+    });
+    box.appendChild(row);
+    const result = document.createElement('div');
+    result.className = 'fx-rps__result fx-roulette__result';
+    box.appendChild(result);
+    show(box, 3200);
+    const n = cells.length;
+    const target = Math.max(0, e.seats.indexOf(e.result));
+    let pos = Math.floor(Math.random() * n);
+    // 12歩くらい（何周か）回ってから決まった人で止まる。1歩の間隔はだんだん長くし、合計で SPIN_MS
+    const steps = Math.ceil(12 / n) * n + ((target - pos + n) % n);
+    const raw = Array.from({ length: steps }, (_, k) => 1 + 7 * (k / steps) ** 2);
+    const unit = SPIN_MS / raw.reduce((a, b) => a + b, 0);
+    const light = () => cells.forEach((c, k) => c.classList.toggle('is-lit', k === pos));
+    light();
+    let k = 0;
+    const step = () => {
+      if (k >= steps) {
+        cells[target].classList.add('is-hit');
+        result.textContent = `${SM.Main.seatName(e.result)}に決定！`;
+        return;
+      }
+      spinTimer = setTimeout(() => {
+        pos = (pos + 1) % n;
+        k += 1;
+        light();
+        step();
+      }, raw[k] * unit);
+    };
+    step();
+  }
+
+  SM.Fx = { dice, rps, compare, roulette };
 })();

@@ -7,6 +7,7 @@
   const SE_FILES = {
     打牌: '打牌.mp3', ツモる: 'ツモる.mp3', ドロー: 'ドロー.wav', イベント発動: 'イベント発動.wav', パワー使用: 'パワー使用.mp3',
     和了: '和了.mp3', 役満和了: '役満和了.mp3', 洗牌: '洗牌.mp3', 破壊: '破壊.mp3', サイコロ: 'サイコロ.mp3',
+    実績: 'achievement.wav',
   };
   const KEY = { bgm: 'super_mahjong_bgm', bgmVol: 'super_mahjong_bgm_vol', seVol: 'super_mahjong_se_vol', mute: 'super_mahjong_mute' };
   const LIST = window.SM_BGM || [];
@@ -18,10 +19,13 @@
   let held = false;     // 和了してから次の局が始まるまで一時停止している
   let blocked = null;   // ブラウザに自動再生を止められた音（次に画面を触った時に流す）
 
+  /** 実績の報酬の曲で、まだ手に入れていないもの（選べない） */
+  const lockOf = (file) => (SM.Achievements ? SM.Achievements.bgmLock(file) : null);
+
   function load() {
     const st = SM.Net.store;
     const file = st.get(KEY.bgm);
-    settings.bgm = file && LIST.some((b) => b.file === file) ? file : '';
+    settings.bgm = file && LIST.some((b) => b.file === file) && !lockOf(file) ? file : '';
     const num = (k, d) => { const v = Number(st.get(k)); return st.get(k) !== null && Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : d; };
     settings.bgmVol = num(KEY.bgmVol, 0.5);
     settings.seVol = num(KEY.seVol, 0.7);
@@ -126,9 +130,10 @@
     if (m) { m.textContent = settings.mute ? '🔇' : '🔊'; m.title = settings.mute ? '音を出す' : '音を消す'; }
   }
 
-  function init() {
-    load();
+  /** タイトルの曲の一覧（実績の報酬の曲は、手に入れるまで灰色で選べない） */
+  function fillBgmSelect() {
     const sel = $('bgm-select');
+    sel.innerHTML = '';
     const none = document.createElement('option');
     none.value = '';
     none.textContent = 'なし（BGMを流さない）';
@@ -136,10 +141,19 @@
     for (const b of LIST) {
       const o = document.createElement('option');
       o.value = b.file;
-      o.textContent = b.title;
+      const lock = lockOf(b.file);
+      o.textContent = lock ? `🔒 ${b.title}（実績「${lock.name}」で解放）` : b.title;
+      o.disabled = Boolean(lock);
       sel.appendChild(o);
     }
     sel.value = settings.bgm;
+  }
+
+  function init() {
+    load();
+    const sel = $('bgm-select');
+    fillBgmSelect();
+    if (SM.Achievements) SM.Achievements.onUnlock(fillBgmSelect);
     sel.addEventListener('change', () => {
       settings.bgm = sel.value;
       save('bgm');

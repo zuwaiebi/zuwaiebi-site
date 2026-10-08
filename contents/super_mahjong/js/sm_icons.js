@@ -1,11 +1,12 @@
-// プレイヤーアイコン（カードのイラストから選ぶ）と、カードの演出などに出す「誰が何を選んだか」
+// プレイヤーアイコン（カードのイラスト・実績の報酬から選ぶ）と、カードの演出などに出す「誰が何を選んだか」
 (function () {
   const SM = (window.SuperMahjong = window.SuperMahjong || {});
   const $ = (id) => document.getElementById(id);
   const IMG_DIR = 'data/card_img/';
   const ICON_KEY = 'super_mahjong_icon';
 
-  // 選べるアイコン: 同じ絵のカードは1つにまとめ、最初のカードのIDで表す（サーバーと同じ）
+  // 選べるアイコン: 同じ絵のカードは1つにまとめ、最初のカードのIDで表す（サーバーと同じ）。
+  // 実績の報酬のアイコンは「a + 実績の番号」（SM.Achievements。手に入れたものだけ選べる）
   const LIST = [];
   const IMG = new Map();
   {
@@ -18,29 +19,36 @@
       LIST.push({ id: c.id, img: c.img, name: c.name });
     }
   }
+  const rewardOf = (id) => (typeof id === 'string' && /^a\d+$/.test(id) && SM.Achievements
+    ? SM.Achievements.rewardIcons().find((x) => x.id === id) || null : null);
 
-  /** 自分のアイコン。初めての時はランダムに決めて覚える */
+  /** 自分のアイコン。初めての時（と、手に入れていない報酬のアイコンだった時）はランダムに決めて覚える */
   function mine() {
     let id = SM.Net.store.get(ICON_KEY);
-    if (!id || !IMG.has(id)) {
+    const reward = rewardOf(id);
+    if (!id || !(IMG.has(id) || (reward && reward.got))) {
       id = LIST[Math.floor(Math.random() * LIST.length)].id;
       SM.Net.store.set(ICON_KEY, id);
     }
     return id;
   }
 
-  /** アイコン要素（id が無ければ空の枠） */
+  /** アイコン要素（id が無ければ空の枠。画像がまだ無い報酬のアイコンは名前の1文字目） */
   function el(id, cls) {
     const span = document.createElement('span');
     span.className = `picon${cls ? ` ${cls}` : ''}`;
-    const img = id ? IMG.get(id) : null;
-    if (img) {
+    const reward = id && !IMG.has(id) ? rewardOf(id) : null;
+    const src = id && IMG.has(id) ? IMG_DIR + encodeURIComponent(IMG.get(id)) : reward && reward.src;
+    if (src) {
       const i = document.createElement('img');
-      i.src = IMG_DIR + encodeURIComponent(img);
+      i.src = src;
       i.alt = '';
       i.loading = 'lazy';
       i.draggable = false;
       span.appendChild(i);
+    } else if (reward) {
+      span.classList.add('picon--text');
+      span.textContent = [...reward.name][0] || '?';
     }
     return span;
   }
@@ -118,20 +126,37 @@
     const q = $('icon-filter').value.trim();
     const current = mine();
     grid.innerHTML = '';
-    for (const it of LIST) {
-      if (q && !it.name.includes(q)) continue;
+    const choice = (id, name, locked) => {
       const b = document.createElement('button');
       b.type = 'button';
-      b.className = `icon-choice${it.id === current ? ' is-current' : ''}`;
-      b.appendChild(el(it.id));
+      b.className = `icon-choice${id === current ? ' is-current' : ''}${locked ? ' is-locked' : ''}`;
+      b.appendChild(el(id));
       const cap = document.createElement('span');
       cap.className = 'icon-choice__name';
-      cap.textContent = it.name;
+      cap.textContent = locked ? `🔒${name}` : name;
       b.appendChild(cap);
-      b.addEventListener('click', () => pick(it.id));
+      if (locked) {
+        b.disabled = true;
+        b.title = `実績「${locked}」を達成すると選べます`;
+      } else b.addEventListener('click', () => pick(id));
       grid.appendChild(b);
+    };
+    const heading = (text) => {
+      const h = document.createElement('div');
+      h.className = 'icon-grid__head';
+      h.textContent = text;
+      grid.appendChild(h);
+    };
+    // 実績の報酬（手に入れていないものは灰色で選べない）
+    const rewards = SM.Achievements ? SM.Achievements.rewardIcons().filter((x) => !q || x.name.includes(q)) : [];
+    if (rewards.length) {
+      heading('実績の報酬');
+      for (const x of rewards) choice(x.id, x.name, x.got ? null : x.ach.name);
+      heading('カード');
     }
-    if (!grid.children.length) grid.textContent = '見つかりません';
+    const cards = LIST.filter((it) => !q || it.name.includes(q));
+    for (const it of cards) choice(it.id, it.name, null);
+    if (!rewards.length && !cards.length) grid.textContent = '見つかりません';
   }
 
   function pick(id) {

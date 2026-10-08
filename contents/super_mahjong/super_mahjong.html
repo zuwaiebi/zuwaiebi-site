@@ -13,6 +13,8 @@
 <body>
   <div id="status-bar" class="status-bar" hidden></div>
   <div id="toast" class="toast" hidden></div>
+  <!-- 実績を達成した時の知らせ（上から下りてきて、少しして消える） -->
+  <div id="ach-popup" class="ach-popup" hidden></div>
 
   <!-- ロビー -->
   <div id="screen-lobby" class="screen active">
@@ -37,37 +39,98 @@
         <label>効果音の音量 <input id="se-vol" type="range" min="0" max="100" step="5"></label>
       </div>
 
-      <section class="lobby-box">
-        <h2>部屋に参加する</h2>
-        <div class="join-row">
-          <input id="join-code" type="text" maxlength="5" placeholder="部屋コード" autocomplete="off">
-          <button id="btn-join" class="main-button">参加</button>
-        </div>
-      </section>
+      <!-- メニュー: 押すと下の中身が切り替わる。準備中のものは灰色で押せない -->
+      <nav class="menu-tabs" aria-label="メニュー">
+        <button type="button" class="menu-tab" data-tab="play">対戦</button>
+        <button type="button" class="menu-tab" data-tab="decks">デッキ構築</button>
+        <button type="button" class="menu-tab" data-tab="achievements">実績</button>
+        <button type="button" class="menu-tab" data-tab="cards">カード一覧</button>
+        <button type="button" class="menu-tab" data-tab="stats">統計</button>
+        <button type="button" class="menu-tab" data-tab="missions" disabled title="準備中">ミッション</button>
+        <button type="button" class="menu-tab" data-tab="tutorial" disabled title="準備中">チュートリアル</button>
+      </nav>
 
-      <section class="lobby-box">
-        <h2>部屋を作る</h2>
-        <form id="create-form" class="rule-form" onsubmit="return false">
-          <label>人数
-            <select id="create-players"><option value="4">4人（四麻）</option><option value="3">3人（三麻）</option></select>
-          </label>
-          <label>長さ
-            <select id="create-length"><option value="hanchan">半荘戦</option><option value="tonpuu" selected>東風戦</option><option value="ikkyoku">一局戦</option></select>
-          </label>
-          <label>持ち点
-            <input id="create-start" type="number" min="1000" max="100000" step="1000" value="35000">
-          </label>
-          <label>1手の時間 <select id="create-perturn"></select></label>
-          <label>持ち時間 <select id="create-bank"></select></label>
-          <label class="check"><input id="create-red" type="checkbox" checked> 赤ドラ</label>
-          <label class="check"><input id="create-kuitan" type="checkbox" checked> 喰いタン</label>
-          <label class="check"><input id="create-tobi" type="checkbox" checked> 飛び</label>
-          <label class="check"><input id="create-renchan" type="checkbox"> 連荘</label>
-          <div class="card-count-row"><button id="create-card-counts" class="sub-button" type="button">カード枚数設定</button><span id="create-card-counts-text" class="card-count-row__text"></span></div>
-        </form>
-        <p class="note">三麻は萬子・筒子・索子・字牌すべてを使い、チーなし・北抜きあり・ツモ損です。連荘なしでは親が和了・聴牌しても親が流れます（一巡目の途中流局だけはやり直し）。</p>
-        <button id="btn-create" class="main-button">部屋を作る</button>
-      </section>
+      <div class="tab-panel" data-panel="play">
+        <section class="lobby-box">
+          <h2>部屋に参加する</h2>
+          <div class="join-row">
+            <input id="join-code" type="text" maxlength="5" placeholder="部屋コード" autocomplete="off">
+            <button id="btn-join" class="main-button">参加</button>
+          </div>
+        </section>
+
+        <section class="lobby-box">
+          <h2>部屋を作る</h2>
+          <form id="create-form" class="rule-form" onsubmit="return false">
+            <label>対戦形式
+              <select id="create-mode"><option value="normal">通常戦</option><option value="deck">デッキ構築戦</option></select>
+            </label>
+            <label id="create-deckrule-label">デッキの制限
+              <select id="create-deckrule"><option value="recommended">推奨ルール</option><option value="free">制限なし</option></select>
+            </label>
+            <label>人数
+              <select id="create-players"><option value="4">4人（四麻）</option><option value="3">3人（三麻）</option></select>
+            </label>
+            <label>長さ
+              <select id="create-length"><option value="hanchan">半荘戦</option><option value="tonpuu" selected>東風戦</option><option value="ikkyoku">一局戦</option></select>
+            </label>
+            <label>持ち点
+              <input id="create-start" type="number" min="1000" max="100000" step="1000" value="35000">
+            </label>
+            <label>1手の時間 <select id="create-perturn"></select></label>
+            <label>持ち時間 <select id="create-bank"></select></label>
+            <label class="check"><input id="create-red" type="checkbox" checked> 赤ドラ</label>
+            <label class="check"><input id="create-kuitan" type="checkbox" checked> 喰いタン</label>
+            <label class="check"><input id="create-tobi" type="checkbox" checked> 飛び</label>
+            <label class="check"><input id="create-renchan" type="checkbox"> 連荘</label>
+            <div class="card-count-row"><button id="create-card-counts" class="sub-button" type="button">カード枚数設定</button><span id="create-card-counts-text" class="card-count-row__text"></span></div>
+          </form>
+          <p class="note">三麻は萬子・筒子・索子・字牌すべてを使い、チーなし・北抜きあり・ツモ損です。連荘なしでは親が和了・聴牌しても親が流れます（一巡目の途中流局だけはやり直し）。</p>
+          <button id="btn-create" class="main-button">部屋を作る</button>
+        </section>
+      </div>
+
+      <div class="tab-panel" data-panel="decks" hidden>
+        <section class="lobby-box">
+          <h2>デッキ構築</h2>
+          <p class="note">デッキ構築戦では、自分で組んだデッキ（カードとフルパワー）を持ち寄って対戦します。山札は各自のデッキから作り、捨て場は全員共有です。推奨ルール: 60枚以上・同名カードは3枚まで（カチコミ・目からビーム・否認は何枚でも）・《おばさん》は使えない。デッキに入れた「ランダム」は、山札を作るたびにランダムなカードになります。デッキはこのブラウザに保存されます。</p>
+          <ul class="decks__list" data-decks-list></ul>
+          <div class="button-row button-row--center decks__actions">
+            <button type="button" class="sub-button" data-deck-act="new">新しいデッキ</button>
+            <button type="button" class="sub-button" data-deck-act="new-default">既定の山札から作る</button>
+            <button type="button" class="sub-button" data-deck-act="import">読み込む</button>
+          </div>
+        </section>
+      </div>
+
+      <div class="tab-panel" data-panel="achievements" hidden>
+        <section class="lobby-box">
+          <h2>実績 <span id="ach-count" class="ach-count"></span></h2>
+          <p class="note">対局中にカードや役で条件を満たすと達成し、アイコンやBGMが手に入ります（記録はこのブラウザに保存されます）。</p>
+          <ul id="ach-list" class="ach-list"></ul>
+        </section>
+      </div>
+
+      <div class="tab-panel" data-panel="stats" hidden>
+        <section class="lobby-box">
+          <h2>いちばん翻数の高い和了</h2>
+          <div id="stats-best" class="stats-best"></div>
+        </section>
+        <section class="lobby-box">
+          <h2>統計</h2>
+          <p class="note">これまでの対局の記録です（このブラウザに保存されます）。▶の付いた項目を押すと、内訳が開きます。</p>
+          <div id="stats-list" class="stats-list"></div>
+        </section>
+      </div>
+
+      <div class="tab-panel" data-panel="cards" hidden>
+        <section class="lobby-box">
+          <h2>カード一覧 <span id="cardlist-count" class="cardlist-count"></span></h2>
+          <input id="cardlist-q" class="cardlist-q" type="text" enterkeyhint="search" placeholder="カード名・テキストで検索" autocomplete="off">
+          <div id="cardlist-types" class="cardlist-types" role="group" aria-label="カードタイプで絞り込み"></div>
+          <div id="cardlist-grid" class="cardlist-grid"></div>
+        </section>
+      </div>
       <p class="back-link"><a href="../../index.html">トップに戻る</a></p>
     </div>
   </div>
@@ -82,6 +145,12 @@
         <ul id="room-seats" class="seat-list"></ul>
         <p id="room-rules-text" class="rules-text"></p>
         <form id="room-form" class="rule-form" onsubmit="return false" hidden>
+          <label>対戦形式
+            <select id="room-mode"><option value="normal">通常戦</option><option value="deck">デッキ構築戦</option></select>
+          </label>
+          <label id="room-deckrule-label">デッキの制限
+            <select id="room-deckrule"><option value="recommended">推奨ルール</option><option value="free">制限なし</option></select>
+          </label>
           <label>人数
             <select id="room-players"><option value="4">4人（四麻）</option><option value="3">3人（三麻）</option></select>
           </label>
@@ -100,6 +169,16 @@
           <div class="card-count-row"><button id="room-card-counts" class="sub-button" type="button">カード枚数設定</button><span id="room-card-counts-text" class="card-count-row__text"></span></div>
         </form>
         <div id="room-card-counts-view" class="card-count-row" hidden><button id="room-card-counts-show" class="sub-button" type="button">山札のカードを見る</button></div>
+        <!-- デッキ構築戦: 自分のデッキを選ぶ -->
+        <div id="room-deck" class="room-deck" hidden>
+          <label for="room-deck-select" class="room-deck__label">自分のデッキ</label>
+          <div class="room-deck__row">
+            <select id="room-deck-select"></select>
+            <button id="room-deck-edit" class="sub-button" type="button">作る・編集</button>
+          </div>
+          <p id="room-deck-status" class="room-deck__status"></p>
+        </div>
+        <p id="room-start-note" class="note room-start-note" hidden></p>
         <p id="room-wait-msg" class="note">ホストの開始を待っています…</p>
         <div class="button-row">
           <button id="btn-leave" class="sub-button">部屋を出る</button>
@@ -211,7 +290,7 @@
   <div id="icon-picker" class="overlay icon-picker" hidden>
     <div class="overlay__box icon-picker__box">
       <h2 class="result-title">アイコンを選ぶ</h2>
-      <input id="icon-filter" type="text" placeholder="カード名で絞り込み" autocomplete="off">
+      <input id="icon-filter" type="text" placeholder="名前で絞り込み" autocomplete="off">
       <div id="icon-grid" class="icon-grid"></div>
       <div class="button-row button-row--center">
         <button id="icon-random" class="sub-button">ランダム</button>
@@ -238,6 +317,70 @@
     </div>
   </div>
 
+  <!-- デッキ構築戦: デッキ一覧 -->
+  <div id="decks" class="overlay decks" hidden>
+    <div class="overlay__box decks__box">
+      <h2 class="result-title">デッキ</h2>
+      <p class="card-counts__note">デッキ構築戦で使うデッキです（このブラウザに保存されます）。推奨ルール: 60枚以上・同名カードは3枚まで（カチコミ・目からビーム・否認は何枚でも）・《おばさん》は使えない。「ランダム」は何枚でも入れられ、山札を作るたびに、使用不可のカード・ハプニング・デッキに入れたカード以外からランダムなカードになります。どちらのルールでもフルパワーを1枚決めておきます。</p>
+      <ul id="decks-list" class="decks__list" data-decks-list></ul>
+      <div class="button-row button-row--center">
+        <button id="decks-new" class="sub-button" data-deck-act="new">新しいデッキ</button>
+        <button id="decks-new-default" class="sub-button" data-deck-act="new-default">既定の山札から作る</button>
+        <button id="decks-import" class="sub-button" data-deck-act="import">読み込む</button>
+        <button id="decks-close" class="main-button">閉じる</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- デッキ構築戦: デッキ編集 -->
+  <div id="deck-edit" class="overlay deck-edit" hidden>
+    <div class="overlay__box card-counts__box deck-edit__box">
+      <div class="deck-edit__head">
+        <input id="deck-edit-name" type="text" maxlength="20" placeholder="デッキの名前" autocomplete="off">
+        <button id="deck-edit-fp" class="deck-edit__fp" type="button"></button>
+      </div>
+      <div class="deck-edit__summary">
+        <span id="deck-edit-total" class="card-counts__total"></span>
+        <span id="deck-edit-types" class="deck-edit__types"></span>
+        <span id="deck-edit-check" class="deck-edit__check"></span>
+      </div>
+      <p id="deck-edit-msg" class="deck-edit__msg" hidden></p>
+      <div class="card-counts__bar">
+        <input id="deck-edit-filter" type="text" placeholder="カード名で絞り込み" autocomplete="off">
+        <label class="deck-edit__only"><input id="deck-edit-only" type="checkbox"> 入れたカードだけ</label>
+      </div>
+      <div id="deck-edit-grid" class="card-counts__grid deck-edit__grid"></div>
+      <div class="button-row button-row--center">
+        <button id="deck-edit-zero" class="sub-button">すべて0枚にする</button>
+        <button id="deck-edit-cancel" class="sub-button">キャンセル</button>
+        <button id="deck-edit-save" class="main-button">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- デッキ構築戦: デッキのフルパワーを選ぶ -->
+  <div id="deck-fp" class="overlay deck-fp" hidden>
+    <div class="overlay__box deck-fp__box">
+      <h2 class="result-title">フルパワーを選ぶ</h2>
+      <p class="card-counts__note">相棒になるカードを1枚選んでください。手札とは別に、対局中に使えます（デッキ構築戦では対局の初めに選び直しません）。</p>
+      <div id="deck-fp-grid" class="fp-grid deck-fp__grid"></div>
+      <div class="button-row button-row--center"><button id="deck-fp-close" class="sub-button">閉じる</button></div>
+    </div>
+  </div>
+
+  <!-- デッキ構築戦: テキストで書き出す・読み込む -->
+  <div id="deck-text" class="overlay deck-text" hidden>
+    <div class="overlay__box deck-text__box">
+      <h2 id="deck-text-title" class="result-title"></h2>
+      <p id="deck-text-note" class="card-counts__note"></p>
+      <textarea id="deck-text-area" class="deck-text__area" rows="12" spellcheck="false"></textarea>
+      <div class="button-row button-row--center">
+        <button id="deck-text-cancel" class="sub-button">閉じる</button>
+        <button id="deck-text-ok" class="main-button"></button>
+      </div>
+    </div>
+  </div>
+
   <!-- 途中退出の確認 -->
   <div id="exit-box" class="overlay exit-box" hidden>
     <div class="overlay__box">
@@ -252,13 +395,18 @@
 
   <script src="js/sm_cards_data.js"></script>
   <script src="js/sm_bgm_data.js"></script>
+  <script src="js/sm_achievements_data.js"></script>
   <script src="js/sm_tiles.js"></script>
   <script src="js/sm_cards.js"></script>
   <script src="js/sm_icons.js"></script>
   <script src="js/sm_fx.js"></script>
   <script src="js/sm_net.js"></script>
+  <script src="js/sm_achievements.js"></script>
   <script src="js/sm_audio.js"></script>
   <script src="js/sm_deck.js"></script>
+  <script src="js/sm_decks.js"></script>
+  <script src="js/sm_cardlist.js"></script>
+  <script src="js/sm_stats.js"></script>
   <script src="js/sm_lobby.js"></script>
   <script src="js/sm_table.js"></script>
   <script src="js/sm_input.js"></script>

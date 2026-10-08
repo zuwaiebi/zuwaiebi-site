@@ -28,12 +28,13 @@
 
   function sendAction(action) {
     if (sent()) return;
+    // 接続が切れていて送れなかった時は送っていない扱いにする（つながり直すと同じ問い合わせが届くので、押し直せる）
+    if (!SM.Net.send({ type: 'answer', promptId: prompt.id, answer: action })) return;
     sentId = prompt.id;
     select(null);
     riichiMode = false;
     closeChooser();
     SM.Cards.hideDetail();
-    SM.Net.send({ type: 'answer', promptId: prompt.id, answer: action });
     renderButtons();
     SM.Table.rerender();
   }
