@@ -21,6 +21,8 @@
   let queue = []; // 接続前に送ろうとしたメッセージ（接続後に送る）
   let retry = 0;
   let statusCb = () => {};
+  // ローカルモード（チュートリアル）: 送るものはサーバーではなく local に渡し、サーバーからの卓の情報は無視する（deliver で流したものだけ描く）
+  let local = null;
 
   function connect() {
     if (location.protocol === 'file:') { statusCb('file'); return; }
@@ -38,7 +40,8 @@
       let m;
       try { m = JSON.parse(e.data); } catch { return; }
       if (m.type === 'welcome') store.set(TOKEN_KEY, m.token);
-      (handlers[m.type] || []).forEach((f) => f(m));
+      if (local && m.type !== 'welcome') return;
+      deliver(m);
     };
     ws.onclose = (e) => {
       ws = null;
@@ -49,7 +52,11 @@
     };
   }
 
+  /** 届いたメッセージを、種類ごとに登録した処理へ渡す（ローカルモードでは、チュートリアルが記録を流すのにも使う） */
+  function deliver(m) { (handlers[m.type] || []).forEach((f) => f(m)); }
+
   function send(obj) {
+    if (local) return Boolean(local(obj));
     if (ws && ws.readyState === 1) { ws.send(JSON.stringify(obj)); return true; }
     // 回答は古くなるので溜めない。部屋の操作などは接続後に送る
     if (obj.type !== 'answer' && obj.type !== 'ready') queue.push(obj);
@@ -61,7 +68,8 @@
   function setIcon(id) { send({ type: 'setProfile', icon: id }); }
 
   SM.Net = {
-    connect, send, getName, setName, setIcon, store,
+    connect, send, deliver, getName, setName, setIcon, store,
+    setLocal(fn) { local = fn || null; },
     on(type, f) { (handlers[type] = handlers[type] || []).push(f); },
     onStatus(f) { statusCb = f; },
     reconnectNow() { if (!ws) connect(); },

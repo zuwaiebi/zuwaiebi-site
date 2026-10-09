@@ -155,8 +155,13 @@
       ol.appendChild(li);
     });
     box.appendChild(ol);
-    $('btn-back-room').hidden = !room.youAreHost;
-    $('final-wait').hidden = room.youAreHost;
+    // ミッション: 結果（クリア・失敗）を上に出し、「もう一度挑戦」「ミッション一覧へ」にする（待機室は無い）
+    const mission = room.mission && SM.Missions ? SM.Missions.finalBlock(room) : null;
+    if (mission) box.prepend(mission);
+    $('btn-back-room').hidden = !room.youAreHost || Boolean(room.mission);
+    $('final-wait').hidden = room.youAreHost || Boolean(room.mission);
+    $('btn-mission-retry').hidden = !room.mission;
+    $('btn-final-leave').textContent = room.mission ? 'ミッション一覧へ' : 'ロビーへ';
     void scores;
   }
 
@@ -166,7 +171,12 @@
       $('btn-ready').disabled = true;
     });
     $('btn-back-room').addEventListener('click', () => SM.Net.send({ type: 'backToRoom' }));
-    $('btn-final-leave').addEventListener('click', () => SM.Net.send({ type: 'leaveRoom' }));
+    $('btn-final-leave').addEventListener('click', () => {
+      const room = SM.Main.state.room;
+      if (room && room.mission) SM.Lobby.showTab('missions');
+      SM.Net.send({ type: 'leaveRoom' });
+    });
+    $('btn-mission-retry').addEventListener('click', () => SM.Missions.retry(SM.Main.state.room));
   }
 
   // agariBlock: 和了1つ分の表示（統計のいちばん翻数の高い和了でも使う）

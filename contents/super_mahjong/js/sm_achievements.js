@@ -1,20 +1,24 @@
-// 実績: 達成した記録（このブラウザに保存）・達成した時の知らせ・実績の画面・報酬（アイコン・BGM）
+// 実績: 達成した記録（このブラウザに保存）・達成した時の知らせ・実績の画面（対局・カード・ミッションのタブ）・報酬（アイコン・BGM）
 // 達成はサーバーが判定して 'achievements' で送ってくる（{id} は達成、{stat, n} は累計の記録、{win} は和了（統計へ）。
 // 累計で何回になったら達成かはここの GOALS。累計の記録は統計（sm_stats.js）でも使う）
 (function () {
   const SM = (window.SuperMahjong = window.SuperMahjong || {});
   const $ = (id) => document.getElementById(id);
-  const STORE_KEY = 'super_mahjong_achievements';   // { got: { 実績の番号: 達成した時刻 }, stats: { 記録の種類: 回数 } }
+  const STORE_KEY = 'super_mahjong_achievements';   // { got: { 実績のID: 達成した時刻 }, stats: { 記録の種類: 回数 } }
   const ICON_DIR = 'data/icon_img/';
   const LIST = window.SM_ACHIEVEMENTS || [];
   const BY_ID = new Map(LIST.map((a) => [a.id, a]));
-  // 累計で達成する実績（実績.txt の条件の回数）: 実績の番号 -> [記録の種類, 回数, 単位]
-  const GOALS = { 1: ['games', 100, '回'], 12: ['present', 10, '回'], 14: ['beam', 20, '枚'], 30: ['choki', 10, '回'] };
+  // 累計で達成する実績（実績.txt の条件の回数）: 実績のID（実績.txt の番号） -> [記録の種類, 回数, 単位]
+  const GOALS = { 1: ['games', 100, '回'], 12: ['present', 10, '回'], 14: ['beam', 20, '枚'], 30: ['choki', 10, '回'], 33: ['yoji', 50, '枚'] };
+  // 実績の種類（実績.txt の見出し。画面のタブ）
+  const CATEGORIES = [['game', '対局'], ['card', 'カード'], ['mission', 'ミッション']];
+  const CAT_KEY = 'super_mahjong_ach_tab';
   const POPUP_MS = 2600;   // 知らせを出しておく時間（下りてきてから上がり始めるまで）
   const SLIDE_MS = 450;
 
   let data = { got: {}, stats: {} };
   const listeners = [];
+  const applyListeners = [];   // 記録が届くたびに呼ぶ（ミッションの成功・挑戦の回数など）
 
   function load() {
     try {
@@ -27,12 +31,14 @@
   }
   const save = () => SM.Net.store.set(STORE_KEY, JSON.stringify(data));
   const has = (id) => Boolean(data.got[id]);
+  /** 画面に出す実績か（ミッションの実績は、そのミッションに挑戦できるようになるまで出さない。達成したものは出す） */
+  const isVisible = (a) => !a.mission || has(a.id) || !SM.Missions || SM.Missions.visible().some((m) => m.id === a.mission);
 
   // ---- 報酬 ----
   const iconId = (a) => `a${a.id}`;
   /** 報酬のアイコン（{id, name, src, ach, got}。画像がまだ無いものは src が null） */
   function rewardIcons() {
-    return LIST.filter((a) => a.reward && a.reward.type === 'icon').map((a) => ({
+    return LIST.filter((a) => a.reward && a.reward.type === 'icon' && isVisible(a)).map((a) => ({
       id: iconId(a), name: a.reward.name, src: a.reward.img ? ICON_DIR + encodeURIComponent(a.reward.img) : null, ach: a, got: has(a.id),
     }));
   }
@@ -65,6 +71,7 @@
     }
     save();
     render();
+    for (const f of applyListeners) f();
     if (!fresh.length) return;
     for (const a of fresh) popup(a);
     for (const f of listeners) f();
@@ -115,27 +122,61 @@
   }
 
   // ---- 実績の画面 ----
+  let tab = SM.Net.store.get(CAT_KEY) || CATEGORIES[0][0];
+  if (!CATEGORIES.some(([k]) => k === tab)) tab = CATEGORIES[0][0];
+
+  /** 種類のタブ（押すとその種類の実績だけを出す。それぞれ 達成数/出している数） */
+  function renderTabs(shown) {
+    const box = $('ach-tabs');
+    if (!box) return;
+    box.innerHTML = '';
+    for (const [key, label] of CATEGORIES) {
+      const list = shown.filter((a) => a.cat === key);
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = `ach-tab${key === tab ? ' is-on' : ''}`;
+      b.setAttribute('aria-pressed', String(key === tab));
+      b.append(label);
+      const n = document.createElement('span');
+      n.className = 'ach-tab__n';
+      n.textContent = `${list.filter((a) => has(a.id)).length}/${list.length}`;
+      b.appendChild(n);
+      b.addEventListener('click', () => {
+        tab = key;
+        SM.Net.store.set(CAT_KEY, key);
+        render();
+      });
+      box.appendChild(b);
+    }
+  }
+
   function render() {
     const ul = $('ach-list');
     if (!ul) return;
-    $('ach-count').textContent = `${LIST.filter((a) => has(a.id)).length} / ${LIST.length}`;
+    const shown = LIST.filter(isVisible);
+    $('ach-count').textContent = `${shown.filter((a) => has(a.id)).length} / ${shown.length}`;
+    renderTabs(shown);
     ul.innerHTML = '';
-    for (const a of LIST) {
+    const list = shown.filter((a) => a.cat === tab);
+    if (!list.length) {
+      const li = document.createElement('li');
+      li.className = 'ach-empty';
+      li.textContent = 'まだありません';
+      ul.appendChild(li);
+    }
+    for (const a of list) {
       const got = has(a.id);
       const li = document.createElement('li');
       li.className = `ach-item${got ? ' is-got' : ''}`;
       const head = document.createElement('div');
       head.className = 'ach-item__head';
-      const no = document.createElement('span');
-      no.className = 'ach-item__no';
-      no.textContent = `No.${a.id}`;
       const name = document.createElement('span');
       name.className = 'ach-item__name';
       name.textContent = a.name;
       const state = document.createElement('span');
       state.className = 'ach-item__state';
       state.textContent = got ? `達成 ${new Date(data.got[a.id]).toLocaleDateString('ja-JP')}` : '未達成';
-      head.append(no, name, state);
+      head.append(name, state);
       const cond = document.createElement('p');
       cond.className = 'ach-item__cond';
       SM.Cards.linkify(cond, a.cond);
@@ -173,7 +214,7 @@
   load();
 
   SM.Achievements = {
-    init, apply, has, render, rewardIcons, bgmLock, rewardText,
+    init, apply, has, isVisible, render, rewardIcons, bgmLock, rewardText,
     /** 累計の記録（統計で使う） */
     stats: () => ({ ...data.stats }),
     /** 達成した実績を達成した順に [{a: 実績, at: 時刻}] */
@@ -181,6 +222,8 @@
       .filter((x) => x.a).sort((x, y) => x.at - y.at),
     /** 実績を達成した時（報酬のアイコン・BGMの一覧を作り直す） */
     onUnlock: (f) => listeners.push(f),
+    /** 達成・累計の記録が届いた時（ミッションの成功・挑戦の回数を描き直す） */
+    onApply: (f) => applyListeners.push(f),
     LIST, GOALS,
   };
 })();

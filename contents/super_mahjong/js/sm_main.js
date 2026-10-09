@@ -38,7 +38,11 @@
   function onRoom(m) {
     if (performance.now() < leavingUntil) return;
     const room = m.room;
+    // ミッションの部屋は待機室を通さずにすぐ始まる（作った直後の待機中の知らせは見せない）
+    if (room.mission && room.state === 'waiting') return;
     state.room = room;
+    // ミッション中はミッションの曲を流す
+    SM.Audio.setTrack(room.mission ? SM.Missions.bgmOf(room.mission.id) : null);
     if (room.error) toast(`エラーで対局が終了しました: ${room.error}`);
     if (room.state !== 'waiting') {
       SM.Deck.close();
@@ -93,12 +97,26 @@
   // 途中退出: 確認してから部屋を出る。席はCPUが引き継ぎ、部屋コードを入れ直すと戻れる
   function askExit() {
     const code = state.room ? state.room.code : '';
-    $('exit-text').textContent = `退出した席はCPUが最後まで代わりに打ちます。同じブラウザで部屋コード「${code}」を入力すると、途中から戻れます。`;
+    // チュートリアル中の「退出」は、練習をやめる確認にする
+    const tut = Boolean(SM.Tutorial && SM.Tutorial.active());
+    const mission = Boolean(state.room && state.room.mission);
+    $('exit-box').querySelector('.result-title').textContent = tut ? 'チュートリアルをやめますか？' : mission ? 'ミッションをやめますか？' : '対局から退出しますか？';
+    $('exit-ok').textContent = tut || mission ? 'やめる' : '退出する';
+    $('exit-text').textContent = tut
+      ? '練習はロビーの「ガイド」から、何度でもやり直せます。'
+      : mission ? '途中でやめると、このミッションは失敗になります（挑戦した回数には数えます）。'
+        : `退出した席はCPUが最後まで代わりに打ちます。同じブラウザで部屋コード「${code}」を入力すると、途中から戻れます。`;
     $('exit-box').hidden = false;
   }
 
   function doExit() {
-    const code = state.room ? state.room.code : '';
+    if (SM.Tutorial && SM.Tutorial.active()) {
+      $('exit-box').hidden = true;
+      SM.Tutorial.stop();
+      return;
+    }
+    const mission = Boolean(state.room && state.room.mission);
+    const code = state.room && !mission ? state.room.code : '';
     $('exit-box').hidden = true;
     SM.Cards.hideDetail();
     SM.Deck.close();
@@ -113,8 +131,12 @@
     leavingUntil = performance.now() + 3000;
     state.room = null;
     state.game = null;
+    SM.Audio.setTrack(null);
     show('screen-lobby');
-    toast(code ? `対局から退出しました（部屋コード ${code} で戻れます）` : '対局から退出しました');
+    if (mission) {
+      SM.Lobby.showTab('missions');
+      toast('ミッションをやめました');
+    } else toast(code ? `対局から退出しました（部屋コード ${code} で戻れます）` : '対局から退出しました');
   }
 
   function init() {
@@ -126,6 +148,7 @@
     SM.Deck.init();
     SM.Decks.init();
     SM.Achievements.init();
+    SM.Missions.init();
     SM.CardList.init();
     SM.Lobby.init();
     SM.Input.init();
@@ -133,6 +156,7 @@
     SM.Monty.init();
     SM.Log.init();
     SM.Result.init();
+    SM.Tutorial.init();
     $('pile-box').addEventListener('click', (e) => { if (e.target.id === 'pile-box' || e.target.id === 'pile-close') $('pile-box').hidden = true; });
     document.querySelectorAll('[data-exit]').forEach((b) => b.addEventListener('click', askExit));
     $('exit-ok').addEventListener('click', doExit);
@@ -144,7 +168,7 @@
       bar.textContent = STATUS[s] || '';
       bar.hidden = !STATUS[s];
     });
-    SM.Net.on('lobby', () => { leavingUntil = 0; show('screen-lobby'); });
+    SM.Net.on('lobby', () => { leavingUntil = 0; SM.Audio.setTrack(null); show('screen-lobby'); });
     SM.Net.on('room', onRoom);
     // 実績の達成・累計の記録（サーバーが判定して、その人にだけ送ってくる）
     SM.Net.on('achievements', (m) => SM.Achievements.apply(m.list));
@@ -156,6 +180,6 @@
     SM.Net.connect();
   }
 
-  SM.Main = { toast, show, seatName, seatIcon, state };
+  SM.Main = { toast, show, seatName, seatIcon, state, askExit };
   document.addEventListener('DOMContentLoaded', init);
 })();

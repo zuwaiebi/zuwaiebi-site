@@ -38,7 +38,11 @@
   // 同じ名前のカードが何種類あるか（《プレゼント！》は4種類を合わせて3枚まで）
   const NAME_KINDS = new Map();
   for (const c of CARDS) NAME_KINDS.set(c.name, (NAME_KINDS.get(c.name) || 0) + 1);
-  const isBanned = (c) => BANNED_NAMES.includes(c.name);
+  // 使用不可: 《おばさん》と、ミッションモード用のCカード（Cイベント・Cパワー・Cフルパワー。c: true）
+  const isBanned = (c) => BANNED_NAMES.includes(c.name) || c.c === true;
+  // Cカードは、ミッションをクリアして解放したものだけデッキに入れられる（SM.Missions。部屋では、ホストが解放したもの rules.cUnlocked）
+  const myUnlocked = () => (SM.Missions ? SM.Missions.unlockedCIds() : []);
+  const isLockedC = (c, unlocked = myUnlocked()) => Boolean(c && c.c === true && !unlocked.includes(c.id));
 
   // 読み込みでは表記ゆれ（空白・中黒・全角半角）を無視して探す。同じ名前のカードが何種類もある時は key（プレゼント！#2 など）で書く
   const norm = (s) => String(s).normalize('NFKC').replace(/[\s･・·]/g, '');
@@ -96,12 +100,18 @@
   // ---- 検査 ----
   /**
    * デッキの枚数と、部屋のルールで引っかかる所（サーバーの checkDeck と同じ）。problems が空なら使える。
-   * rule: 'recommended'（推奨ルール）| 'free'（制限なし。フルパワーだけ見る）
+   * rule: 'recommended'（推奨ルール）| 'free'（制限なし。解放していないCカードとフルパワーだけ見る）。
+   * cUnlocked: 制限なしで使えるCカードのID（部屋のルールの cUnlocked。省くと自分が解放したもの）
    */
-  function check(d, rule = 'recommended') {
+  function check(d, rule = 'recommended', cUnlocked = null) {
     const total = totalOf(d);
     const problems = [];
-    if (rule !== 'free') {
+    const unlocked = Array.isArray(cUnlocked) ? cUnlocked : myUnlocked();
+    if (rule === 'free') {
+      const locked = [];
+      for (const c of CARDS) if (d.counts[c.id] > 0 && isLockedC(c, unlocked) && !locked.includes(c.name)) locked.push(c.name);
+      for (const name of locked) problems.push(`《${name}》はこの部屋ではまだ使えません`);
+    } else {
       if (total < DECK_MIN) problems.push(`${DECK_MIN}枚以上必要です（あと${DECK_MIN - total}枚）`);
       const byName = new Map();
       const banned = [];
@@ -118,6 +128,8 @@
       for (const name of banned) problems.push(`《${name}》は使えません`);
     }
     if (!d.fp) problems.push('フルパワーを選んでください');
+    else if (rule !== 'free' && isBanned(BY_ID.get(d.fp))) problems.push(`フルパワーの《${BY_ID.get(d.fp).name}》は使えません`);
+    else if (rule === 'free' && isLockedC(BY_ID.get(d.fp), unlocked)) problems.push(`フルパワーの《${BY_ID.get(d.fp).name}》はこの部屋ではまだ使えません`);
     if (total > TOTAL_MAX) problems.push(`デッキは${TOTAL_MAX}枚までです`);
     return { total, problems };
   }
@@ -135,7 +147,8 @@
   /** カードの詳細に出す、推奨ルールでの枚数の決まり */
   function limitText(c) {
     if (c === RANDOM) return '何枚でも入れられます（推奨ルールの60枚にも数えます）';
-    if (isBanned(c)) return '推奨ルールでは使えません';
+    if (isLockedC(c)) return 'ミッションモード用のCカードです。ミッションをクリアすると解放されます（推奨ルールでは使えません）';
+    if (isBanned(c)) return c.c ? 'ミッションモード用のCカードです。推奨ルールでは使えません（制限なしの部屋で、ホストも解放していれば使えます）' : '推奨ルールでは使えません';
     if (UNLIMITED_NAMES.includes(c.name)) return '推奨ルールでも何枚でも入れられます';
     if (NAME_KINDS.get(c.name) > 1) return `推奨ルールでは《${c.name}》を合わせて${SAME_NAME_MAX}枚まで`;
     return `推奨ルールでは${SAME_NAME_MAX}枚まで`;
@@ -177,10 +190,11 @@
     return lines.join('\n');
   }
 
-  /** 書き出したテキストからデッキを作る。読めなかった行は unknown に入れる */
+  /** 書き出したテキストからデッキを作る。読めなかった行は unknown に、まだ解放していないCカードは locked に入れる（デッキには入れない） */
   function fromText(text) {
     const deck = { id: newId(), name: '読み込んだデッキ', fp: null, counts: {} };
     const unknown = [];
+    const locked = [];
     for (const raw of String(text).split(/\r?\n/)) {
       const line = raw.trim();
       if (!line || norm(line) === norm(TEXT_HEAD)) continue;
@@ -189,7 +203,8 @@
       m = line.match(/^フルパワー\s*[:：]\s*(.*)$/);
       if (m) {
         const f = FULL_BY_NORM.get(norm(m[1]));
-        if (f) deck.fp = f.id;
+        if (f && isLockedC(f)) locked.push(f.name);
+        else if (f) deck.fp = f.id;
         else if (m[1].trim() && m[1].trim() !== 'なし') unknown.push(line);
         continue;
       }
@@ -197,10 +212,11 @@
       m = line.normalize('NFKC').match(/^(.+?)\s*[×xX*✕]\s*(\d+)$/);
       const c = CARD_BY_NORM.get(norm(m ? m[1] : line));
       if (!c) { unknown.push(line); continue; }
+      if (isLockedC(c)) { if (!locked.includes(c.name)) locked.push(c.name); continue; }
       const n = m ? Number(m[2]) : 1;
       if (n > 0) deck.counts[c.id] = Math.min(copyMax(c), (deck.counts[c.id] || 0) + n);
     }
-    return { deck, unknown };
+    return { deck, unknown, locked };
   }
 
   // ---- デッキ一覧 ----
@@ -347,6 +363,8 @@
     for (const c of EDIT_CARDS) {
       if (only && !edit.deck.counts[c.id]) continue;
       if (q && !norm(c.name).includes(q)) continue;
+      // まだ解放していないCカードは出さない（前から入っている分は、減らせるように出す）
+      if (isLockedC(c) && !edit.deck.counts[c.id]) continue;
       grid.appendChild(gridItem(c));
     }
     if (!grid.childNodes.length) {
@@ -366,7 +384,7 @@
     if (isBanned(c)) {
       const tag = document.createElement('span');
       tag.className = 'deck-card__tag';
-      tag.textContent = '使用不可';
+      tag.textContent = isLockedC(c) ? '🔒 未解放' : '使用不可';
       box.appendChild(tag);
     }
     const ctrl = document.createElement('div');
@@ -394,7 +412,7 @@
       box.classList.toggle('is-over', isOver(d, c));
       box.querySelector('.card-count__n').textContent = `${n}枚`;
       box.querySelector('[data-step="-1"]').disabled = n <= 0;
-      box.querySelector('[data-step="1"]').disabled = n >= copyMax(c) || full;
+      box.querySelector('[data-step="1"]').disabled = n >= copyMax(c) || full || isLockedC(c);
     }
   }
 
@@ -438,7 +456,7 @@
       num.className = 'card-count-edit__n';
       num.textContent = `${n}枚`;
       const plus = smallButton('＋', () => { setCount(c, n + 1); show(); }, 'card-count-edit__step');
-      plus.disabled = n >= copyMax(c) || totalOf(edit.deck) >= TOTAL_MAX;
+      plus.disabled = n >= copyMax(c) || totalOf(edit.deck) >= TOTAL_MAX || isLockedC(c);
       const note = document.createElement('div');
       note.className = `card-count-edit__def${isOver(edit.deck, c) ? ' is-over' : ''}`;
       note.textContent = limitText(c);
@@ -453,12 +471,24 @@
     const grid = $('deck-fp-grid');
     grid.innerHTML = '';
     for (const c of FULLS) {
+      // まだ解放していないCフルパワーは出さない（今のフルパワーなら出す）
+      if (isLockedC(c) && !(edit && edit.deck.fp === c.id)) continue;
       const el = SM.Cards.el(c.id, {
         size: 'mini',
         cls: edit && edit.deck.fp === c.id ? 'is-current' : '',
         onClick: () => SM.Cards.showDetail(c.id, { actions: [{ label: 'これに決める', onClick: () => chooseFp(c.id) }] }),
       });
-      grid.appendChild(el);
+      if (isBanned(c)) {
+        // Cフルパワーは推奨ルールでは使えない（制限なしの部屋だけ）
+        const box = document.createElement('div');
+        box.className = 'card-count deck-card';
+        box.appendChild(el);
+        const tag = document.createElement('span');
+        tag.className = 'deck-card__tag';
+        tag.textContent = '使用不可';
+        box.appendChild(tag);
+        grid.appendChild(box);
+      } else grid.appendChild(el);
     }
     $('deck-fp').hidden = false;
   }
@@ -507,13 +537,16 @@
   }
 
   function importText() {
-    const { deck, unknown } = fromText($('deck-text-area').value);
+    const { deck, unknown, locked } = fromText($('deck-text-area').value);
     if (!totalOf(deck) && !deck.fp) {
-      toast('デッキのテキストが読み取れませんでした');
+      toast(locked.length ? 'まだ解放していないCカードだけのデッキは読み込めません' : 'デッキのテキストが読み取れませんでした');
       return;
     }
     $('deck-text').hidden = true;
-    openEdit(deck, unknown.length ? `読み込めなかった行（${unknown.length}行）: ${unknown.join('、')}` : '読み込みました。確かめて「保存」を押してください。');
+    const msgs = [];
+    if (unknown.length) msgs.push(`読み込めなかった行（${unknown.length}行）: ${unknown.join('、')}`);
+    if (locked.length) msgs.push(`まだ解放していないCカードは入れませんでした: ${locked.map((n) => `《${n}》`).join('')}`);
+    openEdit(deck, msgs.length ? msgs.join(' / ') : '読み込みました。確かめて「保存」を押してください。');
     edit.dirty = true;
   }
 

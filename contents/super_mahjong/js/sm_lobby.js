@@ -23,11 +23,14 @@
       startPoints: Number(f('start').value),
       tobi: f('tobi').checked,
       renchan: f('renchan').checked,
+      cFull: f('cfull').checked,
       perTurn: Number(f('perturn').value),
       bank: Number(f('bank').value),
       cardCounts: counts[prefix],
       mode: f('mode').value,
       deckRule: f('deckrule').value,
+      // この部屋で使えるCカード: 部屋を作った人（ホスト）がミッションをクリアして解放したもの
+      cUnlocked: SM.Missions.unlockedCIds(),
     };
   }
 
@@ -40,6 +43,7 @@
     f('start').value = String(r.startPoints);
     f('tobi').checked = r.tobi;
     f('renchan').checked = Boolean(r.renchan);
+    f('cfull').checked = Boolean(r.cFull);
     f('perturn').value = String(r.perTurn);
     f('bank').value = String(r.bank);
     f('mode').value = r.mode === 'deck' ? 'deck' : 'normal';
@@ -47,10 +51,11 @@
     applyMode(prefix);
   }
 
-  /** 対戦形式に合わせて項目を出し分ける（デッキ構築戦はデッキの制限を選び、カード枚数設定は使わない） */
+  /** 対戦形式に合わせて項目を出し分ける（デッキ構築戦はデッキの制限を選び、カード枚数設定・Cフルパワーの選択は使わない） */
   function applyMode(prefix) {
     const deck = $(`${prefix}-mode`).value === 'deck';
     $(`${prefix}-deckrule-label`).hidden = !deck;
+    $(`${prefix}-cfull-label`).hidden = deck;
     $(`${prefix}-card-counts`).parentElement.hidden = deck;
   }
 
@@ -98,6 +103,7 @@
       r.renchan ? '連荘あり' : '連荘なし',
       t,
       ...(deckMode ? [] : [r.cards === false ? 'カードなし' : SM.Deck.summary(r.cardCounts, r)]),
+      ...(deckMode || !r.cFull ? [] : ['Cフルパワーあり']),
     ].join(' / ');
   }
 
@@ -137,6 +143,17 @@
     for (const b of document.querySelectorAll('.menu-tab')) b.addEventListener('click', () => showTab(b.dataset.tab));
     showTab(q ? 'play' : SM.Net.store.get(TAB_KEY) || 'play');
 
+    $('btn-reset-data').addEventListener('click', resetSavedData);
+    // 操作しながら覚えるチュートリアル（ガイドと、対戦タブの案内から）
+    for (const b of document.querySelectorAll('[data-tutorial-start]')) b.addEventListener('click', () => SM.Tutorial.start());
+    // 対戦タブのチュートリアルの誘導: 一度でも遊んだ人、「非表示にする」を押した人には出さない
+    const hintBox = document.querySelector('.tutorial-hint');
+    if (SM.Net.store.get('super_mahjong_tutorial_done') || SM.Net.store.get('super_mahjong_tutorial_hint_off')) hintBox.hidden = true;
+    $('tutorial-hint-hide').addEventListener('click', () => {
+      SM.Net.store.set('super_mahjong_tutorial_hint_off', '1');
+      hintBox.hidden = true;
+      SM.Main.toast('チュートリアルはガイドからいつでもプレイできます');
+    });
     $('btn-leave').addEventListener('click', () => SM.Net.send({ type: 'leaveRoom' }));
     $('btn-start').addEventListener('click', () => SM.Net.send({ type: 'startGame' }));
     // デッキ構築戦: 自分のデッキを選ぶ
@@ -175,10 +192,38 @@
     }
     for (const p of document.querySelectorAll('.tab-panel')) p.hidden = p.dataset.panel !== open;
     SM.Net.store.set(TAB_KEY, open);
+    if (open === 'missions') SM.Missions.render();
     if (open === 'decks') SM.Decks.renderList();
     if (open === 'achievements') SM.Achievements.render();
     if (open === 'cards') SM.CardList.show();
     if (open === 'stats') SM.Stats.render();
+    if (open === 'tutorial') linkTutorial();
+  }
+
+  /** このブラウザに保存した super_mahjong_ のデータをすべて消して、読み込み直す（最初の状態に戻す） */
+  function resetSavedData() {
+    if (!confirm('保存しているデータ（名前・アイコン・デッキ・実績・統計・各種設定など）をすべて削除します。元には戻せません。よろしいですか？')) return;
+    try {
+      const keys = [];
+      for (let i = 0; i < localStorage.length; i++) keys.push(localStorage.key(i));
+      for (const k of keys) if (k && k.startsWith('super_mahjong_')) localStorage.removeItem(k);
+    } catch { /* 保存できない環境 */ }
+    location.href = location.pathname;
+  }
+
+  /** チュートリアルの本文の《カード名》を、押すとカード詳細が出る印にする（初めて開いた時だけ） */
+  let tutorialLinked = false;
+  function linkTutorial() {
+    if (tutorialLinked) return;
+    tutorialLinked = true;
+    const walker = document.createTreeWalker(document.querySelector('[data-panel="tutorial"]'), NodeFilter.SHOW_TEXT);
+    const texts = [];
+    while (walker.nextNode()) if (walker.currentNode.nodeValue.includes('《')) texts.push(walker.currentNode);
+    for (const t of texts) {
+      const span = document.createElement('span');
+      SM.Cards.linkify(span, t.nodeValue);
+      t.replaceWith(span);
+    }
   }
 
   const isDeckMode = (r) => r.mode === 'deck' && r.cards !== false;
@@ -210,13 +255,14 @@
     const mine = room.seats[room.you];
     const list = SM.Decks.list();
     let pick = SM.Decks.picked();
-    // まだ選んでいなければ、部屋のルールで使えるデッキを選んでおく
+    // まだ選んでいなければ、部屋のルールで使えるデッキを選んでおく（Cカードは部屋で解放してあるものだけ）
+    const checkRoom = (d) => SM.Decks.check(d, room.rules.deckRule, room.rules.cUnlocked || []);
     if (!pick) {
-      pick = list.find((d) => !SM.Decks.check(d, room.rules.deckRule).problems.length) || null;
+      pick = list.find((d) => !checkRoom(d).problems.length) || null;
       if (pick) SM.Decks.setPicked(pick.id);
     }
     const opts = (pick ? [] : [['', list.length ? '（デッキを選ぶ）' : '（デッキがありません）']]).concat(list.map((d) => {
-      const { total, problems } = SM.Decks.check(d, room.rules.deckRule);
+      const { total, problems } = checkRoom(d);
       return [d.id, `${problems.length ? '✗' : '✓'} ${d.name}（${total}枚）`];
     }));
     const sel = $('room-deck-select');
@@ -287,6 +333,8 @@
       main.className = 'seat-row__main';
       main.appendChild(label);
       if (deckMode && s) main.appendChild(deckLine(s));
+      // ミッションのCPU（ネームドCPU）は、通常戦でも自分のデッキから引く
+      else if (s && s.cpu) main.appendChild(Object.assign(document.createElement('span'), { className: 'seat-row__deck', textContent: '自分のデッキで戦います' }));
       li.appendChild(main);
       if (host) {
         if (!s) {
@@ -296,16 +344,26 @@
           b.onclick = () => SM.Net.send({ type: 'addCpu', seat: i });
           li.appendChild(b);
         } else if (i !== room.you) {
+          const acts = document.createElement('div');
+          acts.className = 'seat-row__acts';
+          if (s.kind === 'cpu') {
+            const c = document.createElement('button');
+            c.className = 'small-button';
+            c.textContent = 'CPUを変更';
+            c.onclick = () => SM.Missions.openCpuPicker(i, s.cpu);
+            acts.appendChild(c);
+          }
           const b = document.createElement('button');
           b.className = 'small-button';
           b.textContent = s.kind === 'cpu' ? 'CPUを外す' : '退出させる';
           b.onclick = () => SM.Net.send({ type: 'kick', seat: i });
-          li.appendChild(b);
+          acts.appendChild(b);
+          li.appendChild(acts);
         }
       }
       list.appendChild(li);
     });
   }
 
-  SM.Lobby = { init, renderRoom, rulesText };
+  SM.Lobby = { init, renderRoom, rulesText, showTab };
 })();

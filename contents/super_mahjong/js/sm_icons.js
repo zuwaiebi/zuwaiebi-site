@@ -6,38 +6,86 @@
   const ICON_KEY = 'super_mahjong_icon';
 
   // 選べるアイコン: 同じ絵のカードは1つにまとめ、最初のカードのIDで表す（サーバーと同じ）。
+  // Cカードの絵はミッションで解放したもの（SM.Missions.unlockedCIds）だけ選べ、それまでは一覧にも出さない。
   // 実績の報酬のアイコンは「a + 実績の番号」（SM.Achievements。手に入れたものだけ選べる）
   const LIST = [];
   const IMG = new Map();
+  const BY_ID = new Map();
+  const BY_KEY = new Map();
   {
     const seen = new Set();
     for (const c of window.SM_CARDS || []) {
+      BY_ID.set(c.id, c);
+      BY_KEY.set(c.key, c);
       if (!c.img) continue;
       IMG.set(c.id, c.img);
       if (seen.has(c.img)) continue;
       seen.add(c.img);
-      LIST.push({ id: c.id, img: c.img, name: c.name });
+      LIST.push({ id: c.id, img: c.img, name: c.name, c: Boolean(c.c) });
     }
   }
   const rewardOf = (id) => (typeof id === 'string' && /^a\d+$/.test(id) && SM.Achievements
     ? SM.Achievements.rewardIcons().find((x) => x.id === id) || null : null);
-
-  /** 自分のアイコン。初めての時（と、手に入れていない報酬のアイコンだった時）はランダムに決めて覚える */
-  function mine() {
-    let id = SM.Net.store.get(ICON_KEY);
+  /** 今選べるカードのアイコン（解放していないCカードを除く） */
+  function choices() {
+    const unlocked = new Set(SM.Missions ? SM.Missions.unlockedCIds() : []);
+    return LIST.filter((it) => !it.c || unlocked.has(it.id));
+  }
+  /** 自分のアイコンにできるか（絵のあるカード（Cカードは解放したもの）か、手に入れた報酬のアイコン） */
+  function usable(id) {
+    if (IMG.has(id)) return !BY_ID.get(id).c || choices().some((it) => it.id === id);
     const reward = rewardOf(id);
-    if (!id || !(IMG.has(id) || (reward && reward.got))) {
-      id = LIST[Math.floor(Math.random() * LIST.length)].id;
-      SM.Net.store.set(ICON_KEY, id);
+    return Boolean(reward && reward.got);
+  }
+  const randomChoice = () => { const list = choices(); return list[Math.floor(Math.random() * list.length)].id; };
+
+  // 保存する形: カードの絵は「card:カードのkey」（カードのIDは CSV の行の位置で変わるので、カードを足したり消したりしてもずれない key で覚える）。
+  // 報酬のアイコンは「a + 実績の番号」のまま。前の形（カードのID c001…）は読んだ時に key の形に直す
+  const CARD_PREFIX = 'card:';
+  function toSaved(id) { const c = BY_ID.get(id); return c && IMG.has(id) ? CARD_PREFIX + c.key : id; }
+  function fromSaved(v) {
+    if (typeof v !== 'string') return null;
+    if (v.startsWith(CARD_PREFIX)) { const c = BY_KEY.get(v.slice(CARD_PREFIX.length)); return c ? c.id : null; }
+    return v;
+  }
+  // ミッションのCPU（ネームドCPU）のアイコン「n:名前」（data/icon_img の画像。プレイヤーは選べないので一覧には出さない）
+  const CPU_ICON_FILES = (window.SM_MISSIONS && window.SM_MISSIONS.iconFiles) || {};
+  const cpuIconOf = (id) => {
+    if (typeof id !== 'string' || !id.startsWith('n:')) return null;
+    const name = id.slice(2);
+    const file = CPU_ICON_FILES[name];
+    return { name, src: file ? `data/icon_img/${encodeURIComponent(file)}` : null };
+  };
+
+  /**
+   * 自分のアイコン。初めての時はランダムに決めて覚える。
+   * 覚えているものが今は使えない時（解放していないCカード・手に入れていない報酬・画像が無くなったカード）は、
+   * 選び直したことにはせず（覚えているものは書き換えない）、代わりのアイコンを出す
+   */
+  function mine() {
+    const saved = SM.Net.store.get(ICON_KEY);
+    if (!saved) {
+      const id = randomChoice();
+      SM.Net.store.set(ICON_KEY, toSaved(id));
+      return id;
     }
-    return id;
+    const id = fromSaved(saved);
+    if (id && usable(id)) {
+      if (toSaved(id) !== saved) SM.Net.store.set(ICON_KEY, toSaved(id));   // 前の形（カードのID）で覚えていたら直す
+      return id;
+    }
+    // 代わり: 覚えているものから決める（読み込み直しても同じものになる）
+    const list = choices();
+    let h = 0;
+    for (const ch of saved) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+    return list[h % list.length].id;
   }
 
   /** アイコン要素（id が無ければ空の枠。画像がまだ無い報酬のアイコンは名前の1文字目） */
   function el(id, cls) {
     const span = document.createElement('span');
     span.className = `picon${cls ? ` ${cls}` : ''}`;
-    const reward = id && !IMG.has(id) ? rewardOf(id) : null;
+    const reward = id && !IMG.has(id) ? rewardOf(id) || cpuIconOf(id) : null;
     const src = id && IMG.has(id) ? IMG_DIR + encodeURIComponent(IMG.get(id)) : reward && reward.src;
     if (src) {
       const i = document.createElement('img');
@@ -154,13 +202,13 @@
       for (const x of rewards) choice(x.id, x.name, x.got ? null : x.ach.name);
       heading('カード');
     }
-    const cards = LIST.filter((it) => !q || it.name.includes(q));
+    const cards = choices().filter((it) => !q || it.name.includes(q));
     for (const it of cards) choice(it.id, it.name, null);
     if (!rewards.length && !cards.length) grid.textContent = '見つかりません';
   }
 
   function pick(id) {
-    SM.Net.store.set(ICON_KEY, id);
+    SM.Net.store.set(ICON_KEY, toSaved(id));
     $('icon-picker').hidden = true;
     if (onPicked) onPicked(id);
   }
@@ -175,7 +223,7 @@
 
   function init() {
     $('icon-filter').addEventListener('input', renderPicker);
-    $('icon-random').addEventListener('click', () => pick(LIST[Math.floor(Math.random() * LIST.length)].id));
+    $('icon-random').addEventListener('click', () => pick(randomChoice()));
     $('icon-close').addEventListener('click', () => { $('icon-picker').hidden = true; });
     $('icon-picker').addEventListener('click', (e) => { if (e.target.id === 'icon-picker') $('icon-picker').hidden = true; });
   }

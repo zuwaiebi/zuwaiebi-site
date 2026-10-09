@@ -17,10 +17,22 @@
   let preview = null;   // タイトルでの試聴
   let inGame = false;
   let held = false;     // 和了してから次の局が始まるまで一時停止している
+  let quiet = false;    // チュートリアル中は説明を読めるようにBGMを流さない（効果音は鳴らす）
   let blocked = null;   // ブラウザに自動再生を止められた音（次に画面を触った時に流す）
+  let track = null;     // ミッション中だけ、選んだ曲の代わりに流す曲（ミッションの曲）
 
-  /** 実績の報酬の曲で、まだ手に入れていないもの（選べない） */
-  const lockOf = (file) => (SM.Achievements ? SM.Achievements.bgmLock(file) : null);
+  // 実績の報酬でもなく、まだ手に入れる方法が無い曲（ミッションの曲。タイトルで選べない）
+  const UNOBTAINABLE = ['Vampire Killer'];
+  /**
+   * 選べない曲なら、その理由 { text }（実績の報酬の曲は手に入れるまで。手に入れる方法がまだ無い曲も）。選べる曲は null
+   */
+  function lockOf(file) {
+    const ach = SM.Achievements ? SM.Achievements.bgmLock(file) : null;
+    if (ach) return { text: `実績「${ach.name}」で解放` };
+    const b = LIST.find((x) => x.file === file);
+    const reward = SM.Achievements && SM.Achievements.LIST.some((a) => a.reward && a.reward.type === 'bgm' && a.reward.file === file);
+    return b && !reward && UNOBTAINABLE.includes(b.title) ? { text: '入手方法は準備中' } : null;
+  }
 
   function load() {
     const st = SM.Net.store;
@@ -57,15 +69,25 @@
 
   // ---- 対局中のBGM ----
   function startBgm() {
-    if (!settings.bgm) { stopBgm(); return; }
-    if (bgm && bgm.dataset.file === settings.bgm) {
+    // ミッション中はミッションの曲（タイトルでBGMを「なし」にしている時は流さない）
+    const file = settings.bgm && track ? track : settings.bgm;
+    if (!file || quiet) { stopBgm(); return; }
+    if (bgm && bgm.dataset.file === file) {
       bgm.volume = volume('bgm');
       if (bgm.paused && !held) tryPlay(bgm);
       return;
     }
     stopBgm();
-    bgm = newTrack(settings.bgm);
+    bgm = newTrack(file);
     if (!held) tryPlay(bgm);
+  }
+
+  /** ミッションの曲にする（null で選んだ曲に戻す）。対局画面なら流し直す */
+  function setTrack(file) {
+    const next = file && LIST.some((b) => b.file === file) ? file : null;
+    if (next === track) return;
+    track = next;
+    if (inGame) startBgm();
   }
   function stopBgm() { stopAudio(bgm); bgm = null; }
 
@@ -130,7 +152,7 @@
     if (m) { m.textContent = settings.mute ? '🔇' : '🔊'; m.title = settings.mute ? '音を出す' : '音を消す'; }
   }
 
-  /** タイトルの曲の一覧（実績の報酬の曲は、手に入れるまで灰色で選べない） */
+  /** タイトルの曲の一覧（実績の報酬の曲は、手に入れるまで灰色で選べない。手に入れる方法がまだ無い曲も） */
   function fillBgmSelect() {
     const sel = $('bgm-select');
     sel.innerHTML = '';
@@ -142,7 +164,7 @@
       const o = document.createElement('option');
       o.value = b.file;
       const lock = lockOf(b.file);
-      o.textContent = lock ? `🔒 ${b.title}（実績「${lock.name}」で解放）` : b.title;
+      o.textContent = lock ? `🔒 ${b.title}（${lock.text}）` : b.title;
       o.disabled = Boolean(lock);
       sel.appendChild(o);
     }
@@ -179,5 +201,12 @@
     document.addEventListener('keydown', resume, true);
   }
 
-  SM.Audio = { init, onScreen, se, holdBgm, LIST };
+  /** BGMを流さない状態にする／戻す（チュートリアル用。戻した時に対局画面なら流し始める） */
+  function setQuiet(on) {
+    quiet = Boolean(on);
+    if (quiet) stopBgm();
+    else if (inGame) startBgm();
+  }
+
+  SM.Audio = { init, onScreen, se, holdBgm, setQuiet, setTrack, LIST };
 })();

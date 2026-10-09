@@ -42,15 +42,23 @@
       <!-- メニュー: 押すと下の中身が切り替わる。準備中のものは灰色で押せない -->
       <nav class="menu-tabs" aria-label="メニュー">
         <button type="button" class="menu-tab" data-tab="play">対戦</button>
+        <button type="button" class="menu-tab" data-tab="missions">ミッション</button>
         <button type="button" class="menu-tab" data-tab="decks">デッキ構築</button>
-        <button type="button" class="menu-tab" data-tab="achievements">実績</button>
+        <button type="button" class="menu-tab" data-tab="tutorial">ガイド</button>
         <button type="button" class="menu-tab" data-tab="cards">カード一覧</button>
-        <button type="button" class="menu-tab" data-tab="stats">統計</button>
-        <button type="button" class="menu-tab" data-tab="missions" disabled title="準備中">ミッション</button>
-        <button type="button" class="menu-tab" data-tab="tutorial" disabled title="準備中">チュートリアル</button>
+        <button type="button" class="menu-tab" data-tab="achievements">実績</button>
+        <button type="button" class="menu-tab" data-tab="stats">データ</button>
+        <button type="button" class="menu-tab" data-tab="ranking" disabled title="準備中">ランキング</button>
       </nav>
 
       <div class="tab-panel" data-panel="play">
+        <section class="lobby-box tutorial-hint">
+          <p>はじめての方は、CPUとの1局で操作とカードの動きを覚えられます。</p>
+          <span class="tutorial-hint__buttons">
+            <button type="button" class="sub-button" data-tutorial-start>チュートリアル</button>
+            <button type="button" class="sub-button" id="tutorial-hint-hide">非表示にする</button>
+          </span>
+        </section>
         <section class="lobby-box">
           <h2>部屋に参加する</h2>
           <div class="join-row">
@@ -83,17 +91,26 @@
             <label class="check"><input id="create-kuitan" type="checkbox" checked> 喰いタン</label>
             <label class="check"><input id="create-tobi" type="checkbox" checked> 飛び</label>
             <label class="check"><input id="create-renchan" type="checkbox"> 連荘</label>
+            <label id="create-cfull-label" class="check"><input id="create-cfull" type="checkbox"> Cフルパワー</label>
             <div class="card-count-row"><button id="create-card-counts" class="sub-button" type="button">カード枚数設定</button><span id="create-card-counts-text" class="card-count-row__text"></span></div>
           </form>
-          <p class="note">三麻は萬子・筒子・索子・字牌すべてを使い、チーなし・北抜きあり・ツモ損です。連荘なしでは親が和了・聴牌しても親が流れます（一巡目の途中流局だけはやり直し）。</p>
+          <p class="note">三麻は萬子・筒子・索子・字牌すべてを使い、チーなし・北抜きあり・ツモ損です。連荘なしでは親が和了・聴牌しても親が流れます（一巡目の途中流局だけはやり直し）。Cカード（Cイベント・Cパワー・Cフルパワー）はミッションモード用のカードで、ミッションをクリアすると、そのミッションのCPUが使うCカードが解放されます。解放したCカードは、通常戦でも既定では山札に入りません（「カード枚数設定」で入れられます）。「Cフルパワー」をONにすると、フルパワーの選択に解放したCフルパワーが並びます（部屋で使えるCカードは、部屋を作った人が解放したもの）。CPUを入れた後の「CPUを変更」では、クリアしたミッションのCPUを選べます。</p>
           <button id="btn-create" class="main-button">部屋を作る</button>
+        </section>
+      </div>
+
+      <div class="tab-panel" data-panel="missions" hidden>
+        <section class="lobby-box">
+          <h2>ミッション <span id="mission-count" class="ach-count"></span></h2>
+          <p class="note">自分のデッキ（推奨ルールに合うもの）で、個性的なCPUたちとデッキ構築戦で対局します。条件を満たして終局するとクリアです。クリアすると次のミッションに挑戦できるようになり、そのミッションのCPUとCPUが使うCカードが、通常戦・デッキ構築戦で使えるようになります。数字は成功回数/挑戦回数です（記録はこのブラウザに保存されます）。</p>
+          <ul id="mission-list" class="mission-list"></ul>
         </section>
       </div>
 
       <div class="tab-panel" data-panel="decks" hidden>
         <section class="lobby-box">
           <h2>デッキ構築</h2>
-          <p class="note">デッキ構築戦では、自分で組んだデッキ（カードとフルパワー）を持ち寄って対戦します。山札は各自のデッキから作り、捨て場は全員共有です。推奨ルール: 60枚以上・同名カードは3枚まで（カチコミ・目からビーム・否認は何枚でも）・《おばさん》は使えない。デッキに入れた「ランダム」は、山札を作るたびにランダムなカードになります。デッキはこのブラウザに保存されます。</p>
+          <p class="note">デッキ構築戦では、自分で組んだデッキ（カードとフルパワー）を持ち寄って対戦します。山札は各自のデッキから作り、捨て場は全員共有です。推奨ルール: 60枚以上・同名カードは3枚まで（カチコミ・目からビーム・否認は何枚でも）・《おばさん》とCカードは使えない（制限なしの部屋なら使える。Cカードはミッションをクリアして解放したものだけ）。デッキに入れた「ランダム」は、山札を作るたびにランダムなカードになります。デッキはこのブラウザに保存されます。</p>
           <ul class="decks__list" data-decks-list></ul>
           <div class="button-row button-row--center decks__actions">
             <button type="button" class="sub-button" data-deck-act="new">新しいデッキ</button>
@@ -107,6 +124,7 @@
         <section class="lobby-box">
           <h2>実績 <span id="ach-count" class="ach-count"></span></h2>
           <p class="note">対局中にカードや役で条件を満たすと達成し、アイコンやBGMが手に入ります（記録はこのブラウザに保存されます）。</p>
+          <div id="ach-tabs" class="ach-tabs" role="group" aria-label="実績の種類"></div>
           <ul id="ach-list" class="ach-list"></ul>
         </section>
       </div>
@@ -117,9 +135,14 @@
           <div id="stats-best" class="stats-best"></div>
         </section>
         <section class="lobby-box">
-          <h2>統計</h2>
+          <h2>データ</h2>
           <p class="note">これまでの対局の記録です（このブラウザに保存されます）。▶の付いた項目を押すと、内訳が開きます。</p>
           <div id="stats-list" class="stats-list"></div>
+        </section>
+        <section class="lobby-box">
+          <h2>保存データの削除</h2>
+          <p class="note">このブラウザに保存しているデータ（名前・アイコン・デッキ・カード枚数設定・実績と統計・BGMや音量・操作設定など）をすべて削除して、最初の状態に戻します。元には戻せません。</p>
+          <button id="btn-reset-data" class="sub-button danger-button" type="button">保存データをすべて削除</button>
         </section>
       </div>
 
@@ -129,6 +152,196 @@
           <input id="cardlist-q" class="cardlist-q" type="text" enterkeyhint="search" placeholder="カード名・テキストで検索" autocomplete="off">
           <div id="cardlist-types" class="cardlist-types" role="group" aria-label="カードタイプで絞り込み"></div>
           <div id="cardlist-grid" class="cardlist-grid"></div>
+        </section>
+      </div>
+      <div class="tab-panel" data-panel="tutorial" hidden>
+        <section class="lobby-box">
+          <h2>ガイド</h2>
+          <div class="tutorial-start">
+            <h3>操作しながら覚える（5分ほど）</h3>
+            <p>実際の対局画面を動かしながら、操作のしかたと、普通の麻雀との違い、カードの基本的な動きを、CPUとの1局で体験できます。チュートリアルは成績に残りません。</p>
+            <button type="button" class="main-button" data-tutorial-start>チュートリアルを始める</button>
+          </div>
+
+          <details class="tut-sec" open>
+            <summary>1. このゲームについて</summary>
+            <div class="tut-body">
+              <p class="tut-origin">すべての元凶→<a href="https://maru9.saikyou.biz/huya2/index.html" target="_blank" rel="noopener noreferrer">不夜麻雀</a></p>
+              <p>普通のリーチ麻雀に「カード」を足した対戦ゲームです。3人（三麻）でも4人（四麻）でも遊べます。カードはいつも使います（オフにはできません）。</p>
+              <p>手牌を作って和了を目指すところは麻雀と同じですが、カードで相手の牌を捨てさせたり、役を増やしたり、ルールそのものを曲げたりできます。カードのテキストは、ルールの説明より常に優先されます。</p>
+            </div>
+          </details>
+
+          <details class="tut-sec">
+            <summary>2. 麻雀部分のルール（最低限）</summary>
+            <div class="tut-body">
+              <ul>
+                <li>赤ドラ（各色の5を1枚ずつ、計3枚）・喰いタン・飛びは、部屋を作る時に入り切りできます（既定はすべてあり）。</li>
+                <li>連荘は既定でなしです。親が和了・聴牌しても親は流れ、本場は0に戻ります。ただし一巡目の途中流局（九種九牌など）だけはやり直し（本場+1）です。</li>
+                <li>後付けあり・頭ハネ（ダブロンなし）・喰い替えなし・一発と裏ドラとカンドラあり・流し満貫あり。</li>
+                <li>リーチは持ち点1000点以上で、牌山の残りが人数以上ある時だけ宣言できます。流局時に余った供託は、最終順位がトップの人のものになります。</li>
+                <li>役満は13翻として他の役・ドラと足し算します。合計が13翻の倍数ごとに1倍役満で、13翻以上は数え役満です。役満が成立した時、それに必ず含まれる下位の役（例: 四暗刻の対々和）は数えません。</li>
+                <li>ドラだけでは和了れません（役が1つ以上必要）。</li>
+                <li>三麻は萬子・筒子・索子・字牌をすべて使い、チーなし・北抜きあり・ツモ損です。流局の聴牌料は2000点、四風連打・四家立直の途中流局はありません。</li>
+                <li>既定は東風戦・持ち点35000点（三麻は45000点）です。誰かの持ち点が0を下回ると（飛びあり）その場で終局します。</li>
+              </ul>
+            </div>
+          </details>
+
+          <details class="tut-sec">
+            <summary>3. ゲームの進行</summary>
+            <div class="tut-body">
+              <h4>対局の始まり</h4>
+              <ol>
+                <li>対局の前に、自分の<b>フルパワー</b>を1枚選びます（デッキ構築戦ではデッキに設定したフルパワーが使われます）。他の人と同じフルパワーを選んでもかまいません。</li>
+                <li>局の始めに、牌を13枚、<b>カードを3枚</b>配ります。</li>
+              </ol>
+              <h4>自分の手番</h4>
+              <ol>
+                <li><b>カードを1枚引く</b>（鳴いて回ってきた手番では引きません）。</li>
+                <li>牌をツモる。</li>
+                <li>ここで<b>カードを1枚まで使えます</b>（フルパワーや、場のパワーの能力も「カードを使う」回数に数えます）。鳴いて回ってきた手番ではカードを使えません。ツモ和了・暗槓・加槓・リーチ・北抜きもこの間に行えます。</li>
+                <li>牌を1枚捨てる。他の人はロン・ポン・チー・カンができます。</li>
+              </ol>
+              <p>カードの効果で、手番を飛ばされたり、追加の手番が来たりすることがあります。使える回数が増えるカードもあります。</p>
+              <h4>手札と山札</h4>
+              <ul>
+                <li>手札は<b>5枚まで</b>です。上限を超える分は引けません。</li>
+                <li>手牌・手札・場のカード・捨て場は<b>局ごとにリセット</b>されます。カードの山札だけは局をまたいで続き、空になったら作り直してシャッフルします。山札の残り枚数は見えません。</li>
+                <li>使ったカードは捨て場に置かれます（パワーは場を離れた時）。</li>
+              </ul>
+              <h4>割り込み（▲）</h4>
+              <p>他の人の行動に対して使えるカードや能力があります。割り込める人には<b>全員に同時に</b>確認が出ます。割り込みに対する割り込みもでき、後から出した方から先に解決します。同時に使った場合は、行動した人から近い席順に解決します。カードの対象は、プレイする前に選びます。</p>
+              <h4>局の終わりと対局の終わり</h4>
+              <ul>
+                <li>和了か流局で局が終わります。長さは一局戦・東風戦・半荘戦から選びます（カードの効果で延びることもあります）。</li>
+                <li>流局時は、聴牌料のやり取り（四麻3000点・三麻2000点）と流し満貫の判定があり、リーチをかけていて聴牌していない人は満貫を払います。</li>
+                <li>終局時の順位は持ち点で決まり、同点なら最初の親から見た席順で上の人が上位です。</li>
+              </ul>
+              <h4>対局の途中で出てくる演出</h4>
+              <p>サイコロ・じゃんけん・ルーレットなど、カードによっては全員の画面に演出が出ます。表示に従って操作してください。選択の問い合わせが出た時は、画面の上のウィンドウから選びます（一時的に隠すこともできます）。</p>
+            </div>
+          </details>
+
+          <details class="tut-sec">
+            <summary>4. カードの種類</summary>
+            <div class="tut-body">
+              <div class="tut-type" style="--tc:#FFC000">
+                <h4>イベント</h4>
+                <p>手札から使うと効果が起きて、そのまま捨て場に行きます。いちばん数の多いタイプです。▲の付いたイベントは、条件を満たした時や割り込みのタイミングでしか使えません（例: 《否認》《目からビーム》）。▲のないカードは、効果の対象がいなくても使えます。</p>
+              </div>
+              <div class="tut-type" style="--tc:#0070C0">
+                <h4>パワー</h4>
+                <p>手札から使うと、<b>自分の場に出ます</b>。場には5枠あり、空き枠がないと出せません（他の人の場に重ねて置くカードなど、例外もあります）。出た後は、効果が続くものや、手番に使える能力・割り込める能力を持つものがあります。破壊されたり効果が終わったりすると場を離れ、捨て場に行きます。</p>
+              </div>
+              <div class="tut-type" style="--tc:#FF0000">
+                <h4>フルパワー</h4>
+                <p>各プレイヤーが<b>1枚だけ</b>持つ切り札です。山札には入らず、対局前に選んだものを、カードを使える時に手札を使わず出せます。</p>
+                <ul>
+                  <li>出すと1手番のカード使用に数えられ、場の枠を1つ使います。</li>
+                  <li>すでに自分の場にあるフルパワーは、もう一度出せません。</li>
+                  <li>場を離れた後は、<b>2手番</b>経たないと出し直せません。</li>
+                  <li>出した手番は、牌を捨てる以外の行動ができません。</li>
+                </ul>
+              </div>
+              <div class="tut-type" style="--tc:#00B050">
+                <h4>パワー＋</h4>
+                <p>山札に入らない特別なパワーです。他のカードの効果で場に出ます（例: 《おばさん》や《大富豪》から）。場を離れると、捨て場には行かず消えます。</p>
+              </div>
+              <div class="tut-type" style="--tc:#7030A0">
+                <h4>ハプニング</h4>
+                <p>使えません。<b>手札に入った瞬間に</b>効果が起きて、たいていはそのまま捨てられます。手札が一杯の時は引けないので起きません。</p>
+                <p>「ハプニングなパワー」は、効果が起きた後にパワーとして自分の場に出ます（空き枠がある時）。</p>
+              </div>
+            </div>
+          </details>
+
+          <details class="tut-sec">
+            <summary>5. カードの記号</summary>
+            <div class="tut-body">
+              <table class="tut-table">
+                <tr><th>記号</th><th>意味</th></tr>
+                <tr><td>■</td><td>効果の文です。</td></tr>
+                <tr><td>▲</td><td>使える条件や割り込みのタイミングです。これがあるカードは、その条件の時にしか使えません。</td></tr>
+                <tr><td>●</td><td>キーワード能力です。「スペースチャージ」（条件を満たすと≒の能力が働く）、「プロテクター」、「タイルフォース」（手牌が条件を満たすと✨の能力が使える）、「逆転撃」など。</td></tr>
+                <tr><td>§</td><td>そのカードが追加する役です（7章・8章を参照）。</td></tr>
+                <tr><td>★</td><td>《リサイクル》の別の効果の印です。</td></tr>
+              </table>
+              <p>カードの文の中の《カード名》は、押すとそのカードの詳細が出ます。</p>
+            </div>
+          </details>
+
+          <details class="tut-sec">
+            <summary>6. 対戦の形式</summary>
+            <div class="tut-body">
+              <h4>通常戦</h4>
+              <p>全員が共通の山札と捨て場を使います。山札に入れるカードと枚数は、部屋を作る時の「カード枚数設定」で決められます。既定は、すべてのイベント・パワー・ハプニングが1枚ずつ（《カチコミ》《否認》《目からビーム》だけ15枚）です。</p>
+              <h4>デッキ構築戦</h4>
+              <p>各自が持ち寄ったデッキから山札を作ります。捨て場は全員で共有です。デッキはロビーの「デッキ構築」で作り、このブラウザに保存されます。</p>
+              <ul>
+                <li><b>推奨ルール</b>: 60枚以上、同じ名前のカードは3枚まで（《カチコミ》《目からビーム》《否認》は何枚でも）、《おばさん》は入れられません。フルパワーを1枚決める必要があります。</li>
+                <li><b>制限なし</b>: 同じカードは99枚まで、合計999枚まで。フルパワーは必要です。</li>
+                <li>デッキに入れた「ランダム」は、山札を作るたびにランダムなカードに変わります。</li>
+              </ul>
+            </div>
+          </details>
+
+          <details class="tut-sec">
+            <summary>7. 採用している役（麻雀本来の役）</summary>
+            <div class="tut-body">
+              <p>鳴いて翻数が下がるものは「2 / 1」のように（門前 / 鳴き）書いています。役満はすべて13翻です。</p>
+              <div class="tut-scroll">
+                <table class="tut-table">
+                  <tr><th>翻</th><th>役</th></tr>
+                  <tr><td>1</td><td>立直・一発・門前清自摸和・平和・断幺九・一盃口・役牌（白・發・中・自風牌・場風牌）・海底摸月・河底撈魚・嶺上開花・槍槓</td></tr>
+                  <tr><td>2</td><td>ダブル立直・七対子（25符）・混老頭・三色同刻・対々和・三暗刻・三槓子・小三元・混全帯幺九（2 / 1）・一気通貫（2 / 1）・三色同順（2 / 1）</td></tr>
+                  <tr><td>3</td><td>二盃口・純全帯幺九（3 / 2）・混一色（3 / 2）</td></tr>
+                  <tr><td>6</td><td>清一色（6 / 5）</td></tr>
+                  <tr><td>役満<br>（13）</td><td>国士無双・四暗刻・大三元・大四喜・小四喜・字一色・緑一色・清老頭・四槓子・九蓮宝燈・天和・地和・人和</td></tr>
+                </table>
+              </div>
+              <p class="note">ドラ・赤ドラ・裏ドラ・抜きドラは、役ではなく翻数の加算だけです。</p>
+            </div>
+          </details>
+
+          <details class="tut-sec">
+            <summary>8. カードで追加される役</summary>
+            <div class="tut-body">
+              <p>次のカードを使うと、ルールに新しい役が加わります。「手牌の形を問わず成立」とあるものは、手牌が和了の形でなくても成立します。</p>
+              <div class="tut-scroll">
+                <table class="tut-table">
+                  <tr><th>役</th><th>翻</th><th>成立の条件</th><th>カード</th></tr>
+                  <tr><td>天和九蓮宝燈</td><td>26</td><td>手牌の形を問わず常に成立（オーラスで、使った手番の間だけ）</td><td>《天和九蓮宝燈》</td></tr>
+                  <tr><td>大猿の拳</td><td>13</td><td>ツモ和了でのみ成立（次の普通にツモした手番の間）。その手番の終わりに持ち点全額を供託する</td><td>《オラの全てをこの拳にかける!!!!》</td></tr>
+                  <tr><td>やるんだな！？今！ここで！</td><td>役満</td><td>手牌の形を問わず常に成立（使った手番の間）。翻数は増減しない</td><td>《勝負は今ここで決める》</td></tr>
+                  <tr><td>超裸単騎</td><td>13</td><td>裸単騎（手牌が1枚）の状態で成立（その局の間）</td><td>《一点読み》</td></tr>
+                  <tr><td>スカーレット・ナイトメア</td><td>役満</td><td>中の刻子（槓子）で成立</td><td>フルパワー《スカーレット･ナイトメア》</td></tr>
+                  <tr><td>エクゾディア</td><td>十倍役満</td><td>手牌の形を問わず常に成立。ツモ和了のみ。このカードと封印されし者の右腕・左腕・右足・左足が自分の場に揃った時から</td><td>フルパワー《封印されしエクゾディア》</td></tr>
+                  <tr><td>無限立直</td><td>X</td><td>立直後の捨て牌を毎回横にすることで成立。Xは自分の河の横向きの捨て牌の数（供託は最初の1000点のみ）</td><td>フルパワー《無限立直》</td></tr>
+                  <tr><td>天鳳・地鳳</td><td>役満</td><td>手牌の形を問わず常に成立。ツモ和了のみ。一巡目に手札に入った時だけ、その手番の間</td><td>ハプニング《「天和・地和」》</td></tr>
+                  <tr><td>騙されたか？</td><td>1</td><td>聴牌していない状態でのツモのみ成立。ドラは乗らない。使った手番は和了れない</td><td>《和了っていない！騙されたか？(笑)》</td></tr>
+                  <tr><td>亜空槓</td><td>1</td><td>亜空槓子（捨てられた牌でする特別なカン）1つにつき1役</td><td>《亜空槓》</td></tr>
+                  <tr><td>天地創世</td><td>三倍役満</td><td>自分の手牌がすべて白なら成立</td><td>《轟盲牌》</td></tr>
+                  <tr><td>バンサン</td><td>1</td><td>聴牌していれば常に成立。他の役やドラとも複合し、ロンも可</td><td>《バンサン》</td></tr>
+                </table>
+              </div>
+              <h4>役ではないが、和了の翻数を変えるカード</h4>
+              <div class="tut-scroll">
+                <table class="tut-table">
+                  <tr><th>カード</th><th>効果</th></tr>
+                  <tr><td>《大器晩成》《「いただきます」》</td><td>純正国士無双（26翻）の和了ができる。《大器晩成》は河底撈魚も13翻になる</td></tr>
+                  <tr><td>フルパワー《七対立直》</td><td>七対子の和了の翻数が合計26翻になる</td></tr>
+                  <tr><td>フルパワー《黄金の立直》</td><td>和了の翻数が6翻増える</td></tr>
+                  <tr><td>フルパワー《画竜点睛》</td><td>1牌待ちの和了の翻数が13翻増える</td></tr>
+                  <tr><td>《開示するナリよ！》</td><td>選んだ相手の和了が13翻になる</td></tr>
+                  <tr><td>《はい！！俺の勝ち》</td><td>和了の翻数が13翻増える</td></tr>
+                  <tr><td>《インスタント満貫》</td><td>和了の翻数が4翻増える（役ではないので、別の役は必要）</td></tr>
+                  <tr><td>フルパワー《北抜き》</td><td>四麻でも北抜きができる。三麻では北が3翻のドラになる</td></tr>
+                </table>
+              </div>
+              <p class="note">カードの効果の細かい解釈や、書かれていない状況の扱いは、カード一覧の各カードのテキストを優先してください。</p>
+            </div>
+          </details>
         </section>
       </div>
       <p class="back-link"><a href="../../index.html">トップに戻る</a></p>
@@ -166,6 +379,7 @@
           <label class="check"><input id="room-kuitan" type="checkbox"> 喰いタン</label>
           <label class="check"><input id="room-tobi" type="checkbox"> 飛び</label>
           <label class="check"><input id="room-renchan" type="checkbox"> 連荘</label>
+          <label id="room-cfull-label" class="check"><input id="room-cfull" type="checkbox"> Cフルパワー</label>
           <div class="card-count-row"><button id="room-card-counts" class="sub-button" type="button">カード枚数設定</button><span id="room-card-counts-text" class="card-count-row__text"></span></div>
         </form>
         <div id="room-card-counts-view" class="card-count-row" hidden><button id="room-card-counts-show" class="sub-button" type="button">山札のカードを見る</button></div>
@@ -280,6 +494,7 @@
       <div class="button-row">
         <button id="btn-final-leave" class="sub-button">ロビーへ</button>
         <button id="btn-back-room" class="main-button">部屋に戻る（もう一局）</button>
+        <button id="btn-mission-retry" class="main-button" hidden>もう一度挑戦</button>
       </div>
     </div>
   </div>
@@ -296,6 +511,17 @@
         <button id="icon-random" class="sub-button">ランダム</button>
         <button id="icon-close" class="main-button">閉じる</button>
       </div>
+    </div>
+  </div>
+
+  <!-- 待機室: CPUを変更（クリアしたミッションのCPUから選ぶ） -->
+  <div id="cpu-picker" class="overlay cpu-picker" hidden>
+    <div class="overlay__box cpu-picker__box">
+      <h2 class="result-title">CPUを変更</h2>
+      <p class="card-counts__note">クリアしたミッションのCPUを選べます。ミッションのCPUは、通常戦でも共通の山札ではなく自分のデッキからカードを引き、フルパワーもそのデッキのものを使います。</p>
+      <p id="cpu-picker-empty" class="card-counts__note">ミッションをクリアすると、ここに選べるCPUが増えます。</p>
+      <ul id="cpu-picker-list" class="cpu-picker__list"></ul>
+      <div class="button-row button-row--center"><button id="cpu-picker-close" class="sub-button">閉じる</button></div>
     </div>
   </div>
 
@@ -321,7 +547,7 @@
   <div id="decks" class="overlay decks" hidden>
     <div class="overlay__box decks__box">
       <h2 class="result-title">デッキ</h2>
-      <p class="card-counts__note">デッキ構築戦で使うデッキです（このブラウザに保存されます）。推奨ルール: 60枚以上・同名カードは3枚まで（カチコミ・目からビーム・否認は何枚でも）・《おばさん》は使えない。「ランダム」は何枚でも入れられ、山札を作るたびに、使用不可のカード・ハプニング・デッキに入れたカード以外からランダムなカードになります。どちらのルールでもフルパワーを1枚決めておきます。</p>
+      <p class="card-counts__note">デッキ構築戦で使うデッキです（このブラウザに保存されます）。推奨ルール: 60枚以上・同名カードは3枚まで（カチコミ・目からビーム・否認は何枚でも）・《おばさん》とCカードは使えない（制限なしの部屋なら使える。Cカードはミッションをクリアして解放したものだけ）。「ランダム」は何枚でも入れられ、山札を作るたびに、使用不可のカード・ハプニング・デッキに入れたカード以外からランダムなカードになります。どちらのルールでもフルパワーを1枚決めておきます。</p>
       <ul id="decks-list" class="decks__list" data-decks-list></ul>
       <div class="button-row button-row--center">
         <button id="decks-new" class="sub-button" data-deck-act="new">新しいデッキ</button>
@@ -393,9 +619,25 @@
     </div>
   </div>
 
+  <!-- チュートリアルの説明の吹き出しと、光らせる枠（js/sm_tutorial.js） -->
+  <div id="tutor-ring" class="tutor-ring" hidden></div>
+  <div id="tutor-coach" class="tutor-coach is-top" hidden role="status">
+    <div class="tutor-coach__head">
+      <span id="tutor-count" class="tutor-coach__count"></span>
+      <button id="tutor-quit" class="small-button" type="button">やめる</button>
+    </div>
+    <div id="tutor-text" class="tutor-coach__text"></div>
+    <div id="tutor-flash" class="tutor-coach__flash" hidden></div>
+    <div class="tutor-coach__foot">
+      <button id="tutor-prev" class="sub-button" type="button">前へ</button>
+      <button id="tutor-next" class="main-button" type="button">次へ</button>
+    </div>
+  </div>
+
   <script src="js/sm_cards_data.js"></script>
   <script src="js/sm_bgm_data.js"></script>
   <script src="js/sm_achievements_data.js"></script>
+  <script src="js/sm_missions_data.js"></script>
   <script src="js/sm_tiles.js"></script>
   <script src="js/sm_cards.js"></script>
   <script src="js/sm_icons.js"></script>
@@ -405,6 +647,7 @@
   <script src="js/sm_audio.js"></script>
   <script src="js/sm_deck.js"></script>
   <script src="js/sm_decks.js"></script>
+  <script src="js/sm_missions.js"></script>
   <script src="js/sm_cardlist.js"></script>
   <script src="js/sm_stats.js"></script>
   <script src="js/sm_lobby.js"></script>
@@ -414,6 +657,7 @@
   <script src="js/sm_log.js"></script>
   <script src="js/sm_result.js"></script>
   <script src="js/sm_monty.js"></script>
+  <script src="js/sm_tutorial.js"></script>
   <script src="js/sm_main.js"></script>
 </body>
 </html>

@@ -209,7 +209,7 @@
           { label: 'Cイベントを打ち消した回数', value: count('counter:cevent') },
         ] },
       ] },
-      { label: '達成した実績数', value: () => `${got.length} / ${SM.Achievements.LIST.length}`, children: [
+      { label: '達成した実績数', value: () => `${got.length} / ${SM.Achievements.LIST.filter(SM.Achievements.isVisible).length}`, children: [
         { label: '最初に達成した実績', value: () => (first ? first.a.name : 'なし') },
         { label: '最初に実績を達成した日付', value: () => date(first && first.at) },
         { label: '最後に達成した実績', value: () => (last ? last.a.name : 'なし') },

@@ -319,7 +319,8 @@ input[type=text], input[type=number], select {
 .action-button.is-kita { background: #f4d02a; color: #2b2300; }
 .action-button.is-sub { background: #8a978e; color: #fff; }
 .options { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 16px; font-size: 12px; color: var(--muted); padding-top: 4px; }
-.exit-box { z-index: 58; }
+/* .overlay（後の行）の z-index に負けないよう、詰めて書く（選択ウィンドウ・カード詳細より前に出す） */
+.overlay.exit-box { z-index: 58; }
 .exit-text { font-size: 14px; line-height: 1.6; margin: 0 0 4px; }
 
 .chooser {
@@ -401,6 +402,10 @@ input[type=text], input[type=number], select {
 }
 .card__art { width: 100%; aspect-ratio: 570 / 310; overflow: hidden; background: #eee; }
 .card__art img { width: 100%; height: 100%; object-fit: cover; display: block; }
+/* イラストがまだ無いカードの仮の絵（斜めの縞模様と NO IMAGE） */
+.card__art--empty { display: flex; align-items: center; justify-content: center; background: repeating-linear-gradient(135deg, #f1efe9 0 7px, #e4e0d6 7px 14px); }
+.card__art--empty::after { content: 'NO IMAGE'; font-family: sans-serif; font-weight: 700; letter-spacing: 0.05em; color: #8a8576; font-size: calc(var(--cw) * 0.085); white-space: nowrap; }
+.card--tiny .card__art--empty::after { content: ''; }
 /* デッキの「ランダム」（イラストの代わりに？） */
 .card[data-type="random"] .card__art { display: flex; align-items: center; justify-content: center; background: repeating-linear-gradient(135deg, #eef1f6 0 6px, #e1e6ee 6px 12px); }
 .card[data-type="random"] .card__art::after { content: '？'; font-weight: 900; line-height: 1; color: #5f6b7a; font-size: calc(var(--cw) * 0.3); }
@@ -496,6 +501,7 @@ input[type=text], input[type=number], select {
 .prompt-item--tile.is-selected { transform: translateY(-8px); }
 /* 選べない牌は灰色で見せるだけ */
 .prompt-item--tile.is-disabled { cursor: default; filter: grayscale(1) brightness(0.62); opacity: 0.75; }
+.prompt-item--label.is-disabled { cursor: default; filter: grayscale(1); opacity: 0.45; }
 .prompt__actions { display: flex; gap: 10px; justify-content: flex-end; align-items: center; margin-top: 10px; }
 .prompt__note { margin-right: auto; font-size: 13px; color: #8a5a00; font-weight: 700; }
 .prompt__timer { text-align: right; font-size: 12px; color: #a33; min-height: 14px; }
@@ -810,11 +816,19 @@ input[type=text], input[type=number], select {
 
 /* ---------- 実績 ---------- */
 .ach-count { margin-left: 6px; font-size: 15px; color: #b5651d; }
+.ach-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 12px; }
+.ach-tab {
+  display: inline-flex; align-items: center; gap: 5px; padding: 6px 14px;
+  border: 2px solid #0002; border-radius: 999px; background: #fff; color: #333; font-size: 13px; font-weight: 700;
+}
+.ach-tab.is-on { border-color: var(--accent); background: var(--accent); color: #2b1a00; }
+.ach-tab__n { font-size: 11px; font-weight: 600; color: #888; }
+.ach-tab.is-on .ach-tab__n { color: #6b4a00; }
+.ach-empty { padding: 16px; text-align: center; font-size: 13px; color: #888; }
 .ach-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; text-align: left; }
 .ach-item { padding: 10px; border: 1px solid #0001; border-radius: 8px; background: #fff; }
 .ach-item.is-got { border-color: var(--accent); background: #fff8e1; }
 .ach-item__head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; }
-.ach-item__no { font-size: 12px; color: #999; }
 .ach-item__name { flex: 1; min-width: 0; font-weight: 800; word-break: break-all; }
 .ach-item__state { font-size: 12px; color: #999; white-space: nowrap; }
 .ach-item.is-got .ach-item__state { color: #1c7a3e; font-weight: 700; }
@@ -825,6 +839,55 @@ input[type=text], input[type=number], select {
 .ach-item__reward { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 12px; color: #555; }
 .ach-item__reward .picon { --pi: 26px; }
 .ach-item:not(.is-got) .ach-item__reward .picon { filter: grayscale(1); opacity: 0.6; }
+
+/* ミッション（ロビーの「ミッション」タブ）: 押すと開いて、デッキを選んで挑戦する */
+.mission-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; text-align: left; }
+.mission { border: 1px solid #0001; border-radius: 8px; background: #fff; overflow: hidden; }
+.mission.is-cleared { border-color: var(--accent); background: #fff8e1; }
+.mission.is-open { box-shadow: 0 0 0 2px var(--accent); }
+.mission--more { padding: 10px; font-size: 13px; color: #888; background: #fff9; border-style: dashed; }
+.mission__head {
+  display: flex; align-items: baseline; gap: 2px 8px; flex-wrap: wrap; width: 100%;
+  padding: 10px 10px 4px; border: none; background: none; color: inherit; text-align: left; font: inherit; cursor: pointer;
+}
+.mission__no { font-size: 12px; color: #999; }
+.mission__title { flex: 1; min-width: 0; font-weight: 800; font-size: 16px; word-break: break-all; }
+.mission__score { font-family: monospace; font-size: 14px; color: #555; white-space: nowrap; }
+.mission.is-cleared .mission__score { color: #1c7a3e; font-weight: 700; }
+.mission__body { display: flex; flex-direction: column; gap: 3px; padding: 0 10px 10px; }
+.mission__cond { font-size: 13px; color: #333; }
+.mission__meta { font-size: 12px; color: #666; }
+.mission__go { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; padding: 10px; border-top: 1px solid #0001; background: #fdfaf2; }
+.mission__deck { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; flex: 1 1 220px; min-width: 0; }
+.mission__deck select { flex: 1; min-width: 0; }
+.mission__hint, .mission__nodeck { flex-basis: 100%; font-size: 12px; color: #666; }
+
+/* 終局画面のミッションの結果 */
+.mission-final { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; padding: 12px 14px; border-radius: 10px; background: var(--card); color: var(--card-ink); text-align: left; }
+.mission-final.is-clear { box-shadow: 0 0 0 3px var(--accent); background: #fff8e1; }
+.mission-final__title { font-size: 22px; font-weight: 800; }
+.mission-final.is-clear .mission-final__title { color: #b5651d; }
+.mission-final.is-fail .mission-final__title { color: #555; }
+.mission-final__name, .mission-final__score { font-size: 13px; color: #555; }
+.mission-final__unlocks { list-style: none; margin: 6px 0 0; padding: 8px 0 0; border-top: 1px dashed #0002; display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
+.mission-final__unlocks li { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+.mission-final__row { display: inline-flex; align-items: center; gap: 6px; padding-left: 4px; }
+.mission-final__unlocks .picon { --pi: 26px; }
+.mission-final__label { font-size: 11px; color: #fff; background: #b5651d; border-radius: 4px; padding: 1px 6px; }
+.mission-final__cpu { font-weight: 700; margin-right: 6px; }
+
+/* 待機室: CPUを変更 */
+.seat-row__acts { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; flex: none; }
+.cpu-picker { z-index: 58; }
+.cpu-picker__box { width: min(520px, 100%); max-height: min(640px, 100%); display: flex; flex-direction: column; gap: 8px; overflow: hidden; }
+.cpu-picker__box .result-title { margin: 0; }
+.cpu-picker__list { list-style: none; margin: 0; padding: 2px; overflow-y: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 6px; }
+.cpu-picker__item {
+  display: flex; align-items: center; gap: 8px; width: 100%; padding: 8px 10px; border: 1px solid #0002; border-radius: 8px;
+  background: #fff; color: var(--card-ink); font: inherit; font-weight: 700; text-align: left; cursor: pointer;
+}
+.cpu-picker__item .picon { --pi: 32px; }
+.cpu-picker__item.is-current { border-color: var(--accent); background: #fff8e1; }
 
 /* 達成した時の知らせ: 上から下りてきて、少しして上がって消える（押す邪魔はしない） */
 .ach-popup {
@@ -880,3 +943,62 @@ input[type=text], input[type=number], select {
 .stat-row--leaf .stat-row__label { padding-left: 1.2em; }
 .stat-children { padding-left: 1.1em; border-left: 2px solid #f2b33d55; margin-left: 0.45em; }
 .stat-children .stat-row { font-size: 13px; }
+
+/* ---------- チュートリアル ---------- */
+.tut-soon { margin-bottom: 10px; }
+.tut-sec { margin: 8px 0; border: 1px solid #0002; border-radius: 8px; background: #fff; color: #333; text-align: left; }
+.tut-sec > summary { cursor: pointer; padding: 10px 12px; font-weight: 800; list-style: none; }
+.tut-sec > summary::-webkit-details-marker { display: none; }
+.tut-sec > summary::before { content: '▶'; display: inline-block; width: 1.2em; font-size: 11px; color: #b5651d; transition: transform 0.15s; }
+.tut-sec[open] > summary::before { transform: rotate(90deg); }
+.tut-body { padding: 0 12px 12px; font-size: 14px; line-height: 1.7; }
+.tut-body h4 { margin: 14px 0 4px; font-size: 14px; }
+.tut-body p, .tut-body ul, .tut-body ol { margin: 6px 0; }
+.tut-body ul, .tut-body ol { padding-left: 1.4em; }
+.tut-type { margin: 10px 0; padding: 2px 10px 6px; border-left: 6px solid var(--tc); background: #0000000a; border-radius: 0 6px 6px 0; }
+.tut-type h4 { margin-top: 8px; }
+.tut-scroll { overflow-x: auto; }
+.tut-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.tut-table th, .tut-table td { padding: 6px 8px; border: 1px solid #0002; vertical-align: top; text-align: left; }
+.tut-table th { background: #f2b33d33; white-space: nowrap; }
+.tut-scroll .tut-table { min-width: 460px; }
+.danger-button { border-color: var(--danger); color: var(--danger); }
+.tut-body .tut-origin { margin: 4px 0 10px; font-size: 44px; line-height: 1.3; font-weight: 800; }
+
+/* ---------- 操作しながら覚えるチュートリアル（説明の吹き出しと、光らせる枠。js/sm_tutorial.js） ---------- */
+.tutorial-start { margin: 0 0 14px; padding: 12px 14px; border: 2px solid var(--accent); border-radius: 10px; background: #fff8e3; text-align: left; }
+.tutorial-start h3 { margin: 0 0 6px; font-size: 16px; }
+.tutorial-start p { margin: 0 0 10px; font-size: 13px; line-height: 1.7; }
+.tutorial-hint { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px 12px; padding: 10px 14px; }
+.tutorial-hint p { margin: 0; font-size: 13px; }
+
+/* 光らせる枠: 押してほしいところの周りを脈打たせる（押す邪魔はしない） */
+.tutor-ring {
+  position: fixed; z-index: 85; pointer-events: none; border: 3px solid #ffd34d; border-radius: 8px;
+  box-shadow: 0 0 0 2px #0009, 0 0 18px 4px #ffd34dcc; animation: tutorPulse 1.2s ease-in-out infinite;
+  transition: left 0.12s, top 0.12s, width 0.12s, height 0.12s;
+}
+@keyframes tutorPulse { 50% { box-shadow: 0 0 0 2px #0009, 0 0 28px 10px #ffd34d66; } }
+/* 説明の吹き出し: 光らせているところと重ならないよう、上か下に出す */
+.tutor-coach {
+  position: fixed; z-index: 80; left: 50%; transform: translateX(-50%);
+  width: min(560px, calc(100vw - 32px)); max-height: 44vh; overflow-y: auto;
+  padding: 10px 14px 12px; border: 2px solid var(--accent); border-radius: 12px;
+  background: #fff8e3; color: var(--card-ink); box-shadow: 0 8px 26px #000b;
+}
+.tutor-coach.is-top { top: 8px; bottom: auto; }
+.tutor-coach.is-bottom { bottom: 8px; top: auto; }
+.tutor-coach__head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 4px; }
+.tutor-coach__count { font-size: 12px; font-weight: 800; color: #b5651d; }
+.tutor-coach__text { font-size: 14px; line-height: 1.7; }
+.tutor-coach__text p { margin: 0 0 6px; }
+.tutor-coach__text b { color: #a24600; }
+.tutor-coach__text .card-link { color: #0a58a6; text-decoration: underline; cursor: pointer; }
+.tutor-coach__flash { margin-top: 6px; padding: 6px 10px; border-radius: 8px; background: #ffe3df; color: #a1261b; font-size: 13px; font-weight: 800; }
+.tutor-coach__foot { display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; }
+.tutor-coach__foot .sub-button, .tutor-coach__foot .main-button { padding: 7px 16px; }
+@media (max-width: 699px) {
+  .tutor-coach { max-height: 40vh; padding: 8px 12px 10px; }
+  .tutor-coach__text { font-size: 13px; line-height: 1.6; }
+}
+@media (prefers-reduced-motion: reduce) { .tutor-ring { animation: none; transition: none; } }

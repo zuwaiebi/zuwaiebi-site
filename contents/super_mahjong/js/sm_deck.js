@@ -10,6 +10,15 @@
   const BY_ID = new Map(CARDS.map((c) => [c.id, c]));
 
   const countOf = (counts, c) => (counts && counts[c.id] !== undefined ? counts[c.id] : c.copies);
+  /**
+   * 山札に入れられるカードか: Cカードは、ホストがミッションをクリアして解放したものだけ（部屋のルールの cUnlocked。
+   * 部屋を作る前は自分が解放したもの）。解放していないCカードは一覧に出さず、枚数も数えない（サーバーも捨てる）
+   */
+  function allowed(c, rules) {
+    if (c.c !== true) return true;
+    const list = rules && Array.isArray(rules.cUnlocked) ? rules.cUnlocked : (SM.Missions ? SM.Missions.unlockedCIds() : []);
+    return list.includes(c.id);
+  }
 
   /** 既定と同じ枚数のものを除き、0〜上限に収める */
   function clean(counts) {
@@ -24,12 +33,12 @@
 
   /** 山札の合計枚数（一局戦では四季折々は入らない） */
   function total(counts, rules) {
-    return CARDS.reduce((a, c) => a + (c.name === '四季折々' && rules && rules.length === 'ikkyoku' ? 0 : countOf(counts, c)), 0);
+    return CARDS.reduce((a, c) => a + ((c.name === '四季折々' && rules && rules.length === 'ikkyoku') || !allowed(c, rules) ? 0 : countOf(counts, c)), 0);
   }
 
   /** ルールの一行説明用 */
   function summary(counts, rules) {
-    const changed = Object.keys(counts || {}).length;
+    const changed = Object.keys(counts || {}).filter((id) => BY_ID.has(id) && allowed(BY_ID.get(id), rules)).length;
     return `山札${total(counts, rules)}枚${changed ? `（${changed}種類を変更）` : '（既定）'}`;
   }
 
@@ -95,6 +104,7 @@
     const q = $('card-counts-filter').value.trim();
     for (const c of CARDS) {
       if (q && !c.name.includes(q)) continue;
+      if (!allowed(c, view.rules)) continue;
       const n = countOf(view.counts, c);
       const item = document.createElement('div');
       item.className = `card-count${n === 0 ? ' is-zero' : ''}${n !== c.copies ? ' is-changed' : ''}`;
@@ -112,14 +122,14 @@
 
   /** 山札に入るカードがすべて0枚か */
   function allZero(counts) {
-    return CARDS.every((c) => countOf(counts, c) === 0);
+    return CARDS.every((c) => !allowed(c, view && view.rules) || countOf(counts, c) === 0);
   }
 
-  /** すべてのカードを n 枚にする */
+  /** すべてのカードを n 枚にする（解放していないCカードは触らない） */
   function setAll(n) {
     if (!view || !view.editable) return;
     const out = {};
-    for (const c of CARDS) out[c.id] = n;
+    for (const c of CARDS) if (allowed(c, view.rules)) out[c.id] = n;
     view.counts = clean(out);
     if (view.onChange) view.onChange({ ...view.counts });
     render();

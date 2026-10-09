@@ -3,6 +3,9 @@
   const SM = (window.SuperMahjong = window.SuperMahjong || {});
   const $ = (id) => document.getElementById(id);
   const T = () => SM.Tiles;
+  // 謎ジャム: 卓に見えている牌すべてが？になる（render の間だけ。和了画面などの牌には効かない）
+  let maskAll = false;
+  const tileEl = (id, o) => (maskAll && id !== null && id !== undefined ? T().el(id, { ...o, mask: true }) : T().el(id, o));
 
   const WIND = ['東', '南', '西', '北'];
   const POS4 = ['bottom', 'right', 'top', 'left'];
@@ -34,7 +37,7 @@
     if (m.type === 'ankan' || m.from === null || m.from === undefined) {
       tiles.forEach((t, i) => {
         const id = m.type === 'ankan' && (i === 0 || i === 3) ? null : t;
-        wrap.appendChild(T().el(id, opt(id, { red, size })));
+        wrap.appendChild(tileEl(id, opt(id, { red, size })));
       });
       return wrap;
     }
@@ -50,10 +53,10 @@
       if (t === called) {
         const holder = document.createElement('div');
         holder.className = 'meld__called';
-        holder.appendChild(T().el(t, opt(t, { red, size, sideways: true })));
-        if (m.added !== null && m.added !== undefined) holder.appendChild(T().el(m.added, opt(m.added, { red, size, sideways: true })));
+        holder.appendChild(tileEl(t, opt(t, { red, size, sideways: true })));
+        if (m.added !== null && m.added !== undefined) holder.appendChild(tileEl(m.added, opt(m.added, { red, size, sideways: true })));
         wrap.appendChild(holder);
-      } else if (t !== undefined) wrap.appendChild(T().el(t, opt(t, { red, size })));
+      } else if (t !== undefined) wrap.appendChild(tileEl(t, opt(t, { red, size })));
     });
     return wrap;
   }
@@ -130,7 +133,7 @@
     p.discards.forEach((d, i) => {
       const last = game.lastDiscard && game.lastDiscard.seat === p.seat && i === p.discards.length - 1;
       const cls = [d.called ? 'is-called' : '', d.tsumogiri ? 'is-tsumogiri' : '', last ? 'is-last' : '', d.faceDown ? 'is-facedown' : ''].join(' ');
-      river.appendChild(T().el(d.tile, { red: game.red, size, sideways: d.riichi, cls }));
+      river.appendChild(tileEl(d.tile, { red: game.red, size, sideways: d.riichi, cls }));
     });
 
     const melds = panel.querySelector('.seat__melds');
@@ -139,18 +142,18 @@
       const hidden = document.createElement('div');
       hidden.className = 'hidden-hand';
       if (p.hand) {
-        p.hand.forEach((t) => hidden.appendChild(T().el(t, { size: 'sm', red: game.red })));
+        p.hand.forEach((t) => hidden.appendChild(tileEl(t, { size: 'sm', red: game.red })));
       } else {
         const shown = p.shown || [];
-        shown.forEach((t) => hidden.appendChild(T().el(t, { size: 'xs', red: game.red })));
-        for (let i = shown.length; i < p.handCount; i++) hidden.appendChild(T().el(null, { size: 'xs' }));
+        shown.forEach((t) => hidden.appendChild(tileEl(t, { size: 'xs', red: game.red })));
+        for (let i = shown.length; i < p.handCount; i++) hidden.appendChild(tileEl(null, { size: 'xs' }));
       }
       melds.appendChild(hidden);
     }
     if (p.kita.length) {
       const k = document.createElement('div');
       k.className = 'kita';
-      p.kita.forEach((t) => k.appendChild(T().el(t, { size: 'sm' })));
+      p.kita.forEach((t) => k.appendChild(tileEl(t, { size: 'sm' })));
       melds.appendChild(k);
     }
     if (!self) p.melds.forEach((m) => melds.appendChild(meldEl(m, p.seat, game.n, game.red, 'sm')));
@@ -176,7 +179,7 @@
     dora.innerHTML = '';
     for (let i = 0; i < Math.max(5, game.doraIndicators.length); i++) {
       const t = game.doraIndicators[i];
-      dora.appendChild(T().el(t === undefined ? null : t, { red: game.red, size: 'sm', plain: true }));
+      dora.appendChild(tileEl(t === undefined ? null : t, { red: game.red, size: 'sm', plain: true }));
     }
     const cards = $('center-cards');
     cards.hidden = !game.cardsEnabled;
@@ -222,7 +225,7 @@
     // タイルフォースが有効なパワーで選んでいる牌は緑の縁
     const forced = new Set(me.forceTiles || []);
     const make = (t, extraCls) => {
-      const e = T().el(t, { red: game.red, size: 'hand', cls: `${extraCls}${forced.has(t) ? ' is-force' : ''}`, mask: me.masked });
+      const e = tileEl(t, { red: game.red, size: 'hand', cls: `${extraCls}${forced.has(t) ? ' is-force' : ''}`, mask: me.masked });
       input.decorateHandTile(e, t);
       return e;
     };
@@ -231,7 +234,7 @@
     if (me.heldTiles && me.heldTiles.length) {
       const h = document.createElement('div');
       h.className = 'held-tiles';
-      me.heldTiles.forEach((t) => h.appendChild(T().el(t, { size: 'sm', red: game.red })));
+      me.heldTiles.forEach((t) => h.appendChild(tileEl(t, { size: 'sm', red: game.red })));
       hand.appendChild(h);
     }
 
@@ -245,7 +248,7 @@
     if (me.altHand) {
       const ah = $('my-alt-hand');
       ah.innerHTML = '';
-      me.altHand.forEach((t) => ah.appendChild(T().el(t, { red: game.red, size: 'hand-sm', mask: me.masked })));
+      me.altHand.forEach((t) => ah.appendChild(tileEl(t, { red: game.red, size: 'hand-sm', mask: me.masked })));
       const am = $('my-alt-melds');
       am.innerHTML = '';
       (me.altMelds || []).slice().reverse().forEach((m) => am.appendChild(meldEl(m, me.seat, game.n, game.red, 'hand-sm')));
@@ -277,9 +280,14 @@
     const table = $('table');
     table.dataset.players = game.n;
     ['bottom', 'right', 'top', 'left'].forEach((pos) => { $(`seat-${pos}`).hidden = true; });
-    game.players.forEach((p) => renderPanel(game, room, p));
-    renderCenter(game);
-    renderHand(game);
+    maskAll = Boolean(game.maskAll);
+    try {
+      game.players.forEach((p) => renderPanel(game, room, p));
+      renderCenter(game);
+      renderHand(game);
+    } finally {
+      maskAll = false;
+    }
   }
 
   // 発声の吹き出し

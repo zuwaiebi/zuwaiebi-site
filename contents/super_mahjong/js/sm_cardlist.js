@@ -12,6 +12,8 @@
     { key: 'full', label: 'フルパワー', has: (c) => c.typeKey === 'full' },
     { key: 'plus', label: 'パワー＋', has: (c) => c.typeKey === 'plus' },
     { key: 'happening', label: 'ハプニング', has: (c) => c.typeKey === 'happening' || c.typeKey === 'happeningPower' },
+    // Cカード（Cイベント・Cパワー・Cフルパワー。ミッションモード用）
+    { key: 'c', label: 'Cカード', has: (c) => c.c === true },
   ];
   // 検索では表記ゆれ（全角半角・ひらがなカタカナ・大文字小文字・空白・中黒）を無視する
   const norm = (s) => String(s).normalize('NFKC').toLowerCase()

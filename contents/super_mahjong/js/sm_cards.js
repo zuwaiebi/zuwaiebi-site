@@ -72,10 +72,12 @@
       d.innerHTML = '<div class="card__backlogo">SUPER<br>麻雀</div>';
     } else {
       d.dataset.type = def.typeKey;
+      d.dataset.cid = cid; // チュートリアルが光らせるカードを探す
       const nameLen = [...def.name].length;
       const nameScale = nameLen <= 6 ? 1 : Math.max(0.38, 6 / nameLen);
       d.innerHTML = `<div class="card__name" style="--ns:${nameScale}">${esc(def.name)}</div>`
-        + `<div class="card__art">${def.img ? `<img src="${IMG_DIR}${encodeURIComponent(def.img)}" alt="" loading="lazy" draggable="false">` : ''}</div>`
+        // イラストがまだ無いカード（新カードなど）は仮の絵（NO IMAGE）。画像を data/card_img/ に置いて build-cards を実行すると差し替わる
+        + `<div class="card__art${def.img || def.typeKey === 'random' ? '' : ' card__art--empty'}">${def.img ? `<img src="${IMG_DIR}${encodeURIComponent(def.img)}" alt="" loading="lazy" draggable="false">` : ''}</div>`
         + `<div class="card__type">${typeBadge(def)}</div>`
         + (size === 'full' ? `<div class="card__text">${formatText(def)}</div>` : '');
     }

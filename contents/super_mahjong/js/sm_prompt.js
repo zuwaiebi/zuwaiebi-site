@@ -66,7 +66,7 @@
       return e;
     }
     if (it.tile !== undefined) {
-      e = SM.Tiles.el(it.tile, { size: 'hand', mask: it.tile === null, red: SM.Main.state.game ? SM.Main.state.game.red : true });
+      e = SM.Tiles.el(it.tile, { size: 'hand', mask: it.tile === null || Boolean(SM.Main.state.game && SM.Main.state.game.maskAll), red: SM.Main.state.game ? SM.Main.state.game.red : true });
       e.classList.add('prompt-item', 'prompt-item--tile');
       // 選べない牌は灰色で見せるだけ
       if (it.disabled) e.classList.add('is-disabled');
@@ -81,7 +81,8 @@
       e.appendChild(SM.Icons.el(SM.Main.seatIcon(it.seat)));
     }
     e.append(it.label);
-    e.addEventListener('click', () => onPick(i, e));
+    // 選べない項目は灰色で見せるだけ
+    if (it.disabled) { e.classList.add('is-disabled'); e.disabled = true; } else e.addEventListener('click', () => onPick(i, e));
     return e;
   }
 

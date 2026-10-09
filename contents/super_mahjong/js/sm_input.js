@@ -56,8 +56,8 @@
     deadline = p && g.timeLeft !== null && g.timeLeft !== undefined ? performance.now() + g.timeLeft : null;
     closeChooser();
 
-    // 鳴かない設定: ロン以外の応答は自動でスキップ
-    if ($('opt-nocall').checked && p && p.kind === 'call' && !sent() && !actions.some((a) => a.type === 'ron')) {
+    // 鳴かない設定: ロン以外の応答は自動でスキップ（チュートリアルでは確認を見せるので飛ばさない）
+    if ($('opt-nocall').checked && !(SM.Tutorial && SM.Tutorial.active()) && p && p.kind === 'call' && !sent() && !actions.some((a) => a.type === 'ron')) {
       setTimeout(() => sendAction({ type: 'pass' }), 150);
     }
     renderButtons();
@@ -67,6 +67,7 @@
   function decorateHandTile(el, t) {
     // カードの効果で手牌から選んでいる最中（選び方は sm_prompt）
     if (SM.Prompt.decorateHandPick(el, t)) return;
+    el.dataset.tile = t; // チュートリアルが光らせる牌を探す
     const can = riichiMode ? riichiSet.has(t) : discardSet.has(t);
     if (!sent() && (discardSet.size || riichiSet.size)) el.classList.toggle('is-disabled', !can);
     if (t === selected) el.classList.add('is-selected');
@@ -115,7 +116,7 @@
       const b = document.createElement('button');
       b.className = 'chooser__item';
       if (row.label) b.append(row.label);
-      (row.tiles || []).forEach((t) => b.appendChild(SM.Tiles.el(t, { red: game.red, size: 'sm' })));
+      (row.tiles || []).forEach((t) => b.appendChild(SM.Tiles.el(t, { red: game.red, size: 'sm', mask: Boolean(game.maskAll) })));
       b.addEventListener('click', () => onPick(i));
       box.appendChild(b);
     });
@@ -217,6 +218,7 @@
         cls: can ? 'is-playable' : '',
         onClick: () => SM.Cards.showDetail(c.cid, can ? { actions: [{ label: 'このカードをプレイする', onClick: () => sendAction({ type: 'card', iid: c.iid }) }] } : {}),
       });
+      e.dataset.iid = c.iid; // チュートリアルが光らせるカードを探す
       box.appendChild(e);
     }
     const me = game.players[game.you];
