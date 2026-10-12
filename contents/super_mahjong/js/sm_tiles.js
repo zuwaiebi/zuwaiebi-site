@@ -17,7 +17,7 @@
   let doraKinds = new Set();
   let doraTiles = new Set();
   let asKinds = {};
-  // 黄金の国ジパング: すべての牌がドラ（手牌・河・副露・抜き北・ドラ表示牌など、見えている牌をすべて光らせる）
+  // 一攫千金: すべての牌がドラ（手牌・河・副露・抜き北・ドラ表示牌など、見えている牌をすべて光らせる）
   let allDora = false;
   // オールマイティ牌に変化した牌の牌種（大器晩成など）
   const JOKER = 38;
@@ -218,11 +218,19 @@
     return d;
   }
 
-  /** 牌種から牌要素を作る（宣言した牌の種類など。牌IDの差し替えの影響を受けない） */
+  /**
+   * 牌種から牌要素を作る（宣言した牌の種類・予見の次のツモなど。牌IDの差し替えの影響を受けない）。
+   * o.red: 赤ドラの牌、o.mask: ？で描く（謎ジャム）、o.shine: ドラの牌なら光沢を付ける（ドラの牌種・赤ドラ・一攫千金）
+   */
   function kindEl(k, o = {}) {
-    const name = kindNameOf(k);
+    if (o.mask) return build('mask', o);
+    const name = kindNameOf(k) + (o.red ? 'r' : '');
     const d = build(name, o);
     d.dataset.k = k;
+    if (o.shine && (allDora || o.red || doraKinds.has(k))) {
+      d.classList.add('is-dora');
+      d.style.setProperty('--shine-delay', phase(SHINE_MS));
+    }
     return d;
   }
 

@@ -20,6 +20,8 @@
   <div id="screen-lobby" class="screen active">
     <div class="panel lobby">
       <h1 class="logo">スーパー麻雀</h1>
+      <!-- バージョン（データタブの「更新履歴」の一番上と合わせる） -->
+      <p class="version-label">ver 0.91</p>
       <div class="field">
         <label for="lobby-name">名前とアイコン</label>
         <div class="profile-row">
@@ -48,7 +50,7 @@
         <button type="button" class="menu-tab" data-tab="cards">カード一覧</button>
         <button type="button" class="menu-tab" data-tab="achievements">実績</button>
         <button type="button" class="menu-tab" data-tab="stats">データ</button>
-        <button type="button" class="menu-tab" data-tab="ranking" disabled title="準備中">ランキング</button>
+        <button type="button" class="menu-tab" data-tab="ranking">ランキング</button>
       </nav>
 
       <div class="tab-panel" data-panel="play">
@@ -71,7 +73,7 @@
           <h2>部屋を作る</h2>
           <form id="create-form" class="rule-form" onsubmit="return false">
             <label>対戦形式
-              <select id="create-mode"><option value="normal">通常戦</option><option value="deck">デッキ構築戦</option></select>
+              <select id="create-mode"><option value="normal">通常戦</option><option value="deck">デッキ構築戦</option><option value="custom">カスタム</option></select>
             </label>
             <label id="create-deckrule-label">デッキの制限
               <select id="create-deckrule"><option value="recommended">推奨ルール</option><option value="free">制限なし</option></select>
@@ -92,14 +94,21 @@
             <label class="check"><input id="create-tobi" type="checkbox" checked> 飛び</label>
             <label class="check"><input id="create-renchan" type="checkbox"> 連荘</label>
             <label id="create-cfull-label" class="check"><input id="create-cfull" type="checkbox"> Cフルパワー</label>
+            <!-- カスタムモードのルール（js/sm_lobby.js が作る） -->
+            <div id="create-custom" class="custom-rules" hidden></div>
             <div class="card-count-row"><button id="create-card-counts" class="sub-button" type="button">カード枚数設定</button><span id="create-card-counts-text" class="card-count-row__text"></span></div>
           </form>
-          <p class="note">三麻は萬子・筒子・索子・字牌すべてを使い、チーなし・北抜きあり・ツモ損です。連荘なしでは親が和了・聴牌しても親が流れます（一巡目の途中流局だけはやり直し）。Cカード（Cイベント・Cパワー・Cフルパワー）はミッションモード用のカードで、ミッションをクリアすると、そのミッションのCPUが使うCカードが解放されます。解放したCカードは、通常戦でも既定では山札に入りません（「カード枚数設定」で入れられます）。「Cフルパワー」をONにすると、フルパワーの選択に解放したCフルパワーが並びます（部屋で使えるCカードは、部屋を作った人が解放したもの）。CPUを入れた後の「CPUを変更」では、クリアしたミッションのCPUを選べます。</p>
+          <p class="note">三麻は萬子・筒子・索子・字牌すべてを使い、チーなし・北抜きあり・ツモ損です。連荘なしでは親が和了・聴牌しても親が流れます（一巡目の途中流局だけはやり直し）。対戦形式の「カスタム」では、並んだルールを組み合わせて遊べます（ルールの内容はガイドの「6. 対戦の形式」にもあります）。Cカード（Cイベント・Cパワー・Cフルパワー）はミッションモード用のカードで、ミッションをクリアすると、そのミッションのCPUが使うCカードが解放されます。解放したCカードは、通常戦でも既定では山札に入りません（「カード枚数設定」で入れられます）。「Cフルパワー」をONにすると、フルパワーの選択に解放したCフルパワーが並びます（カード枚数設定とCフルパワーで使えるCカードは、部屋を作った人が解放したもの）。CPUを入れた後の「CPUを変更」では、クリアしたミッションのCPUを選べます。</p>
           <button id="btn-create" class="main-button">部屋を作る</button>
         </section>
       </div>
 
       <div class="tab-panel" data-panel="missions" hidden>
+        <section class="lobby-box daily">
+          <h2>デイリーミッション <span id="daily-date" class="ach-count"></span></h2>
+          <p class="note">毎日（日本時間の0時に）内容が切り替わる、全員共通のカスタムモードの対局です。人数・長さ・デッキの決め方・ルール・対戦相手のCPUは日ごとにランダムに決まります。その日1回目の挑戦の順位と点数が、その日のあいだ記録として残ります（途中でやめても1回目です。2回目以降も挑戦できますが、記録されません）。</p>
+          <div id="daily-mission" class="daily__body"></div>
+        </section>
         <section class="lobby-box">
           <h2>ミッション <span id="mission-count" class="ach-count"></span></h2>
           <p class="note">自分のデッキ（推奨ルールに合うもの）で、個性的なCPUたちとデッキ構築戦で対局します。条件を満たして終局するとクリアです。クリアすると次のミッションに挑戦できるようになり、そのミッションのCPUとCPUが使うCカードが、通常戦・デッキ構築戦で使えるようになります。数字は成功回数/挑戦回数です（記録はこのブラウザに保存されます）。</p>
@@ -110,7 +119,7 @@
       <div class="tab-panel" data-panel="decks" hidden>
         <section class="lobby-box">
           <h2>デッキ構築</h2>
-          <p class="note">デッキ構築戦では、自分で組んだデッキ（カードとフルパワー）を持ち寄って対戦します。山札は各自のデッキから作り、捨て場は全員共有です。推奨ルール: 60枚以上・同名カードは3枚まで（カチコミ・目からビーム・否認は何枚でも）・《おばさん》とCカードは使えない（制限なしの部屋なら使える。Cカードはミッションをクリアして解放したものだけ）。デッキに入れた「ランダム」は、山札を作るたびにランダムなカードになります。デッキはこのブラウザに保存されます。</p>
+          <p class="note">デッキ構築戦では、自分で組んだデッキ（カードとフルパワー）を持ち寄って対戦します。山札は各自のデッキから作り、捨て場は全員共有です。推奨ルール: 60枚以上・同名カードは3枚まで（「天和・地和」・3つの願いは1枚まで。カチコミ・目からビーム・否認は何枚でも）・《おばさん》とCカード、フルパワーの《ネクロノミコン》は使えない（制限なしの部屋なら使える。Cカードは自分がミッションをクリアして解放したものだけ。部屋を作った人が解放していなくてもよい）。デッキに入れた「ランダム」は、山札を作るたびにランダムなカードになります。デッキはこのブラウザに保存されます。</p>
           <ul class="decks__list" data-decks-list></ul>
           <div class="button-row button-row--center decks__actions">
             <button type="button" class="sub-button" data-deck-act="new">新しいデッキ</button>
@@ -135,14 +144,68 @@
           <div id="stats-best" class="stats-best"></div>
         </section>
         <section class="lobby-box">
-          <h2>データ</h2>
-          <p class="note">これまでの対局の記録です（このブラウザに保存されます）。▶の付いた項目を押すと、内訳が開きます。</p>
+          <h2>統計</h2>
           <div id="stats-list" class="stats-list"></div>
         </section>
+        <!-- 更新履歴: 新しい版を上に足す。ロビーの ver 表示も合わせて変える。既定は畳んでおき、見出しの▶を押すと開く -->
+        <details class="lobby-box version-history">
+          <summary><h2>更新履歴</h2></summary>
+          <h3>ver 0.91</h3>
+          <ul>
+            <li>対戦形式に「カスタム」を追加しました。狂乱・デュエリスト・ドラフト・オールフォーワンのデッキの決め方と、殿堂ゼロ・レッドアウト・青天井など17のルールを組み合わせて遊べます（ルールの内容はガイドの「6. 対戦の形式」）。</li>
+            <li>ミッションタブに「デイリーミッション」を追加しました。毎日内容が切り替わる全員共通のカスタムモードの対局で、その日1回目の挑戦の順位と点数が記録として残り、Xで共有できます。</li>
+            <li>ロビーの「ランキング」タブを追加しました。いちばん翻数の高い和了を競う「最高翻数和了ランキング」（5位まで）と、デイリーミッションの点数を競う「デイリーランキング」（その日の3位まで）があり、データタブの和了・ミッションタブの今日の記録の「ランキングに登録」から登録できます（ランキング機能の追加前の和了・記録は登録できません）。</li>
+            <li>対局終了時に残った供託は、トップの人に渡さず放棄する（誰のものにもならない）ように変更しました。</li>
+            <li>デッキ構築戦の推奨ルールで、《「天和・地和」》と《3つの願い》はデッキに1枚までにしました。</li>
+            <li>《ネクロノミコン》をデッキのフルパワーに選べるようにしました（推奨ルールには合わないので、制限なしの部屋で使えます）。</li>
+            <li>《影武者》で《QED「495年の波紋」》の破壊も置き換えられるようにしました（置き換えても持ち点はすべて供託します）。</li>
+            <li>パワーをまとめて破壊する時は《影武者》を最後に破壊するようにしました。並び順に関係なく、他のパワーの身代わりになれます。</li>
+            <li>《影武者》が身代わりになっても、「破壊してもよい。そうしたら〜」の効果（《まだだ！まだ終わってない！》・プロテクターなど）は起きるようにしました（そのパワーは場に残ります）。</li>
+            <li>《影武者》が身代わりになった時、《突然変異》は実際に破壊されたパワーの数だけ、《天道万象》は身代わりの分も数えるようにし、《転生プログラム》《アクア･ギャクテンポインター》は選ばれたパワーの持ち主がランダムなパワーをプレイするようにしました。</li>
+            <li>《「全人類の緋想天」》など、1つの効果で何人分もの点数が動く時は、すべて動かし終えてから飛びを判定するようにしました。</li>
+            <li>カード一覧で、まだ解放していないCカードはイラストとテキストを伏せて表示するようにしました。</li>
+            <li>《悪霊「ミスフォーチュンズホイール」》をCフルパワーから普通のフルパワーに変更しました。</li>
+            <li>新カード《出る杭は打たれる》《封印された剣》《予見》を追加しました（《封印された剣》は挑戦に成功すると《マスターソード》に変化します）。</li>
+            <li>《予見》が場にある間は、次に自分が普通にツモる牌が手牌の左の「NEXT」の枠に表示されます。</li>
+            <li>《♪英美なる トワイライトで 罰を強いた》のテキストの誤記を直しました。</li>
+            <li>《一点読み》の手番に、山が尽きた後で手牌を切る効果を受けて手牌が無くなると、対局が進まなくなる不具合を直しました（打牌せずに手番を終えます）。</li>
+            <li>頭ハネをやめ、ダブロン・トリロンありにしました（3人ともロンしても流局にはなりません）。放銃した人から手番順に近い人から順に和了し、供託は最初に和了した人がすべて受け取り、本場は和了した全員が受け取ります。</li>
+            <li>《プレゼント！》（ロマノグリラ）のテキストを「手記」に変え、直近でプレイされた5枚のうちどのカードをプレイするか選べるようにしました。</li>
+            <li>新しいCフルパワー《新たなる王族プリン&amp;リュウセイ》を追加しました（ミッションを進めると解放されます）。</li>
+            <li>カードの処理のウィンドウを隠した時に出る「〜に戻る」のバナーを、ドラッグで好きな位置に動かせるようにしました（動かした位置は次に隠した時も使います）。</li>
+            <li>新カード《１万点と２千点くれたら愛してる》《HOT LIMIT》《ドラの可能性》《黒神龍ザビ・カシオペヤ》と、新しいCカード《禁弾「過去を刻む時計」》《呪詛「ブラド・ツェペシュの呪い」》を追加しました（Cカードはミッションを進めると解放されます）。</li>
+            <li>《黄金の国ジパング》の名前を《一攫千金》に変えました（保存したデッキなどはそのまま使えます）。</li>
+            <li>《ロンはいつだって唐突だ》が発動する確率を1%から5%にしました。</li>
+            <li>《蛙符「オールウェイズ冬眠できます」》のテキストを「他家が普通に捨牌した時」に変え、カードの効果で切った牌では点数を奪わないようにしました。</li>
+            <li>カスタムモードのドラフトで、カードのセットを選んでいる間も自分のフルパワーを見られるようにしました。</li>
+            <li>新カード《罠符「キャプチャーウェブ」》《冥土人形アカイブ・ヤップップ》と、新しいCカード《恋符「マスタースパーク」》《魔廃「ディープエコロジカルボム」》《魔符「スターダストレヴァリエ」》《天使の人形》《咒詛「蓬莱人形」》を追加しました（Cカードはミッションを進めると解放されます）。</li>
+            <li>《きたぜぬるりと…》のテキストを変え、この効果でツモ和了した時は翻数が+4されるようにしました（役ではありません）。</li>
+            <li>ミッションを1つと、実績を2つ追加しました。</li>
+          </ul>
+          <h3>ver 0.90</h3>
+          <ul>
+            <li>ここまでの版をバージョン0.90とします。</li>
+          </ul>
+        </details>
         <section class="lobby-box">
           <h2>保存データの削除</h2>
           <p class="note">このブラウザに保存しているデータ（名前・アイコン・デッキ・カード枚数設定・実績と統計・BGMや音量・操作設定など）をすべて削除して、最初の状態に戻します。元には戻せません。</p>
           <button id="btn-reset-data" class="sub-button danger-button" type="button">保存データをすべて削除</button>
+        </section>
+      </div>
+
+      <!-- ランキング（サーバーに保存。js/sm_ranking.js が描く） -->
+      <div class="tab-panel" data-panel="ranking" hidden>
+        <section class="lobby-box">
+          <h2>最高翻数和了ランキング</h2>
+          <p class="note">いちばん翻数の高い和了を競います（5位まで）。翻数が同じなら和了点（本場・供託を除く）が高い方、それも同じなら先に登録した方が上です。データタブの「いちばん翻数の高い和了」から登録でき、1人1枠です（もっと高い和了を登録すると入れ替わります）。押すと和了の形を見られます。</p>
+          <ol id="ranking-best" class="rankboard"></ol>
+        </section>
+        <section class="lobby-box">
+          <h2>デイリーランキング <span id="ranking-daily-date" class="ach-count"></span></h2>
+          <p id="ranking-daily-rules" class="rankboard__rules" hidden></p>
+          <p class="note">その日のデイリーミッションの、1回目の挑戦の終局時の点数を競います（3位まで。同点なら先に登録した方が上）。ミッションタブの「今日の記録」から登録できます。日本時間の0時にリセットされます。</p>
+          <ol id="ranking-daily" class="rankboard"></ol>
         </section>
       </div>
 
@@ -178,12 +241,12 @@
               <ul>
                 <li>赤ドラ（各色の5を1枚ずつ、計3枚）・喰いタン・飛びは、部屋を作る時に入り切りできます（既定はすべてあり）。</li>
                 <li>連荘は既定でなしです。親が和了・聴牌しても親は流れ、本場は0に戻ります。ただし一巡目の途中流局（九種九牌など）だけはやり直し（本場+1）です。</li>
-                <li>後付けあり・頭ハネ（ダブロンなし）・喰い替えなし・一発と裏ドラとカンドラあり・流し満貫あり。</li>
-                <li>リーチは持ち点1000点以上で、牌山の残りが人数以上ある時だけ宣言できます。流局時に余った供託は、最終順位がトップの人のものになります。</li>
+                <li>後付けあり・ダブロンとトリロンあり（3人ともロンしても流局になりません）・喰い替えなし・一発と裏ドラとカンドラあり・流し満貫あり。複数人がロンした時は、放銃した人から手番順に近い人から順に和了し、供託は最初に和了した人がすべて受け取り、本場は和了した全員が受け取ります。</li>
+                <li>リーチは持ち点1000点以上で、牌山の残りが人数以上ある時だけ宣言できます。対局終了時に残った供託は放棄され、誰のものにもなりません。</li>
                 <li>役満は13翻として他の役・ドラと足し算します。合計が13翻の倍数ごとに1倍役満で、13翻以上は数え役満です。役満が成立した時、それに必ず含まれる下位の役（例: 四暗刻の対々和）は数えません。</li>
                 <li>ドラだけでは和了れません（役が1つ以上必要）。</li>
                 <li>三麻は萬子・筒子・索子・字牌をすべて使い、チーなし・北抜きあり・ツモ損です。流局の聴牌料は2000点、四風連打・四家立直の途中流局はありません。</li>
-                <li>既定は東風戦・持ち点35000点（三麻は45000点）です。誰かの持ち点が0を下回ると（飛びあり）その場で終局します。</li>
+                <li>既定は東風戦・持ち点35000点（三麻は45000点）です。誰かの持ち点が0を下回ると（飛びあり）その場で終局します。和了・流局の精算や、《「全人類の緋想天」》のように1つの効果で何人分もの点数が動く時は、すべて動かし終えてから判定します。</li>
               </ul>
             </div>
           </details>
@@ -279,9 +342,34 @@
               <h4>デッキ構築戦</h4>
               <p>各自が持ち寄ったデッキから山札を作ります。捨て場は全員で共有です。デッキはロビーの「デッキ構築」で作り、このブラウザに保存されます。</p>
               <ul>
-                <li><b>推奨ルール</b>: 60枚以上、同じ名前のカードは3枚まで（《カチコミ》《目からビーム》《否認》は何枚でも）、《おばさん》は入れられません。フルパワーを1枚決める必要があります。</li>
-                <li><b>制限なし</b>: 同じカードは99枚まで、合計999枚まで。フルパワーは必要です。</li>
+                <li><b>推奨ルール</b>: 60枚以上、同じ名前のカードは3枚まで（《「天和・地和」》《3つの願い》は1枚まで、《カチコミ》《目からビーム》《否認》は何枚でも）、《おばさん》は入れられません。フルパワーを1枚決める必要があります（《ネクロノミコン》は選べません）。</li>
+                <li><b>制限なし</b>: 同じカードは99枚まで、合計999枚まで。フルパワーは必要です（《ネクロノミコン》も選べます）。</li>
                 <li>デッキに入れた「ランダム」は、山札を作るたびにランダムなカードに変わります。</li>
+              </ul>
+              <h4>カスタム</h4>
+              <p>下のルールを組み合わせて遊びます。各自が自分の山札を持ち、捨て場は全員で共有です。デッキの決め方（狂乱・デュエリスト・ドラフト・オールフォーワン）は必ずどれか1つを選びます。</p>
+              <ul>
+                <li><b>狂乱</b>: 全カードが既定の枚数入ったデッキを使います。フルパワーは対局の初めに選びます。</li>
+                <li><b>デュエリスト</b>: 自分のデッキを選んで対局します（推奨ルール）。</li>
+                <li><b>ドラフト</b>: 最初に5枚のフルパワーから1つ選び、その後は3つの5枚セットから1つ選ぶのを8回繰り返して、選んだ40枚をデッキにします。</li>
+                <li><b>オールフォーワン</b>: ハプニング以外のカードを1枚選び、そのカードだけのデッキを使います。フルパワーも選びます。</li>
+                <li><b>殿堂ゼロ</b>: 使用不可のカード（《おばさん》・Cカード・フルパワーの《ネクロノミコン》）も使えます。デュエリストのデッキは60枚以上・同じ名前のカードは3枚までだけになります。</li>
+                <li><b>レッドアウト</b>: 使うすべての牌が赤ドラです。</li>
+                <li><b>フルスロットル</b>: 毎手番、手札の上限までカードを引き、何枚でもカードをプレイできます。</li>
+                <li><b>リミットブレイク</b>: 手札とパワーの上限が両方8になります。</li>
+                <li><b>デュアルショック</b>: すべての牌が8枚ずつあります。</li>
+                <li><b>満貫全席</b>: 翻数がいつも+4されます（ドラと同じく役にはなりません）。</li>
+                <li><b>限りなく透明に近い</b>: 白のかわりにオールマイティ牌を使います。</li>
+                <li><b>モロノリ</b>: ポン・チーでも新ドラをめくります。</li>
+                <li><b>青天井</b>: 点数を上限なしで計算します（飛びなし）。</li>
+                <li><b>文殊の知恵</b>: フルパワーを3つ使えます（クールタイムもそれぞれ）。</li>
+                <li><b>サドンデス</b>: 全員0点で始まります。</li>
+                <li><b>のろわれボディ</b>: フルパワーが《ネクロノミコン》になります（文殊の知恵なら3つのうち1つ）。</li>
+                <li><b>ショバ代</b>: 普通に捨牌するたびに200点を供託します。</li>
+                <li><b>唯々諾々</b>: カードが打ち消されません。</li>
+                <li><b>即断即決</b>: 手番やカード処理の制限時間が5秒です（カードの処理中は手番の時間が止まります）。</li>
+                <li><b>厄日</b>: 配牌に面子が来ません。九種九牌もできません。</li>
+                <li><b>ヤギ</b>: 全員の場に《ヤギ》がある状態で局が始まります（手札は捨てません）。</li>
               </ul>
             </div>
           </details>
@@ -359,7 +447,7 @@
         <p id="room-rules-text" class="rules-text"></p>
         <form id="room-form" class="rule-form" onsubmit="return false" hidden>
           <label>対戦形式
-            <select id="room-mode"><option value="normal">通常戦</option><option value="deck">デッキ構築戦</option></select>
+            <select id="room-mode"><option value="normal">通常戦</option><option value="deck">デッキ構築戦</option><option value="custom">カスタム</option></select>
           </label>
           <label id="room-deckrule-label">デッキの制限
             <select id="room-deckrule"><option value="recommended">推奨ルール</option><option value="free">制限なし</option></select>
@@ -380,6 +468,7 @@
           <label class="check"><input id="room-tobi" type="checkbox"> 飛び</label>
           <label class="check"><input id="room-renchan" type="checkbox"> 連荘</label>
           <label id="room-cfull-label" class="check"><input id="room-cfull" type="checkbox"> Cフルパワー</label>
+          <div id="room-custom" class="custom-rules" hidden></div>
           <div class="card-count-row"><button id="room-card-counts" class="sub-button" type="button">カード枚数設定</button><span id="room-card-counts-text" class="card-count-row__text"></span></div>
         </form>
         <div id="room-card-counts-view" class="card-count-row" hidden><button id="room-card-counts-show" class="sub-button" type="button">山札のカードを見る</button></div>
@@ -402,13 +491,19 @@
     </div>
   </div>
 
-  <!-- フルパワー選択 -->
+  <!-- フルパワー選択（カスタムモードのドラフト・オールフォーワンのカード選びも同じ画面） -->
   <div id="screen-pregame" class="screen">
     <div class="panel pregame">
-      <h1 class="logo logo--small">フルパワーを選ぶ</h1>
-      <p class="note-light">相棒になるカードを1枚選んでください。手札とは別に、対局中に使えます。</p>
+      <h1 id="pregame-title" class="logo logo--small">フルパワーを選ぶ</h1>
+      <p id="pregame-note" class="note-light">相棒になるカードを1枚選んでください。手札とは別に、対局中に使えます。</p>
       <p id="fp-wait" class="note-light"></p>
+      <!-- 決まっているフルパワー（のろわれボディの《ネクロノミコン》・デュエリストのデッキのフルパワーなど） -->
+      <div id="fp-fixed" class="pregame-fixed" hidden></div>
+      <input id="fp-filter" class="pregame-filter" type="text" placeholder="カード名・テキストで絞り込み" autocomplete="off" hidden>
       <div id="fp-grid" class="fp-grid"></div>
+      <div id="fp-actions" class="button-row button-row--center" hidden></div>
+      <!-- ドラフト: 自分のフルパワーと、これまでに選んだカード -->
+      <div id="draft-picked" class="draft-picked" hidden></div>
       <div class="button-row button-row--center"><button class="sub-button" data-exit>対局から退出する</button></div>
     </div>
   </div>
@@ -443,6 +538,8 @@
       <div id="riichi-waits" class="riichi-waits"></div>
       <div id="my-cards" class="my-cards"></div>
       <div class="my-tiles">
+        <!-- 予見: 次に自分が普通にツモる牌（手牌の左。上に NEXT と書いた枠） -->
+        <div id="my-next" class="my-next" hidden><span class="my-next__label">NEXT</span><div class="my-next__tile"></div></div>
         <div id="my-hand" class="my-hand"></div>
         <div id="my-melds" class="my-melds"></div>
       </div>
@@ -547,7 +644,7 @@
   <div id="decks" class="overlay decks" hidden>
     <div class="overlay__box decks__box">
       <h2 class="result-title">デッキ</h2>
-      <p class="card-counts__note">デッキ構築戦で使うデッキです（このブラウザに保存されます）。推奨ルール: 60枚以上・同名カードは3枚まで（カチコミ・目からビーム・否認は何枚でも）・《おばさん》とCカードは使えない（制限なしの部屋なら使える。Cカードはミッションをクリアして解放したものだけ）。「ランダム」は何枚でも入れられ、山札を作るたびに、使用不可のカード・ハプニング・デッキに入れたカード以外からランダムなカードになります。どちらのルールでもフルパワーを1枚決めておきます。</p>
+      <p class="card-counts__note">デッキ構築戦で使うデッキです（このブラウザに保存されます）。推奨ルール: 60枚以上・同名カードは3枚まで（「天和・地和」・3つの願いは1枚まで。カチコミ・目からビーム・否認は何枚でも）・《おばさん》とCカード、フルパワーの《ネクロノミコン》は使えない（制限なしの部屋なら使える。Cカードは自分がミッションをクリアして解放したものだけ。部屋を作った人が解放していなくてもよい）。「ランダム」は何枚でも入れられ、山札を作るたびに、使用不可のカード・ハプニング・デッキに入れたカード以外からランダムなカードになります。どちらのルールでもフルパワーを1枚決めておきます。</p>
       <ul id="decks-list" class="decks__list" data-decks-list></ul>
       <div class="button-row button-row--center">
         <button id="decks-new" class="sub-button" data-deck-act="new">新しいデッキ</button>
@@ -650,6 +747,7 @@
   <script src="js/sm_missions.js"></script>
   <script src="js/sm_cardlist.js"></script>
   <script src="js/sm_stats.js"></script>
+  <script src="js/sm_ranking.js"></script>
   <script src="js/sm_lobby.js"></script>
   <script src="js/sm_table.js"></script>
   <script src="js/sm_input.js"></script>

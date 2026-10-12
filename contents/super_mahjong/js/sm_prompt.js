@@ -25,13 +25,79 @@
     endHandPick();
   }
 
-  /** 選択ウィンドウを一時的に隠す／戻す（隠している間は画面上部に「戻る」ボタン） */
+  /** 選択ウィンドウを一時的に隠す／戻す（隠している間は画面上部に「戻る」ボタン。ドラッグで動かした位置があればそこ） */
   function setPeek(on) {
     peeking = Boolean(on && current);
     if (current) $('prompt-box').hidden = peeking;
     const pill = $('prompt-peek');
-    pill.hidden = !peeking;
     if (peeking) pill.querySelector('.prompt-peek__label').textContent = `${sourceLine(current) || '選択'}に戻る`;
+    pill.hidden = !peeking;
+    if (peeking) placePeek(loadPeekPos());
+  }
+
+  // ---- 隠している間の「〜に戻る」のバナー: ドラッグで動かせる（押しただけなら戻る）。位置はこのブラウザに覚える ----
+  const PEEK_POS_KEY = 'super_mahjong_peek_pos';
+  const DRAG_START_PX = 6;   // これより動かしたらドラッグ（押しただけの揺れは押したことにする）
+
+  function loadPeekPos() {
+    try {
+      const v = JSON.parse(localStorage.getItem(PEEK_POS_KEY) || 'null');
+      return v && Number.isFinite(v.x) && Number.isFinite(v.y) ? v : null;
+    } catch (e) { return null; }
+  }
+  function savePeekPos(pos) {
+    try { localStorage.setItem(PEEK_POS_KEY, JSON.stringify(pos)); } catch (e) { /* 保存できなくても、今は動かせる */ }
+  }
+
+  /** バナーの左上を (x, y) に置く（画面の外にはみ出さないように収める）。pos が無ければ既定の上の中央 */
+  function placePeek(pos) {
+    const pill = $('prompt-peek');
+    if (!pos) {
+      pill.classList.remove('is-moved');
+      pill.style.left = '';
+      pill.style.top = '';
+      return;
+    }
+    pill.classList.add('is-moved');
+    const x = Math.max(4, Math.min(window.innerWidth - pill.offsetWidth - 4, pos.x));
+    const y = Math.max(4, Math.min(window.innerHeight - pill.offsetHeight - 4, pos.y));
+    pill.style.left = `${x}px`;
+    pill.style.top = `${y}px`;
+  }
+
+  function initPeekDrag() {
+    const pill = $('prompt-peek');
+    let drag = null;
+    pill.addEventListener('pointerdown', (e) => {
+      if (e.button !== 0) return;
+      const rect = pill.getBoundingClientRect();
+      drag = { id: e.pointerId, sx: e.clientX, sy: e.clientY, dx: e.clientX - rect.left, dy: e.clientY - rect.top, moved: false };
+      pill.setPointerCapture(e.pointerId);
+    });
+    pill.addEventListener('pointermove', (e) => {
+      if (!drag || e.pointerId !== drag.id) return;
+      if (!drag.moved && Math.hypot(e.clientX - drag.sx, e.clientY - drag.sy) < DRAG_START_PX) return;
+      drag.moved = true;
+      pill.classList.add('is-dragging');
+      placePeek({ x: e.clientX - drag.dx, y: e.clientY - drag.dy });
+    });
+    // 押しただけ（動かさずに離した）なら戻る。タッチで押した時は click が来ないことがあるので、離した時に決める
+    const end = (e, canceled) => {
+      if (!drag || e.pointerId !== drag.id) return;
+      const { moved } = drag;
+      drag = null;
+      pill.classList.remove('is-dragging');
+      if (moved) {
+        const rect = pill.getBoundingClientRect();
+        savePeekPos({ x: Math.round(rect.left), y: Math.round(rect.top) });
+      } else if (!canceled) setPeek(false);
+    };
+    pill.addEventListener('pointerup', (e) => end(e, false));
+    pill.addEventListener('pointercancel', (e) => end(e, true));
+    // キーボード（Enter・スペース）で押した時（detail が 0）。マウス・タッチは上の pointerup で戻している
+    pill.addEventListener('click', (e) => { if (e.detail === 0) setPeek(false); });
+    // 画面の大きさが変わったら（スマホの向きなど）、画面の中に収め直す
+    window.addEventListener('resize', () => { if (peeking) placePeek(loadPeekPos()); });
   }
 
   function sourceLine(p) {
@@ -312,7 +378,50 @@
     tick();
   }
 
-  // ---- フルパワー選択 ----
+  // ---- 対局の初めの選択（フルパワー選択。カスタムモードのドラフトのセット・オールフォーワンのカードも） ----
+  // 2つ以上選ぶ時（文殊の知恵）に選んでいる項目の番号
+  let pregameSel = new Set();
+
+  /** 見出しと説明（問い合わせの出どころで変える） */
+  function pregameHeading(p) {
+    const src = p.source && p.source.name;
+    const title = src === 'ドラフト' ? 'ドラフト' : src === 'オールフォーワン' ? 'オールフォーワン' : 'フルパワーを選ぶ';
+    let note;
+    if (p.draft) note = `${p.title}。選んだセットの5枚がデッキに入ります。`;
+    else if (src === 'オールフォーワン') note = `${p.title}。選んだカードだけのデッキで対局します。`;
+    else if ((p.max || 1) > 1) note = `${p.title}。手札とは別に、それぞれ対局中に使えます（カードを押して「選ぶ」）。`;
+    else if (src === 'フルパワー選択' && p.title === 'フルパワーを1枚選んでください') note = '相棒になるカードを1枚選んでください。手札とは別に、対局中に使えます。';
+    else note = `${p.title}。手札とは別に、対局中に使えます。`;
+    $('pregame-title').textContent = title;
+    $('pregame-note').textContent = note;
+  }
+
+  /**
+   * カードを小さく並べた行（決まっているフルパワー・ドラフトで選んだフルパワーとカード）。
+   * groups は [見出し, カードIDの並び] の並び（カードの無いものは出さない）。カードを押すと詳しく見られる
+   */
+  function miniRows(box, groups) {
+    box.innerHTML = '';
+    const shown = groups.filter(([, cids]) => cids && cids.length);
+    box.hidden = !shown.length;
+    for (const [label, cids] of shown) {
+      const cap = document.createElement('div');
+      cap.className = 'pregame-row__label';
+      cap.textContent = label;
+      const row = document.createElement('div');
+      row.className = 'pregame-row';
+      for (const cid of cids) row.appendChild(SM.Cards.el(cid, { size: 'mini' }));
+      box.append(cap, row);
+    }
+  }
+
+  /** 答えを送る（送れた時だけ待つ表示にする。接続が切れていて送れなければ、そのまま選び直せる） */
+  function sendPregame(p, pick, pg, room) {
+    answeredId = null;
+    send(p, { pick });
+    if (answeredId === p.id) showPregame({ prompt: null, waitingFor: pg.waitingFor }, room);
+  }
+
   function showPregame(pg, room) {
     const grid = $('fp-grid');
     const wait = $('fp-wait');
@@ -320,6 +429,9 @@
     const names = (pg.waitingFor || []).map((s) => (room.seats[s] ? room.seats[s].name : '?')).join('、');
     if (!p || answeredId === p.id) {
       grid.innerHTML = '';
+      grid.dataset.pid = '';
+      $('fp-actions').hidden = true;
+      $('fp-filter').hidden = true;
       wait.textContent = names ? `他のプレイヤーの選択を待っています（${names}）` : '対局を準備しています…';
       return;
     }
@@ -327,18 +439,82 @@
     if (grid.dataset.pid === String(p.id)) return;
     grid.dataset.pid = String(p.id);
     grid.innerHTML = '';
+    pregameSel = new Set();
+    pregameHeading(p);
+    // ドラフトのセット選びでは、選んだフルパワーを選んだカードと一緒に下に出す
+    miniRows($('fp-fixed'), [['決まっているフルパワー', p.draft ? null : p.fixed]]);
+    miniRows($('draft-picked'), p.draft
+      ? [['自分のフルパワー', p.fixed], [`これまでに選んだカード（${p.draft.picked.length}枚）`, p.draft.picked]] : []);
+    const filter = $('fp-filter');
+    filter.hidden = !p.search;
+    filter.value = '';
+    const actions = $('fp-actions');
+    actions.innerHTML = '';
+    actions.hidden = true;
+    grid.classList.toggle('is-sets', p.items.some((it) => it.cids));
+    // ドラフト: 3つの5枚セットから1つ
+    if (p.items.some((it) => it.cids)) {
+      p.items.forEach((it, i) => {
+        const set = document.createElement('div');
+        set.className = 'draft-set';
+        const head = document.createElement('div');
+        head.className = 'draft-set__head';
+        const label = document.createElement('span');
+        label.textContent = it.label;
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'main-button';
+        b.textContent = 'このセットにする';
+        b.addEventListener('click', () => sendPregame(p, [i], pg, room));
+        head.append(label, b);
+        const row = document.createElement('div');
+        row.className = 'draft-set__cards';
+        for (const cid of it.cids) row.appendChild(SM.Cards.el(cid, { size: 'mini' }));
+        set.append(head, row);
+        grid.appendChild(set);
+      });
+      return;
+    }
+    const max = p.max || 1;
+    const multi = max > 1;
+    // 2つ以上選ぶ時: カードを押して「選ぶ」を繰り返し、そろったら「決定」
+    const ok = document.createElement('button');
+    ok.type = 'button';
+    ok.className = 'main-button';
+    const refresh = () => {
+      ok.textContent = `決定（${pregameSel.size}/${max}）`;
+      ok.disabled = pregameSel.size !== max;
+      for (const e of grid.children) e.classList.toggle('is-chosen', pregameSel.has(Number(e.dataset.idx)));
+    };
+    if (multi) {
+      ok.addEventListener('click', () => { if (pregameSel.size === max) sendPregame(p, [...pregameSel], pg, room); });
+      actions.appendChild(ok);
+      actions.hidden = false;
+    }
     p.items.forEach((it, i) => {
       const e = SM.Cards.el(it.cid, {
         size: 'mini',
-        onClick: () => SM.Cards.showDetail(it.cid, { actions: [{ label: 'これに決める', onClick: () => {
-          answeredId = null;
-          send(p, { pick: [i] });
-          // 送れた時だけ待つ表示にする（接続が切れていて送れなければ、そのまま選び直せる）
-          if (answeredId === p.id) showPregame({ prompt: null, waitingFor: pg.waitingFor }, room);
-        } }] }),
+        onClick: () => {
+          const acts = !multi
+            ? [{ label: 'これに決める', onClick: () => sendPregame(p, [i], pg, room) }]
+            : pregameSel.has(i)
+              ? [{ label: '選ぶのをやめる', onClick: () => { pregameSel.delete(i); refresh(); } }]
+              : [{ label: '選ぶ', onClick: () => { if (pregameSel.size < max) pregameSel.add(i); refresh(); } }];
+          SM.Cards.showDetail(it.cid, { actions: acts });
+        },
       });
+      e.dataset.idx = String(i);
       grid.appendChild(e);
     });
+    if (multi) refresh();
+  }
+
+  /** オールフォーワン: カード名・テキストで並んだカードを絞り込む */
+  function filterPregame() {
+    const q = $('fp-filter').value;
+    for (const e of $('fp-grid').children) {
+      if (e.dataset.cid) e.hidden = Boolean(q.trim()) && !SM.CardList.matches(e.dataset.cid, q);
+    }
   }
 
   /** 新しい対局が始まった時: 前の対局で答えた問い合わせの覚えを消す（番号が重なっても選べるように） */
@@ -352,7 +528,8 @@
 
   function init() {
     setInterval(tick, 250);
-    $('prompt-peek').addEventListener('click', () => setPeek(false));
+    initPeekDrag();
+    $('fp-filter').addEventListener('input', filterPregame);
   }
 
   SM.Prompt = { init, update, hide, reset, showPregame, sendAnswer: send, decorateHandPick, isAnswered: (p) => Boolean(p) && answeredId === p.id };

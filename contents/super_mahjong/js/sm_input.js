@@ -209,7 +209,8 @@
     if (cardAct && !sent()) for (const iid of cardAct.iids) playable.add(iid);
     const label = document.createElement('div');
     label.className = 'my-cards__label';
-    label.textContent = `手札 ${game.myCards.length}/5`;
+    // 手札の上限（カスタムモードのリミットブレイクで8）
+    label.textContent = `手札 ${game.myCards.length}/${game.handLimit || 5}`;
     box.appendChild(label);
     for (const c of game.myCards) {
       const can = playable.has(c.iid);
@@ -222,20 +223,38 @@
       box.appendChild(e);
     }
     const me = game.players[game.you];
-    if (me.fp) {
+    // フルパワー（カスタムモードの文殊の知恵では3つ。idx でどれかを送る）。前の形（fp だけ）の記録でも出せるように
+    const fps = me.fps || (me.fp ? [{ ...me.fp, idx: 0 }] : []);
+    // 手札とフルパワーが多い時（リミットブレイク・文殊の知恵）は、スマホでは少し小さくする
+    box.classList.toggle('is-many', game.myCards.length + fps.length > 6);
+    if (fps.length) {
       // 他のカードと同じく、画像を押して詳しく見てからプレイする
-      const canFp = !sent() && actions.some((a) => a.type === 'fullPower');
       const wrap = document.createElement('div');
       wrap.className = 'my-cards__fp';
       const cap = document.createElement('div');
       cap.className = 'my-cards__label';
-      cap.textContent = me.fp.playable ? 'フルパワー（使える）' : (me.fp.cooldown ? `フルパワー（あと${me.fp.cooldown}ツモ番）` : 'フルパワー');
+      const one = fps[0];
+      cap.textContent = fps.length > 1 ? 'フルパワー'
+        : one.playable ? 'フルパワー（使える）' : (one.cooldown ? `フルパワー（あと${one.cooldown}ツモ番）` : 'フルパワー');
       wrap.appendChild(cap);
-      wrap.appendChild(SM.Cards.el(me.fp.cid, {
-        size: 'mini',
-        cls: canFp ? 'is-playable' : me.fp.playable ? '' : 'is-dim',
-        onClick: () => SM.Cards.showDetail(me.fp.cid, canFp ? { actions: [{ label: 'このフルパワーをプレイする', onClick: () => sendAction({ type: 'fullPower' }) }] } : {}),
-      }));
+      for (const fp of fps) {
+        const canFp = !sent() && actions.some((a) => a.type === 'fullPower' && (a.idx ?? 0) === fp.idx);
+        const e = SM.Cards.el(fp.cid, {
+          size: 'mini',
+          cls: canFp ? 'is-playable' : fp.playable ? '' : 'is-dim',
+          onClick: () => SM.Cards.showDetail(fp.cid, canFp ? { actions: [{ label: 'このフルパワーをプレイする', onClick: () => sendAction({ type: 'fullPower', idx: fp.idx }) }] } : {}),
+        });
+        // 2つ以上ある時は、クールタイムをカードの下に出す
+        if (fps.length > 1 && fp.cooldown) {
+          const holder = document.createElement('div');
+          holder.className = 'my-cards__fp-item';
+          const cd = document.createElement('span');
+          cd.className = 'my-cards__cd';
+          cd.textContent = `あと${fp.cooldown}`;
+          holder.append(e, cd);
+          wrap.appendChild(holder);
+        } else wrap.appendChild(e);
+      }
       box.appendChild(wrap);
     }
   }

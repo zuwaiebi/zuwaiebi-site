@@ -28,8 +28,9 @@
       const tr = document.createElement('tr');
       const delta = info.after[s] - info.before[s];
       const w = game ? SM.Table.WIND[game.players[s].wind - 27] : '';
-      tr.innerHTML = `<td>${w}</td><td class="name"></td><td>${info.before[s]}</td>`
-        + `<td class="${delta > 0 ? 'plus' : delta < 0 ? 'minus' : ''}">${delta > 0 ? '+' : ''}${delta || ''}</td><td>${info.after[s]}</td>`;
+      const pt = SM.Main.points;
+      tr.innerHTML = `<td>${w}</td><td class="name"></td><td>${pt(info.before[s])}</td>`
+        + `<td class="${delta > 0 ? 'plus' : delta < 0 ? 'minus' : ''}">${delta > 0 ? '+' : ''}${delta ? pt(delta) : ''}</td><td>${pt(info.after[s])}</td>`;
       const nm = tr.querySelector('.name');
       nm.appendChild(SM.Icons.el(room.seats[s] && room.seats[s].icon));
       nm.append(nameOf(room, s) + (s === room.you ? '（あなた）' : ''));
@@ -82,7 +83,8 @@
     box.appendChild(yaku);
     const pts = document.createElement('p');
     pts.className = 'result-points';
-    pts.textContent = r.han >= 13 ? `${r.han}翻 ${r.limit}　${r.label}` : `${r.fu}符 ${r.han}翻${r.limit ? ` ${r.limit}` : ''}　${r.label}`;
+    // 青天井では13翻以上でも上限の名前（数え役満など）が無いので、符と翻を出す
+    pts.textContent = r.han >= 13 && r.limit ? `${r.han}翻 ${r.limit}　${r.label}` : `${r.fu}符 ${r.han}翻${r.limit ? ` ${r.limit}` : ''}　${r.label}`;
     box.appendChild(pts);
   }
 
@@ -147,7 +149,7 @@
     ol.className = 'ranking';
     ranking.forEach((r) => {
       const li = document.createElement('li');
-      li.innerHTML = `<span class="rank">${r.rank}位</span><span class="name"></span><span class="score">${r.score}</span>`;
+      li.innerHTML = `<span class="rank">${r.rank}位</span><span class="name"></span><span class="score">${SM.Main.points(r.score)}</span>`;
       const nm = li.querySelector('.name');
       nm.appendChild(SM.Icons.el(room.seats[r.seat] && room.seats[r.seat].icon));
       nm.append(nameOf(room, r.seat) + (r.seat === room.you ? '（あなた）' : ''));
@@ -155,13 +157,15 @@
       ol.appendChild(li);
     });
     box.appendChild(ol);
-    // ミッション: 結果（クリア・失敗）を上に出し、「もう一度挑戦」「ミッション一覧へ」にする（待機室は無い）
-    const mission = room.mission && SM.Missions ? SM.Missions.finalBlock(room) : null;
+    // ミッション: 結果（クリア・失敗）を上に出し、「もう一度挑戦」「ミッション一覧へ」にする（待機室は無い）。
+    // デイリーミッションも同じ（結果の代わりに、今日の記録にしたか）
+    const solo = Boolean(room.mission || room.daily);
+    const mission = solo && SM.Missions ? SM.Missions.finalBlock(room) : null;
     if (mission) box.prepend(mission);
-    $('btn-back-room').hidden = !room.youAreHost || Boolean(room.mission);
-    $('final-wait').hidden = room.youAreHost || Boolean(room.mission);
-    $('btn-mission-retry').hidden = !room.mission;
-    $('btn-final-leave').textContent = room.mission ? 'ミッション一覧へ' : 'ロビーへ';
+    $('btn-back-room').hidden = !room.youAreHost || solo;
+    $('final-wait').hidden = room.youAreHost || solo;
+    $('btn-mission-retry').hidden = !solo;
+    $('btn-final-leave').textContent = solo ? 'ミッション一覧へ' : 'ロビーへ';
     void scores;
   }
 
@@ -173,7 +177,7 @@
     $('btn-back-room').addEventListener('click', () => SM.Net.send({ type: 'backToRoom' }));
     $('btn-final-leave').addEventListener('click', () => {
       const room = SM.Main.state.room;
-      if (room && room.mission) SM.Lobby.showTab('missions');
+      if (room && (room.mission || room.daily)) SM.Lobby.showTab('missions');
       SM.Net.send({ type: 'leaveRoom' });
     });
     $('btn-mission-retry').addEventListener('click', () => SM.Missions.retry(SM.Main.state.room));

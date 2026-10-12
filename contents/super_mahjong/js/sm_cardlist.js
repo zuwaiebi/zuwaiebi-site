@@ -1,5 +1,6 @@
 // カード一覧: すべてのカード（イベント・パワー・フルパワー・パワー＋・ハプニング）を見る。
-// カード名・テキストで検索し（空白で区切るとすべてを含むもの）、カードタイプで絞り込む。カードを押すと詳細
+// カード名・テキストで検索し（空白で区切るとすべてを含むもの）、カードタイプで絞り込む。カードを押すと詳細。
+// ミッションで解放していないCカードは、イラストを鍵の絵、テキストを「ミッションを進めることで明かされる…」にして出す（検索もその文で）
 (function () {
   const SM = (window.SuperMahjong = window.SuperMahjong || {});
   const $ = (id) => document.getElementById(id);
@@ -20,15 +21,26 @@
     .replace(/[ぁ-ゖ]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) + 0x60))
     .replace(/[\s･・·]/g, '');
   const HAY = new Map(CARDS.map((c) => [c.id, norm(`${c.name}\n${c.text}`)]));
+  const LOCKED_HAY = new Map(CARDS.map((c) => [c.id, norm(`${c.name}\n${SM.Cards.LOCKED_TEXT}`)]));
 
   let type = 'all';
   let built = false;
   let timer = null;
+  let lockedKey = '';   // 一覧を作った時の、解放していないCカード（解放したら作り直す）
+
+  /** ミッションで解放していないCカードのID */
+  function lockedIds() {
+    const unlocked = SM.Missions ? SM.Missions.unlockedCIds() : [];
+    return new Set(CARDS.filter((c) => c.c === true && !unlocked.includes(c.id)).map((c) => c.id));
+  }
 
   function render() {
     built = true;
+    const locked = lockedIds();
+    lockedKey = [...locked].join(',');
+    const hay = (c) => (locked.has(c.id) ? LOCKED_HAY : HAY).get(c.id);
     const terms = $('cardlist-q').value.split(/\s+/).map(norm).filter(Boolean);
-    const hit = CARDS.filter((c) => terms.every((t) => HAY.get(c.id).includes(t)));
+    const hit = CARDS.filter((c) => terms.every((t) => hay(c).includes(t)));
     // 絞り込みのボタンには、検索に合うカードの種類ごとの枚数
     for (const b of $('cardlist-types').children) {
       const t = TYPES.find((x) => x.key === b.dataset.type);
@@ -40,7 +52,7 @@
     $('cardlist-count').textContent = shown.length === CARDS.length ? `${shown.length}枚` : `${shown.length} / ${CARDS.length}枚`;
     const grid = $('cardlist-grid');
     grid.innerHTML = '';
-    for (const c of shown) grid.appendChild(SM.Cards.el(c.id, { size: 'mini' }));
+    for (const c of shown) grid.appendChild(SM.Cards.el(c.id, { size: 'mini', locked: locked.has(c.id) }));
     if (!shown.length) {
       const p = document.createElement('p');
       p.className = 'cardlist-empty';
@@ -49,9 +61,9 @@
     }
   }
 
-  /** タブを開いた時（初めて開くまでは一覧を作らない） */
+  /** タブを開いた時（初めて開くまでは一覧を作らない。ミッションでCカードを解放していたら作り直す） */
   function show() {
-    if (!built) render();
+    if (!built || [...lockedIds()].join(',') !== lockedKey) render();
   }
 
   function init() {
@@ -75,5 +87,15 @@
     });
   }
 
-  SM.CardList = { init, show, render };
+  /**
+   * カード cid が検索の文字 q に合うか（一覧の検索と同じく、表記ゆれを無視し、空白で区切るとすべてを含むもの。
+   * 対局の初めにカードを選ぶ画面（オールフォーワン）の絞り込みで使う）
+   */
+  function matches(cid, q) {
+    const terms = String(q || '').split(/\s+/).map(norm).filter(Boolean);
+    const hay = HAY.get(cid) || '';
+    return terms.every((t) => hay.includes(t));
+  }
+
+  SM.CardList = { init, show, render, matches };
 })();

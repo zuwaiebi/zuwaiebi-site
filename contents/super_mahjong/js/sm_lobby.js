@@ -5,9 +5,104 @@
 
   const TIME_OPTIONS = [[0, '無制限'], [10, '10秒'], [15, '15秒'], [20, '20秒'], [30, '30秒'], [60, '60秒']];
   const BANK_OPTIONS = [[0, 'なし'], [30, '30秒'], [60, '60秒'], [120, '120秒'], [300, '300秒']];
+  // 部屋のコードにこれを入れて参加すると、実績とミッションをすべて開放する（サーバーの room.js の RESERVED_CODES）
+  const UNLOCK_ALL_CODE = 'CMPLT';
 
   // 山札のカード枚数（既定と違う分だけ）。部屋を作る時の設定は覚えておき、待機室では部屋の設定を使う
   const counts = { create: {}, room: {} };
+
+  // カスタムモードのルール（サーバーの src/game/rules.js の CUSTOM_DECKS・CUSTOM_FLAGS と同じキー）: [キー, 名前, 説明, 赤文字]。
+  // デッキの決め方は必ずどれか1つ。中身はガイドの「6. 対戦の形式」とサーバーの docs/card_rules.md の「カスタムモード」。
+  // サドンデス〜ヤギは赤文字で出す
+  const CUSTOM_DECKS = [
+    ['kyouran', '狂乱', '全カードが既定の枚数入ったデッキを使う'],
+    ['duelist', 'デュエリスト', '自分のデッキを選んで対局する'],
+    ['draft', 'ドラフト', '5枚のフルパワーから1つ選び、3つの5枚セットから1つ選ぶのを8回。選んだカードがデッキ'],
+    ['afo', 'オールフォーワン', 'ハプニング以外のカードを1枚選び、そのカードだけのデッキを使う'],
+  ];
+  const CUSTOM_FLAGS = [
+    ['zero', '殿堂ゼロ', '使用不可のカードも使える'],
+    ['redout', 'レッドアウト', '使うすべての牌が赤ドラ'],
+    ['throttle', 'フルスロットル', '毎手番、上限までカードを引き、何枚でもプレイできる'],
+    ['limitBreak', 'リミットブレイク', '手札とパワーの上限が両方8'],
+    ['dual', 'デュアルショック', 'すべての牌が8枚ずつ'],
+    ['mangan', '満貫全席', '翻数がいつも+4（役にはならない）'],
+    ['transparent', '限りなく透明に近い', '白のかわりにオールマイティ牌を使う'],
+    ['moronori', 'モロノリ', 'ポン・チーでも新ドラをめくる'],
+    ['aotenjou', '青天井', '点数を上限なしで計算する（飛びなし）'],
+    ['monju', '文殊の知恵', 'フルパワーを3つ選ぶ'],
+    ['suddenDeath', 'サドンデス', '全員0点で開始する', true],
+    ['cursed', 'のろわれボディ', 'フルパワーがネクロノミコンになる', true],
+    ['shoba', 'ショバ代', '普通に捨牌するたびに200点供託する', true],
+    ['iidaku', '唯々諾々', 'カードが打ち消されない', true],
+    ['sokudan', '即断即決', '手番やカード処理の制限時間が5秒', true],
+    ['yakubi', '厄日', '配牌に面子が来ない。九種九牌もできない', true],
+    ['yagi', 'ヤギ', '全員の場にヤギがある状態で局が始まる', true],
+  ];
+  const customOf = (r) => (r && r.mode === 'custom' && r.cards !== false && r.custom ? r.custom : null);
+  /** カスタムモードのルールの名前の並び（デッキの決め方が先） */
+  function customNames(c) {
+    const deck = CUSTOM_DECKS.find(([k]) => k === c.deck) || CUSTOM_DECKS[0];
+    return [deck[1], ...CUSTOM_FLAGS.filter(([k]) => c[k]).map(([, name]) => name)];
+  }
+
+  /** カスタムモードのルールのチェックボックスを作る（デッキの決め方は必ず1つ: 押したものだけを選び、選んでいるものは外せない） */
+  function buildCustom(prefix) {
+    const box = $(`${prefix}-custom`);
+    box.innerHTML = '';
+    const group = (title, list, attr) => {
+      const g = document.createElement('div');
+      g.className = 'custom-rules__group';
+      const h = document.createElement('div');
+      h.className = 'custom-rules__title';
+      h.textContent = title;
+      g.appendChild(h);
+      for (const [key, name, desc, red] of list) {
+        const label = document.createElement('label');
+        label.className = `custom-rule${red ? ' is-red' : ''}`;
+        const cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.dataset[attr] = key;
+        const text = document.createElement('span');
+        text.className = 'custom-rule__text';
+        const nm = document.createElement('span');
+        nm.className = 'custom-rule__name';
+        nm.textContent = name;
+        const d = document.createElement('span');
+        d.className = 'custom-rule__desc';
+        d.textContent = desc;
+        text.append(nm, d);
+        label.append(cb, text);
+        g.appendChild(label);
+      }
+      box.appendChild(g);
+    };
+    group('デッキの決め方（どれか1つ）', CUSTOM_DECKS, 'deck');
+    group('ルール', CUSTOM_FLAGS, 'flag');
+    box.querySelector('[data-deck]').checked = true;
+    // フォームの change（ルールを送る）より先に、デッキの決め方を1つにそろえる
+    box.addEventListener('change', (e) => {
+      const cb = e.target;
+      if (!cb.dataset || !cb.dataset.deck) return;
+      if (!cb.checked) { cb.checked = true; return; }
+      for (const x of box.querySelectorAll('[data-deck]')) if (x !== cb) x.checked = false;
+    });
+  }
+
+  function readCustom(prefix) {
+    const box = $(`${prefix}-custom`);
+    const sel = box.querySelector('[data-deck]:checked');
+    const c = { deck: sel ? sel.dataset.deck : 'kyouran' };
+    for (const cb of box.querySelectorAll('[data-flag]')) c[cb.dataset.flag] = cb.checked;
+    return c;
+  }
+
+  function writeCustom(prefix, c) {
+    const box = $(`${prefix}-custom`);
+    const cx = c || {};
+    for (const cb of box.querySelectorAll('[data-deck]')) cb.checked = cb.dataset.deck === (cx.deck || 'kyouran');
+    for (const cb of box.querySelectorAll('[data-flag]')) cb.checked = Boolean(cx[cb.dataset.flag]);
+  }
 
   function fillSelect(sel, opts) {
     sel.innerHTML = opts.map(([v, t]) => `<option value="${v}">${t}</option>`).join('');
@@ -31,6 +126,7 @@
       deckRule: f('deckrule').value,
       // この部屋で使えるCカード: 部屋を作った人（ホスト）がミッションをクリアして解放したもの
       cUnlocked: SM.Missions.unlockedCIds(),
+      custom: readCustom(prefix),
     };
   }
 
@@ -46,17 +142,32 @@
     f('cfull').checked = Boolean(r.cFull);
     f('perturn').value = String(r.perTurn);
     f('bank').value = String(r.bank);
-    f('mode').value = r.mode === 'deck' ? 'deck' : 'normal';
+    f('mode').value = ['deck', 'custom'].includes(r.mode) ? r.mode : 'normal';
     f('deckrule').value = r.deckRule === 'free' ? 'free' : 'recommended';
+    writeCustom(prefix, r.custom);
     applyMode(prefix);
   }
 
-  /** 対戦形式に合わせて項目を出し分ける（デッキ構築戦はデッキの制限を選び、カード枚数設定・Cフルパワーの選択は使わない） */
+  /**
+   * 対戦形式に合わせて項目を出し分ける（デッキ構築戦はデッキの制限を選び、カード枚数設定・Cフルパワーの選択は使わない。
+   * カスタムはカスタムのルールを選ぶ。青天井は飛びなし、即断即決は1手の時間・持ち時間、レッドアウトは赤ドラ、サドンデスは持ち点の設定を使わない）
+   */
   function applyMode(prefix) {
-    const deck = $(`${prefix}-mode`).value === 'deck';
+    const mode = $(`${prefix}-mode`).value;
+    const deck = mode === 'deck';
+    const custom = mode === 'custom';
     $(`${prefix}-deckrule-label`).hidden = !deck;
-    $(`${prefix}-cfull-label`).hidden = deck;
-    $(`${prefix}-card-counts`).parentElement.hidden = deck;
+    $(`${prefix}-cfull-label`).hidden = deck || custom;
+    $(`${prefix}-card-counts`).parentElement.hidden = deck || custom;
+    $(`${prefix}-custom`).hidden = !custom;
+    const c = custom ? readCustom(prefix) : {};
+    const tobi = $(`${prefix}-tobi`);
+    tobi.disabled = Boolean(c.aotenjou);
+    if (c.aotenjou) tobi.checked = false;
+    $(`${prefix}-perturn`).disabled = Boolean(c.sokudan);
+    $(`${prefix}-bank`).disabled = Boolean(c.sokudan);
+    $(`${prefix}-red`).disabled = Boolean(c.redout);
+    $(`${prefix}-start`).disabled = Boolean(c.suddenDeath);
   }
 
   function showCountsText(prefix) {
@@ -66,6 +177,7 @@
   function setupRuleForm(prefix, onChange) {
     fillSelect($(`${prefix}-perturn`), TIME_OPTIONS);
     fillSelect($(`${prefix}-bank`), BANK_OPTIONS);
+    buildCustom(prefix);
     $(`${prefix}-players`).addEventListener('change', () => {
       $(`${prefix}-start`).value = $(`${prefix}-players`).value === '3' ? '45000' : '35000';
     });
@@ -90,13 +202,15 @@
   }
 
   function rulesText(r) {
-    const t = r.perTurn ? `1手${r.perTurn}秒${r.bank ? `+持ち時間${r.bank}秒` : ''}` : '時間無制限';
-    const deckMode = r.mode === 'deck' && r.cards !== false;
+    const cx = customOf(r);
+    const t = cx && cx.sokudan ? '制限時間5秒（即断即決）' : r.perTurn ? `1手${r.perTurn}秒${r.bank ? `+持ち時間${r.bank}秒` : ''}` : '時間無制限';
+    const deckMode = (r.mode === 'deck' && r.cards !== false) || Boolean(cx);
     return [
-      ...(deckMode ? [`デッキ構築戦（${r.deckRule === 'free' ? '制限なし' : '推奨ルール'}）`] : []),
+      ...(r.mode === 'deck' && r.cards !== false ? [`デッキ構築戦（${r.deckRule === 'free' ? '制限なし' : '推奨ルール'}）`] : []),
+      ...(cx ? [`カスタム（${customNames(cx).join('・')}）`] : []),
       `${r.players === 3 ? '三麻（チーなし・北抜きあり・ツモ損）' : '四麻'}`,
       { ikkyoku: '一局戦', tonpuu: '東風戦', hanchan: '半荘戦' }[r.length] || '半荘戦',
-      `${r.startPoints}点持ち`,
+      cx && cx.suddenDeath ? '0点持ち（サドンデス）' : `${r.startPoints}点持ち`,
       r.red ? '赤あり' : '赤なし',
       r.kuitan ? '喰いタンあり' : '喰いタンなし',
       r.tobi ? '飛びあり' : '飛びなし',
@@ -131,8 +245,17 @@
     const join = () => {
       const code = $('join-code').value.trim().toUpperCase();
       if (!code) return;
+      // 「CMPLT」: 部屋には入らず、実績をすべて達成にし、ミッションをすべてクリア済みにする（ネームドCPU・Cカードも解放される。
+      // サーバーはこのコードの部屋を作らない）
+      if (code === UNLOCK_ALL_CODE) {
+        SM.Achievements.unlockAll(SM.Missions.allIds());
+        $('join-code').value = '';
+        SM.Main.toast('実績とミッションをすべて開放しました');
+        return;
+      }
       SM.Net.setName(nameInput.value.trim().slice(0, 12));
-      SM.Net.send({ type: 'joinRoom', code });
+      // 自分がミッションで解放したCカードも送る（カスタムモードの殿堂ゼロで、自分が選ぶカード・フルパワーに使う）
+      SM.Net.send({ type: 'joinRoom', code, cUnlocked: SM.Missions.unlockedCIds() });
     };
     $('btn-join').addEventListener('click', join);
     $('join-code').addEventListener('keydown', (e) => { if (e.key === 'Enter') join(); });
@@ -166,7 +289,7 @@
     // 使っているデッキを編集・削除したら、席のデッキも送り直す（待機室にいる時だけ）
     SM.Decks.onChange(() => {
       const room = SM.Main.state.room;
-      if (!lastRoom || !room || room.state !== 'waiting' || !isDeckMode(room.rules)) return;
+      if (!lastRoom || !room || room.state !== 'waiting' || !usesDeckSelect(room.rules)) return;
       sendDeck(SM.Decks.picked());
       renderRoom(room);
     });
@@ -197,6 +320,7 @@
     if (open === 'achievements') SM.Achievements.render();
     if (open === 'cards') SM.CardList.show();
     if (open === 'stats') SM.Stats.render();
+    if (open === 'ranking') SM.Ranking.render();
     if (open === 'tutorial') linkTutorial();
   }
 
@@ -227,6 +351,10 @@
   }
 
   const isDeckMode = (r) => r.mode === 'deck' && r.cards !== false;
+  /** 待機室で自分のデッキを選ぶ部屋か（デッキ構築戦と、カスタムモードのデュエリスト） */
+  const usesDeckSelect = (r) => isDeckMode(r) || Boolean(customOf(r) && customOf(r).deck === 'duelist');
+  /** デッキの検査のルール（サーバーの decks.js の deckRuleOf と同じ。カスタムモードは殿堂ゼロなら 'zero'、それ以外は推奨ルール） */
+  const deckRuleOf = (r) => { const c = customOf(r); if (c) return c.zero ? 'zero' : 'recommended'; return r.deckRule === 'free' ? 'free' : 'recommended'; };
   const sendDeck = (d) => SM.Net.send({ type: 'setDeck', deck: d ? SM.Decks.toServer(d) : null });
 
   /** 席ごとのデッキの準備（デッキ構築戦。他の人のデッキは名前・枚数・使えるかだけ） */
@@ -250,13 +378,13 @@
   let deckSentKey = null;   // 自動で送ったデッキ（送っても席に反映されない時に、何度も送らないため）
   function renderMyDeck(room) {
     const box = $('room-deck');
-    box.hidden = !isDeckMode(room.rules) || room.you < 0;
+    box.hidden = !usesDeckSelect(room.rules) || room.you < 0;
     if (box.hidden) return;
     const mine = room.seats[room.you];
     const list = SM.Decks.list();
     let pick = SM.Decks.picked();
-    // まだ選んでいなければ、部屋のルールで使えるデッキを選んでおく（Cカードは部屋で解放してあるものだけ）
-    const checkRoom = (d) => SM.Decks.check(d, room.rules.deckRule, room.rules.cUnlocked || []);
+    // まだ選んでいなければ、部屋のルールで使えるデッキを選んでおく（Cカードは自分が解放したもの。ホストが解放していなくてもよい）
+    const checkRoom = (d) => SM.Decks.check(d, deckRuleOf(room.rules));
     if (!pick) {
       pick = list.find((d) => !checkRoom(d).problems.length) || null;
       if (pick) SM.Decks.setPicked(pick.id);
@@ -300,11 +428,11 @@
     $('room-code').textContent = room.code;
     $('room-rules-text').textContent = rulesText(room.rules);
     const host = room.youAreHost;
-    const deckMode = isDeckMode(room.rules);
+    const deckMode = usesDeckSelect(room.rules);
     lastRules = room.rules;
     counts.room = room.rules.cardCounts || {};
     $('room-form').hidden = !host;
-    $('room-card-counts-view').hidden = host || room.rules.cards === false || deckMode;
+    $('room-card-counts-view').hidden = host || room.rules.cards === false || deckMode || Boolean(customOf(room.rules));
     if (host && document.activeElement?.closest?.('#room-form') == null) writeRules('room', room.rules);
     if (host) showCountsText('room');
     else SM.Deck.refresh(counts.room, room.rules);
@@ -365,5 +493,6 @@
     });
   }
 
-  SM.Lobby = { init, renderRoom, rulesText, showTab };
+  // CUSTOM_DECKS・CUSTOM_FLAGS: デイリーミッションの欄でルールの名前・説明・赤文字かを出す
+  SM.Lobby = { init, renderRoom, rulesText, showTab, CUSTOM_DECKS, CUSTOM_FLAGS };
 })();

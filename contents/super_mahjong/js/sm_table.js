@@ -92,7 +92,7 @@
     head.appendChild(name);
     const score = document.createElement('span');
     score.className = 'seat__score';
-    score.textContent = p.score;
+    score.textContent = SM.Main.points(p.score);
     head.appendChild(score);
     if (p.riichi) {
       const r = document.createElement('span');
@@ -108,7 +108,7 @@
       head.appendChild(hc);
     }
 
-    // 場のパワー（5スロット）
+    // 場のパワー（5スロット。カスタムモードのリミットブレイクで8）
     let field = panel.querySelector('.seat__field');
     if (!field) {
       field = document.createElement('div');
@@ -117,7 +117,9 @@
     }
     field.innerHTML = '';
     field.hidden = !game.cardsEnabled;
-    for (let i = 0; i < 5; i++) {
+    const slots = Math.max(game.slots || 5, p.cards.field.length);
+    field.classList.toggle('is-wide', slots > 5);
+    for (let i = 0; i < slots; i++) {
       const c = p.cards.field[i];
       // タイルフォースが有効なパワーは緑の縁。詳細にはメモ（唯我独尊の宣言など）も出す
       if (c) field.appendChild(SM.Cards.el(c.cid, { size: 'tiny', cls: c.force ? 'is-force' : '', onClick: () => SM.Cards.showDetail(c.cid, { note: c.note }) }));
@@ -173,7 +175,7 @@
 
   function renderCenter(game) {
     $('center-label').textContent = game.label;
-    $('center-sticks').textContent = `${game.honba}本場 / 供託${game.pot}点`;
+    $('center-sticks').textContent = `${game.honba}本場 / 供託${SM.Main.points(game.pot)}点`;
     $('center-wall').textContent = `残り ${game.wallRemaining}枚`;
     const dora = $('center-dora');
     dora.innerHTML = '';
@@ -231,6 +233,7 @@
     };
     me.hand.forEach((t) => hand.appendChild(make(t, '')));
     if (me.drawn !== null && me.drawn !== undefined) hand.appendChild(make(me.drawn, 'is-drawn'));
+    renderNext(me.next);
     if (me.heldTiles && me.heldTiles.length) {
       const h = document.createElement('div');
       h.className = 'held-tiles';
@@ -269,6 +272,28 @@
     if (me.furiten) addInfo('フリテン', 'furiten');
     // カードの効果で和了れない時（ヤギ・他家の光の護封剣など）も、フリテンと同じように出す
     if (me.noWin && me.noWin.length) addInfo(`和了れない（${me.noWin.map((n) => `《${n}》`).join('')}）`, 'furiten');
+  }
+
+  /**
+   * 予見: 次に自分が普通にツモる牌を、手牌の左の NEXT の枠に出す（予見が無ければ枠を出さない）。
+   * next: { kind, red } / { unknown: true }（決まっていない。？） / { none: true }（山が尽きるなどで、もう普通にツモらない）
+   */
+  function renderNext(next) {
+    const box = $('my-next');
+    box.hidden = !next;
+    // 枠の分だけ手牌を小さくする（CSS の .my-area.has-next）
+    box.closest('.my-area').classList.toggle('has-next', Boolean(next));
+    const slot = box.querySelector('.my-next__tile');
+    slot.innerHTML = '';
+    if (!next) return;
+    if (next.none) {
+      const e = document.createElement('div');
+      e.className = 'my-next__none';
+      e.textContent = '－';
+      slot.appendChild(e);
+      return;
+    }
+    slot.appendChild(T().kindEl(next.kind || 0, { size: 'hand', red: Boolean(next.red), mask: maskAll || Boolean(next.unknown), shine: true }));
   }
 
   function render(game, room) {

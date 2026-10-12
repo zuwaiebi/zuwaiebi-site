@@ -8,6 +8,9 @@
     power: '#0070C0', full: '#FF0000', plus: '#00B050', event: '#FFC000', happening: '#7030A0', random: '#5f6b7a',
   };
   const IMG_DIR = 'data/card_img/';
+  // ミッションで解放していないCカード（カード一覧の locked）: イラストは鍵の絵、テキストはこの文にする
+  const LOCKED_IMG = 'locked.webp';
+  const LOCKED_TEXT = 'このカードはミッションを進めることで明かされる…';
 
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
@@ -60,7 +63,7 @@
   /**
    * カード要素を作る
    * @param {string|null} cid カードID（null なら裏向き）
-   * @param {object} o { size: 'full'|'mini'|'tiny', onClick, cls }
+   * @param {object} o { size: 'full'|'mini'|'tiny', onClick, cls, locked: 解放していないCカードとして出す（イラストとテキストを伏せる。詳細も同じ） }
    */
   function el(cid, o = {}) {
     const size = o.size || 'mini';
@@ -75,30 +78,34 @@
       d.dataset.cid = cid; // チュートリアルが光らせるカードを探す
       const nameLen = [...def.name].length;
       const nameScale = nameLen <= 6 ? 1 : Math.max(0.38, 6 / nameLen);
+      const img = o.locked ? LOCKED_IMG : def.img;
       d.innerHTML = `<div class="card__name" style="--ns:${nameScale}">${esc(def.name)}</div>`
         // イラストがまだ無いカード（新カードなど）は仮の絵（NO IMAGE）。画像を data/card_img/ に置いて build-cards を実行すると差し替わる
-        + `<div class="card__art${def.img || def.typeKey === 'random' ? '' : ' card__art--empty'}">${def.img ? `<img src="${IMG_DIR}${encodeURIComponent(def.img)}" alt="" loading="lazy" draggable="false">` : ''}</div>`
+        + `<div class="card__art${img || def.typeKey === 'random' ? '' : ' card__art--empty'}">${img ? `<img src="${IMG_DIR}${encodeURIComponent(img)}" alt="" loading="lazy" draggable="false">` : ''}</div>`
         + `<div class="card__type">${typeBadge(def)}</div>`
-        + (size === 'full' ? `<div class="card__text">${formatText(def)}</div>` : '');
+        + (size === 'full' ? `<div class="card__text">${o.locked ? `<p>${esc(LOCKED_TEXT)}</p>` : formatText(def)}</div>` : '');
     }
     if (o.onClick) {
       d.classList.add('is-clickable');
       d.addEventListener('click', (e) => { e.stopPropagation(); o.onClick(cid, d); });
     } else if (def && o.detail !== false) {
       d.classList.add('is-clickable');
-      d.addEventListener('click', (e) => { e.stopPropagation(); showDetail(cid); });
+      d.addEventListener('click', (e) => { e.stopPropagation(); showDetail(cid, o.locked ? { locked: true } : {}); });
     }
     return d;
   }
 
-  /** カードの詳細を大きく表示する。actions: [{label, cls, onClick}]、extra: カードの下に出す要素（枚数の増減など） */
+  /**
+   * カードの詳細を大きく表示する。actions: [{label, cls, onClick}]、extra: カードの下に出す要素（枚数の増減など）、
+   * locked: 解放していないCカードとして出す（カード一覧）
+   */
   let shownDetail = null;  // 表示中の詳細（《》のカード名から別のカードを開いた時に「戻る」で戻すため）
   function showDetail(cid, o = {}) {
     shownDetail = { cid, o };
     const box = $('card-detail');
     const body = $('card-detail-body');
     body.innerHTML = '';
-    body.appendChild(el(cid, { size: 'full', detail: false }));
+    body.appendChild(el(cid, { size: 'full', detail: false, locked: o.locked }));
     // 場のパワーのメモ（唯我独尊で宣言した種類・タイルフォースで選んだ牌など）
     if (o.note) {
       const note = document.createElement('p');
@@ -200,5 +207,5 @@
   /** カードではないが、カードと同じ見た目・詳細で出すもの（デッキの「ランダム」）を足す。カード一覧・《》のリンクには出ない */
   function register(def) { DEFS.set(def.id, def); }
 
-  SM.Cards = { el, def: (cid) => DEFS.get(cid), showDetail, hideDetail, showPlayed, showTriggered, init, TYPE_COLOR, linkify, linkHtml, register };
+  SM.Cards = { el, def: (cid) => DEFS.get(cid), showDetail, hideDetail, showPlayed, showTriggered, init, TYPE_COLOR, LOCKED_TEXT, linkify, linkHtml, register };
 })();

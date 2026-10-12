@@ -1,5 +1,5 @@
 // 実績: 達成した記録（このブラウザに保存）・達成した時の知らせ・実績の画面（対局・カード・ミッションのタブ）・報酬（アイコン・BGM）
-// 達成はサーバーが判定して 'achievements' で送ってくる（{id} は達成、{stat, n} は累計の記録、{win} は和了（統計へ）。
+// 達成はサーバーが判定して 'achievements' で送ってくる（{id} は達成、{stat, n} は累計の記録、{win, proof} は和了（統計へ。proof はランキングに登録する証明書）。
 // 累計で何回になったら達成かはここの GOALS。累計の記録は統計（sm_stats.js）でも使う）
 (function () {
   const SM = (window.SuperMahjong = window.SuperMahjong || {});
@@ -67,7 +67,7 @@
         data.stats[ev.stat] = (data.stats[ev.stat] || 0) + (Number(ev.n) || 1);
         for (const [id, [key, goal]] of Object.entries(GOALS)) if (key === ev.stat && data.stats[key] >= goal) unlock(Number(id));
       } else if (ev.id !== undefined) unlock(Number(ev.id));
-      else if (ev.win && SM.Stats) SM.Stats.offerWin(ev.win);
+      else if (ev.win && SM.Stats) SM.Stats.offerWin(ev.win, ev.proof);
     }
     save();
     render();
@@ -206,6 +206,25 @@
     }
   }
 
+  /**
+   * すべての実績を達成にし、ミッション（番号の並び missionIds）をすべてクリア済みにする（部屋のコードに「CMPLT」を入れて参加した時）。
+   * 達成の知らせは出さない。クリア済みは成功回数を1以上にする（挑戦回数も成功回数より少なくならないように）
+   */
+  function unlockAll(missionIds) {
+    const now = Date.now();
+    for (const a of LIST) if (!has(a.id)) data.got[a.id] = now;
+    for (const id of missionIds) {
+      const clear = `mission:clear:${id}`;
+      const tries = `mission:try:${id}`;
+      data.stats[clear] = Math.max(1, data.stats[clear] || 0);
+      data.stats[tries] = Math.max(data.stats[clear], data.stats[tries] || 0);
+    }
+    save();
+    render();
+    for (const f of applyListeners) f();
+    for (const f of listeners) f();
+  }
+
   function init() {
     render();
   }
@@ -214,7 +233,7 @@
   load();
 
   SM.Achievements = {
-    init, apply, has, isVisible, render, rewardIcons, bgmLock, rewardText,
+    init, apply, has, isVisible, render, rewardIcons, bgmLock, rewardText, unlockAll,
     /** 累計の記録（統計で使う） */
     stats: () => ({ ...data.stats }),
     /** 達成した実績を達成した順に [{a: 実績, at: 時刻}] */

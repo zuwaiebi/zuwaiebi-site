@@ -20,6 +20,21 @@
     toastTimer = setTimeout(() => { t.hidden = true; }, 3000);
   }
 
+  // 点数の表示: カスタムモードの青天井で大きくなった時（1億以上）は、上の2つの単位までで出す（例: 527兆7655億）
+  const UNITS = ['', '万', '億', '兆', '京', '垓', '𥝱', '穣', '溝', '澗', '正', '載', '極', '恒河沙', '阿僧祇', '那由他', '不可思議', '無量大数'];
+  function points(n) {
+    const v = Number(n);
+    if (!Number.isFinite(v) || Math.abs(v) < 1e8) return String(n);
+    const a = Math.abs(v);
+    let u = Math.floor(Math.log10(a) / 4);
+    if (a / 10 ** (4 * u) >= 1e4) u++;
+    if (u >= UNITS.length) return v.toExponential(3);
+    const unit = 10 ** (4 * u);
+    const head = Math.floor(a / unit);
+    const rest = Math.floor((a - head * unit) / (unit / 1e4));
+    return `${v < 0 ? '-' : ''}${head}${UNITS[u]}${rest ? `${rest}${UNITS[u - 1]}` : ''}`;
+  }
+
   function seatName(s) {
     const seat = state.room && state.room.seats[s];
     return seat ? seat.name : `P${s + 1}`;
@@ -38,8 +53,8 @@
   function onRoom(m) {
     if (performance.now() < leavingUntil) return;
     const room = m.room;
-    // ミッションの部屋は待機室を通さずにすぐ始まる（作った直後の待機中の知らせは見せない）
-    if (room.mission && room.state === 'waiting') return;
+    // ミッション・デイリーミッションの部屋は待機室を通さずにすぐ始まる（作った直後の待機中の知らせは見せない）
+    if ((room.mission || room.daily) && room.state === 'waiting') return;
     state.room = room;
     // ミッション中はミッションの曲を流す
     SM.Audio.setTrack(room.mission ? SM.Missions.bgmOf(room.mission.id) : null);
@@ -100,12 +115,18 @@
     // チュートリアル中の「退出」は、練習をやめる確認にする
     const tut = Boolean(SM.Tutorial && SM.Tutorial.active());
     const mission = Boolean(state.room && state.room.mission);
-    $('exit-box').querySelector('.result-title').textContent = tut ? 'チュートリアルをやめますか？' : mission ? 'ミッションをやめますか？' : '対局から退出しますか？';
-    $('exit-ok').textContent = tut || mission ? 'やめる' : '退出する';
+    // デイリーミッション: その日1回目の挑戦は、途中でやめても1回目（記録は途中退出）
+    const daily = Boolean(state.room && state.room.daily);
+    $('exit-box').querySelector('.result-title').textContent = tut ? 'チュートリアルをやめますか？'
+      : mission ? 'ミッションをやめますか？' : daily ? 'デイリーミッションをやめますか？' : '対局から退出しますか？';
+    $('exit-ok').textContent = tut || mission || daily ? 'やめる' : '退出する';
     $('exit-text').textContent = tut
       ? '練習はロビーの「ガイド」から、何度でもやり直せます。'
       : mission ? '途中でやめると、このミッションは失敗になります（挑戦した回数には数えます）。'
-        : `退出した席はCPUが最後まで代わりに打ちます。同じブラウザで部屋コード「${code}」を入力すると、途中から戻れます。`;
+        : daily ? (SM.Missions.isFirstDaily(state.room)
+          ? '今日1回目の挑戦は、途中でやめても1回目として扱い、今日の記録は「途中退出」になります（このあと挑戦しても記録されません）。'
+          : '2回目以降の挑戦なので、やめても今日の記録は変わりません。')
+          : `退出した席はCPUが最後まで代わりに打ちます。同じブラウザで部屋コード「${code}」を入力すると、途中から戻れます。`;
     $('exit-box').hidden = false;
   }
 
@@ -115,7 +136,8 @@
       SM.Tutorial.stop();
       return;
     }
-    const mission = Boolean(state.room && state.room.mission);
+    const daily = Boolean(state.room && state.room.daily);
+    const mission = Boolean(state.room && state.room.mission) || daily;
     const code = state.room && !mission ? state.room.code : '';
     $('exit-box').hidden = true;
     SM.Cards.hideDetail();
@@ -135,7 +157,7 @@
     show('screen-lobby');
     if (mission) {
       SM.Lobby.showTab('missions');
-      toast('ミッションをやめました');
+      toast(daily ? 'デイリーミッションをやめました' : 'ミッションをやめました');
     } else toast(code ? `対局から退出しました（部屋コード ${code} で戻れます）` : '対局から退出しました');
   }
 
@@ -149,6 +171,7 @@
     SM.Decks.init();
     SM.Achievements.init();
     SM.Missions.init();
+    SM.Ranking.init();
     SM.CardList.init();
     SM.Lobby.init();
     SM.Input.init();
@@ -180,6 +203,6 @@
     SM.Net.connect();
   }
 
-  SM.Main = { toast, show, seatName, seatIcon, state, askExit };
+  SM.Main = { toast, show, seatName, seatIcon, state, askExit, points };
   document.addEventListener('DOMContentLoaded', init);
 })();

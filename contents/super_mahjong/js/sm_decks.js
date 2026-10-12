@@ -10,6 +10,9 @@
   // 推奨ルール（サーバーの decks.js と同じ）
   const DECK_MIN = 60;
   const SAME_NAME_MAX = 3;
+  // 上限が SAME_NAME_MAX より少ないカード { カード名: 枚数 }
+  const NAME_LIMITS = { '「天和・地和」': 1, '3つの願い': 1 };
+  const sameNameMax = (name) => NAME_LIMITS[name] ?? SAME_NAME_MAX;
   const UNLIMITED_NAMES = ['カチコミ', '目からビーム', '否認'];
   const BANNED_NAMES = ['おばさん'];
   // 作りすぎを防ぐ上限（ルールではない）
@@ -31,8 +34,9 @@
   const EDIT_CARDS = [RANDOM, ...CARDS];
   /** 1種類に入れられる枚数の上限（「ランダム」はデッキの合計の上限まで） */
   const copyMax = (c) => (c === RANDOM ? TOTAL_MAX : COPY_MAX);
-  // デッキのフルパワーとして選べるもの（《ネクロノミコン》のように、ゲーム開始時のフルパワーとして選べないものは除く）
-  const FULLS = ALL.filter((c) => c.typeKey === 'full' && !c.text.includes('ゲーム開始時のフルパワーとして選べない'));
+  // デッキのフルパワーとして選べるもの（すべてのフルパワー。《ネクロノミコン》のように、ゲーム開始時のフルパワーとして
+  // 選べないものも選べるが、推奨ルールには合わない（isBannedFp））
+  const FULLS = ALL.filter((c) => c.typeKey === 'full');
   const BY_ID = new Map([...ALL, RANDOM].map((c) => [c.id, c]));
   const BY_KEY = new Map([...ALL, RANDOM].map((c) => [c.key, c]));
   // 同じ名前のカードが何種類あるか（《プレゼント！》は4種類を合わせて3枚まで）
@@ -40,14 +44,20 @@
   for (const c of CARDS) NAME_KINDS.set(c.name, (NAME_KINDS.get(c.name) || 0) + 1);
   // 使用不可: 《おばさん》と、ミッションモード用のCカード（Cイベント・Cパワー・Cフルパワー。c: true）
   const isBanned = (c) => BANNED_NAMES.includes(c.name) || c.c === true;
-  // Cカードは、ミッションをクリアして解放したものだけデッキに入れられる（SM.Missions。部屋では、ホストが解放したもの rules.cUnlocked）
+  // 推奨ルールでデッキのフルパワーにできない: Cフルパワーと、ゲーム開始時のフルパワーとして選べない《ネクロノミコン》
+  const isNotSelectable = (c) => c.text.includes('ゲーム開始時のフルパワーとして選べない');
+  const isBannedFp = (c) => isBanned(c) || isNotSelectable(c);
+  // Cカードは、ミッションをクリアして解放したものだけデッキに入れられる（SM.Missions。部屋のホストが解放していなくてもよい）
   const myUnlocked = () => (SM.Missions ? SM.Missions.unlockedCIds() : []);
   const isLockedC = (c, unlocked = myUnlocked()) => Boolean(c && c.c === true && !unlocked.includes(c.id));
 
-  // 読み込みでは表記ゆれ（空白・中黒・全角半角）を無視して探す。同じ名前のカードが何種類もある時は key（プレゼント！#2 など）で書く
+  // 読み込みでは表記ゆれ（空白・中黒・全角半角）を無視して探す。同じ名前のカードが何種類もある時は key（プレゼント！#2 など）で書く。
+  // 名前を変えたカード（一攫千金）は key が前の名前のままなので、テキストはカード名で書き、読み込みは key でもカード名でもよい
   const norm = (s) => String(s).normalize('NFKC').replace(/[\s･・·]/g, '');
-  const CARD_BY_NORM = new Map(EDIT_CARDS.map((c) => [norm(c.key), c]));
-  const FULL_BY_NORM = new Map(FULLS.map((c) => [norm(c.key), c]));
+  const textName = (c) => (c.key.includes('#') ? c.key : c.name);
+  const byNorm = (list) => new Map(list.flatMap((c) => [[norm(c.key), c], [norm(textName(c)), c]]));
+  const CARD_BY_NORM = byNorm(EDIT_CARDS);
+  const FULL_BY_NORM = byNorm(FULLS);
 
   let decks = [];   // 保存してあるデッキ { id, name, fp: カードID|null, counts: { カードID: 枚数 } }
   const listeners = [];
@@ -100,17 +110,20 @@
   // ---- 検査 ----
   /**
    * デッキの枚数と、部屋のルールで引っかかる所（サーバーの checkDeck と同じ）。problems が空なら使える。
-   * rule: 'recommended'（推奨ルール）| 'free'（制限なし。解放していないCカードとフルパワーだけ見る）。
-   * cUnlocked: 制限なしで使えるCカードのID（部屋のルールの cUnlocked。省くと自分が解放したもの）
+   * rule: 'recommended'（推奨ルール）| 'free'（制限なし。自分が解放していないCカードとフルパワーだけ見る）|
+   * 'zero'（カスタムモードのデュエリスト＋殿堂ゼロ: 60枚以上・同名カードは3枚まで。使用不可のカードも使えるが、Cカードは自分が解放したもの）
    */
-  function check(d, rule = 'recommended', cUnlocked = null) {
+  function check(d, rule = 'recommended') {
     const total = totalOf(d);
     const problems = [];
-    const unlocked = Array.isArray(cUnlocked) ? cUnlocked : myUnlocked();
-    if (rule === 'free') {
+    const unlocked = myUnlocked();
+    const lockedNames = () => {
       const locked = [];
       for (const c of CARDS) if (d.counts[c.id] > 0 && isLockedC(c, unlocked) && !locked.includes(c.name)) locked.push(c.name);
-      for (const name of locked) problems.push(`《${name}》はこの部屋ではまだ使えません`);
+      return locked;
+    };
+    if (rule === 'free') {
+      for (const name of lockedNames()) problems.push(`《${name}》はまだ解放していません`);
     } else {
       if (total < DECK_MIN) problems.push(`${DECK_MIN}枚以上必要です（あと${DECK_MIN - total}枚）`);
       const byName = new Map();
@@ -122,14 +135,16 @@
         if (isBanned(c) && !banned.includes(c.name)) banned.push(c.name);
       }
       for (const [name, n] of byName) {
-        if (n <= SAME_NAME_MAX || UNLIMITED_NAMES.includes(name)) continue;
-        problems.push(`《${name}》は${NAME_KINDS.get(name) > 1 ? '合わせて' : ''}${SAME_NAME_MAX}枚までです（${n}枚）`);
+        const max = rule === 'zero' ? SAME_NAME_MAX : sameNameMax(name);
+        if (n <= max || UNLIMITED_NAMES.includes(name)) continue;
+        problems.push(`《${name}》は${NAME_KINDS.get(name) > 1 ? '合わせて' : ''}${max}枚までです（${n}枚）`);
       }
-      for (const name of banned) problems.push(`《${name}》は使えません`);
+      if (rule === 'zero') for (const name of lockedNames()) problems.push(`《${name}》はまだ解放していません`);
+      else for (const name of banned) problems.push(`《${name}》は使えません`);
     }
     if (!d.fp) problems.push('フルパワーを選んでください');
-    else if (rule !== 'free' && isBanned(BY_ID.get(d.fp))) problems.push(`フルパワーの《${BY_ID.get(d.fp).name}》は使えません`);
-    else if (rule === 'free' && isLockedC(BY_ID.get(d.fp), unlocked)) problems.push(`フルパワーの《${BY_ID.get(d.fp).name}》はこの部屋ではまだ使えません`);
+    else if (rule === 'recommended' && isBannedFp(BY_ID.get(d.fp))) problems.push(`フルパワーの《${BY_ID.get(d.fp).name}》は使えません`);
+    else if (rule !== 'recommended' && isLockedC(BY_ID.get(d.fp), unlocked)) problems.push(`フルパワーの《${BY_ID.get(d.fp).name}》はまだ解放していません`);
     if (total > TOTAL_MAX) problems.push(`デッキは${TOTAL_MAX}枚までです`);
     return { total, problems };
   }
@@ -141,22 +156,29 @@
   function isOver(d, c) {
     if (!d.counts[c.id] || c === RANDOM) return false;
     if (isBanned(c)) return true;
-    return !UNLIMITED_NAMES.includes(c.name) && sameNameCount(d, c) > SAME_NAME_MAX;
+    return !UNLIMITED_NAMES.includes(c.name) && sameNameCount(d, c) > sameNameMax(c.name);
   }
 
   /** カードの詳細に出す、推奨ルールでの枚数の決まり */
   function limitText(c) {
     if (c === RANDOM) return '何枚でも入れられます（推奨ルールの60枚にも数えます）';
     if (isLockedC(c)) return 'ミッションモード用のCカードです。ミッションをクリアすると解放されます（推奨ルールでは使えません）';
-    if (isBanned(c)) return c.c ? 'ミッションモード用のCカードです。推奨ルールでは使えません（制限なしの部屋で、ホストも解放していれば使えます）' : '推奨ルールでは使えません';
+    if (isBanned(c)) return c.c ? 'ミッションモード用のCカードです。推奨ルールでは使えません（制限なしの部屋なら使えます）' : '推奨ルールでは使えません';
     if (UNLIMITED_NAMES.includes(c.name)) return '推奨ルールでも何枚でも入れられます';
-    if (NAME_KINDS.get(c.name) > 1) return `推奨ルールでは《${c.name}》を合わせて${SAME_NAME_MAX}枚まで`;
-    return `推奨ルールでは${SAME_NAME_MAX}枚まで`;
+    if (NAME_KINDS.get(c.name) > 1) return `推奨ルールでは《${c.name}》を合わせて${sameNameMax(c.name)}枚まで`;
+    return `推奨ルールでは${sameNameMax(c.name)}枚まで`;
+  }
+
+  /** フルパワーを選ぶ画面のカードの詳細に出す、推奨ルールで使えるか（使えるものは何も出さない） */
+  function fpLimitText(c) {
+    if (c.c) return 'ミッションモード用のCフルパワーです。推奨ルールでは使えません（制限なしの部屋なら使えます）';
+    if (isNotSelectable(c)) return '推奨ルールでは使えません（制限なしの部屋なら使えます）';
+    return '';
   }
 
   /**
    * 既定の山札から推奨ルールで使えないカードを除き、同名カードを推奨ルールの上限までにしたもの。
-   * 上限を超える同名カードは番号（key の #n）の小さい方から残す（《プレゼント！》は蛇・正倉院・ロマノグリラ。CPUのデッキはランダムに3種類）
+   * 上限を超える同名カードは番号（key の #n）の小さい方から残す（《プレゼント！》は蛇・正倉院・手記。CPUのデッキはランダムに3種類）
    */
   function defaultCounts() {
     const counts = {};
@@ -169,7 +191,7 @@
       groups.get(c.name).push(c);
     }
     for (const group of groups.values()) {
-      let room = SAME_NAME_MAX;
+      let room = sameNameMax(group[0].name);
       for (const c of group.slice().sort((a, b) => no(a) - no(b))) {
         const n = Math.min(counts[c.id], room);
         room -= n;
@@ -181,12 +203,13 @@
   }
 
   /** サーバーに送る形 */
-  const toServer = (d) => ({ name: d.name, counts: { ...d.counts }, fp: d.fp });
+  // サーバーへ送る形。cUnlocked は自分が解放したCカード（制限なしの部屋で、サーバーもこれでデッキを検査する）
+  const toServer = (d) => ({ name: d.name, counts: { ...d.counts }, fp: d.fp, cUnlocked: myUnlocked() });
 
   // ---- テキストで書き出す・読み込む ----
   function toText(d) {
-    const lines = [TEXT_HEAD, `名前: ${d.name}`, `フルパワー: ${d.fp ? BY_ID.get(d.fp).key : 'なし'}`];
-    for (const c of EDIT_CARDS) if (d.counts[c.id] > 0) lines.push(`${c.key} ×${d.counts[c.id]}`);
+    const lines = [TEXT_HEAD, `名前: ${d.name}`, `フルパワー: ${d.fp ? textName(BY_ID.get(d.fp)) : 'なし'}`];
+    for (const c of EDIT_CARDS) if (d.counts[c.id] > 0) lines.push(`${textName(c)} ×${d.counts[c.id]}`);
     return lines.join('\n');
   }
 
@@ -476,10 +499,10 @@
       const el = SM.Cards.el(c.id, {
         size: 'mini',
         cls: edit && edit.deck.fp === c.id ? 'is-current' : '',
-        onClick: () => SM.Cards.showDetail(c.id, { actions: [{ label: 'これに決める', onClick: () => chooseFp(c.id) }] }),
+        onClick: () => SM.Cards.showDetail(c.id, { extra: fpNote(c), actions: [{ label: 'これに決める', onClick: () => chooseFp(c.id) }] }),
       });
-      if (isBanned(c)) {
-        // Cフルパワーは推奨ルールでは使えない（制限なしの部屋だけ）
+      if (isBannedFp(c)) {
+        // Cフルパワーと《ネクロノミコン》は推奨ルールでは使えない（制限なしの部屋だけ）
         const box = document.createElement('div');
         box.className = 'card-count deck-card';
         box.appendChild(el);
@@ -491,6 +514,19 @@
       } else grid.appendChild(el);
     }
     $('deck-fp').hidden = false;
+  }
+
+  /** フルパワーの詳細の下に出す、推奨ルールで使えない時の知らせ（使えるものは null） */
+  function fpNote(c) {
+    const text = fpLimitText(c);
+    if (!text) return null;
+    const box = document.createElement('div');
+    box.className = 'card-count-edit';
+    const note = document.createElement('div');
+    note.className = 'card-count-edit__def is-over';
+    note.textContent = text;
+    box.appendChild(note);
+    return box;
   }
 
   function chooseFp(cid) {

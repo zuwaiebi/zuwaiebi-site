@@ -45,6 +45,17 @@ button:disabled { cursor: default; opacity: 0.6; }
 .panel.lobby { width: min(560px, 100%); margin: 0 auto; padding: 24px 16px 40px; }
 .logo { text-align: center; font-size: 40px; letter-spacing: 0.1em; margin: 8px 0 20px; color: var(--accent); text-shadow: 0 2px 0 #0006; }
 .logo--small { font-size: 26px; }
+/* 更新履歴は既定で畳んでおき、見出しを押すと開く */
+.version-history > summary { cursor: pointer; list-style: none; }
+.version-history > summary::-webkit-details-marker { display: none; }
+.version-history > summary h2 { display: inline; margin: 0; }
+.version-history > summary::before { content: '▶'; display: inline-block; width: 1.2em; font-size: 13px; color: #b5651d; transition: transform 0.15s; }
+.version-history[open] > summary { margin-bottom: 12px; }
+.version-history[open] > summary::before { transform: rotate(90deg); }
+.version-history h3 { margin: 12px 0 4px; font-size: 15px; }
+.version-history h3:first-of-type { margin-top: 0; }
+.version-history ul { margin: 4px 0; padding-left: 1.4em; font-size: 14px; line-height: 1.7; }
+.version-label { margin: -16px 0 14px; text-align: center; font-size: 12px; opacity: 0.6; }
 .field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 16px; font-size: 14px; }
 input[type=text], input[type=number], select {
   font: inherit; padding: 8px 10px; border-radius: 6px; border: 1px solid #0003; background: #fff; color: #222;
@@ -290,7 +301,24 @@ input[type=text], input[type=number], select {
 .riichi-waits { font-size: 12px; color: var(--accent); min-height: 16px; }
 /* 選んだ牌が持ち上がっても上が切れないだけの余白 */
 .my-tiles { display: flex; align-items: flex-end; justify-content: space-between; gap: 8px; padding-top: 17px; overflow-x: auto; }
-.my-hand { display: flex; align-items: flex-end; }
+/* 手牌は左（予見の NEXT の枠の隣）、副露は右に寄せる */
+.my-hand { display: flex; align-items: flex-end; margin-right: auto; }
+/* 予見: 次に自分が普通にツモる牌（手牌の左。上に NEXT と書いた四角い枠） */
+.my-next {
+  flex: none; display: flex; flex-direction: column; align-items: center; gap: 3px;
+  padding: 3px 5px 5px; border: 2px solid var(--accent); border-radius: 8px; background: #0006;
+}
+.my-next__label { font-family: sans-serif; font-size: 10px; font-weight: 900; letter-spacing: 0.12em; line-height: 1; color: var(--accent); }
+.my-next__tile { display: flex; }
+.my-next__tile .tile { --w: calc(var(--hand-w) * 0.85); margin: 0; }
+/* もう普通にツモらない時（山が尽きるなど） */
+.my-next__none {
+  width: calc(var(--hand-w) * 0.85); height: calc(var(--hand-w) * 0.85 * 4 / 3);
+  display: flex; align-items: center; justify-content: center;
+  border: 1px dashed #fff6; border-radius: 4px; color: var(--muted); font-size: 14px;
+}
+/* NEXT の枠を出している間は、その分だけ手牌を小さくする（横長の画面は余裕があるのでそのまま。下のメディアクエリ） */
+.my-area.has-next { --hand-w: min(54px, calc((100vw - 24px) / 17)); }
 .my-hand .tile { cursor: pointer; transition: transform 0.08s; }
 .my-hand .tile.is-drawn { margin-left: calc(var(--hand-w) * 0.35); }
 .my-hand .tile.is-selected { transform: translateY(-12px); }
@@ -301,6 +329,8 @@ input[type=text], input[type=number], select {
   .my-hand .tile:not(.is-disabled):hover { transform: translateY(-8px); }
 }
 .my-melds { display: flex; gap: 4px; align-items: flex-end; }
+/* 鳴いていない時は、空の副露の分の隙間も詰める（スマホで手牌が横にはみ出さないように） */
+.my-melds:empty { display: none; }
 /* 二足の草鞋: もう一方の手牌（普通の手牌の下） */
 .my-alt { display: flex; align-items: flex-end; gap: 8px; padding-top: 4px; overflow-x: auto; }
 .my-alt__label { flex: none; align-self: center; font-size: 11px; color: var(--muted); white-space: nowrap; }
@@ -375,6 +405,7 @@ input[type=text], input[type=number], select {
   .seat--left, .seat--right { justify-self: center; }
   .seat--top, .seat--bottom { justify-self: center; }
   .center { flex-direction: column; min-width: 200px; padding: 14px; }
+  .my-area.has-next { --hand-w: min(52px, calc((100vw - 300px) / 16)); }
 }
 
 /* ---------- カード ---------- */
@@ -483,6 +514,10 @@ input[type=text], input[type=number], select {
   border: none; border-radius: 22px; padding: 10px 18px; font-weight: 800; color: #2b1a00;
   background: var(--accent); box-shadow: 0 4px 14px #000a; animation: peekPulse 1.6s ease-in-out infinite;
 }
+/* ドラッグで動かせる（押しただけなら戻る）。動かした後は左上の位置で置く */
+.prompt-peek { cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; }
+.prompt-peek.is-moved { transform: none; }
+.prompt-peek.is-dragging { cursor: grabbing; animation: none; }
 .prompt-peek__label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .prompt-peek__timer { font-size: 12px; font-weight: 700; color: #7a2b00; white-space: nowrap; }
 @keyframes peekPulse { 50% { box-shadow: 0 4px 14px #000a, 0 0 0 6px #f2b33d55; } }
@@ -689,6 +724,11 @@ input[type=text], input[type=number], select {
   .my-cards__fp { position: relative; }
   .my-cards__fp .my-cards__label { top: -14px; left: auto; right: 0; }
   .my-tiles { padding-top: 16px; }
+  .my-area.has-next { --hand-w: min(54px, calc((100vw - 20px) / 15.4 - 3px)); }
+  .my-next { padding: 2px 3px 3px; gap: 2px; }
+  .my-next__label { font-size: 7px; letter-spacing: 0.04em; }
+  .my-next__tile .tile { --w: var(--hand-w); }
+  .my-next__none { width: var(--hand-w); height: calc(var(--hand-w) * 4 / 3); }
   .actions { min-height: 40px; gap: 6px; padding-top: 4px; }
   .action-button { padding: 8px 16px; font-size: 15px; }
   .call-actions { right: 6px; gap: 8px; }
@@ -862,13 +902,40 @@ input[type=text], input[type=number], select {
 .mission__deck select { flex: 1; min-width: 0; }
 .mission__hint, .mission__nodeck { flex-basis: 100%; font-size: 12px; color: #666; }
 
+/* デイリーミッション（「ミッション」タブの上）: その日のルール・対戦相手・今日の記録・挑戦する */
+.daily__body { display: flex; flex-direction: column; gap: 10px; text-align: left; }
+.daily__loading { font-size: 13px; color: #666; }
+.daily__meta { font-weight: 800; font-size: 16px; }
+.daily__rules { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 6px 12px; }
+.daily__rule { display: grid; grid-template-columns: auto 1fr; align-items: baseline; gap: 0 8px; padding: 6px 8px; border-radius: 8px; background: #f3eddc; font-size: 13px; }
+.daily__rule-kind { grid-row: span 2; align-self: center; font-size: 11px; color: #fff; background: #6b5b3e; border-radius: 4px; padding: 1px 6px; }
+.daily__rule-name { font-weight: 700; }
+.daily__rule-desc { font-size: 11px; color: #666; line-height: 1.35; }
+.daily__rule.is-red .daily__rule-name { color: #c0392b; }
+.daily__rule.is-red .daily__rule-desc { color: #d0665a; }
+.daily__cpus { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; font-size: 14px; }
+.daily__cpus-label { font-size: 12px; color: #666; }
+.daily__cpu { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; }
+.daily__cpu .picon { --pi: 30px; }
+.daily__record { display: flex; flex-direction: column; gap: 6px; padding: 10px; border-radius: 8px; box-shadow: 0 0 0 2px var(--accent); background: #fff8e1; }
+.daily__record-title { font-size: 13px; font-weight: 800; color: #b5651d; }
+.daily__record-none { font-size: 16px; font-weight: 700; color: #555; }
+.daily__ranking { margin: 0; }
+.daily__ranking li { gap: 10px; padding: 8px 12px; font-size: 15px; }
+.daily__ranking .name { min-width: 0; overflow-wrap: anywhere; }
+.daily__ranking .name .picon { --pi: 26px; }
+.daily__go { border: 1px solid #0001; border-radius: 8px; }
+.mission-final.is-daily { box-shadow: 0 0 0 3px var(--accent); }
+.mission-final.is-daily .mission-final__title { color: #b5651d; }
+.mission-final__share { align-self: flex-end; margin-top: 4px; }
+
 /* 終局画面のミッションの結果 */
 .mission-final { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; padding: 12px 14px; border-radius: 10px; background: var(--card); color: var(--card-ink); text-align: left; }
 .mission-final.is-clear { box-shadow: 0 0 0 3px var(--accent); background: #fff8e1; }
 .mission-final__title { font-size: 22px; font-weight: 800; }
 .mission-final.is-clear .mission-final__title { color: #b5651d; }
 .mission-final.is-fail .mission-final__title { color: #555; }
-.mission-final__name, .mission-final__score { font-size: 13px; color: #555; }
+.mission-final__name, .mission-final__score, .mission-final__note { font-size: 13px; color: #555; }
 .mission-final__unlocks { list-style: none; margin: 6px 0 0; padding: 8px 0 0; border-top: 1px dashed #0002; display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
 .mission-final__unlocks li { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
 .mission-final__row { display: inline-flex; align-items: center; gap: 6px; padding-left: 4px; }
@@ -941,6 +1008,38 @@ input[type=text], input[type=number], select {
 .stat-group > summary .stat-row__label::before { content: '▶'; display: inline-block; width: 1.2em; font-size: 11px; color: #b5651d; transition: transform 0.15s; }
 .stat-group[open] > summary .stat-row__label::before { transform: rotate(90deg); }
 .stat-row--leaf .stat-row__label { padding-left: 1.2em; }
+
+/* 「Xで共有」「ランキングに登録」を並べる（データタブの和了・ミッションタブの今日の記録・デイリーミッションの終局画面）。
+   登録できない時の説明はその下 */
+.share-buttons { display: inline-flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; margin-left: auto; }
+.rank-submit { padding: 8px 18px; }
+.rank-submit__note { font-size: 12px; color: #666; }
+.stats-best__foot .rank-submit__note { flex-basis: 100%; }
+
+/* ---------- ランキング ---------- */
+.rankboard { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; text-align: left; }
+.rankboard__item { border: 1px solid #0001; border-radius: 8px; background: #fff; overflow: hidden; }
+.rankboard__item.is-you { border-color: var(--accent); background: #fff8e1; }
+.rankboard__head { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 2px 10px; padding: 8px 10px; }
+summary.rankboard__head { cursor: pointer; list-style: none; }
+summary.rankboard__head::-webkit-details-marker { display: none; }
+.rankboard__rank { grid-row: span 2; min-width: 2.4em; font-size: 18px; font-weight: 800; text-align: center; color: #555; }
+.rankboard__rank.is-1 { color: #c99a06; }
+.rankboard__rank.is-2 { color: #7d8a96; }
+.rankboard__rank.is-3 { color: #b0683a; }
+.rankboard__name { display: inline-flex; align-items: center; gap: 6px; min-width: 0; font-weight: 700; overflow-wrap: anywhere; }
+.rankboard__name .picon { --pi: 28px; }
+.rankboard__value { font-weight: 800; white-space: nowrap; text-align: right; }
+.rankboard__sub { min-width: 0; font-size: 12px; color: #666; overflow-wrap: anywhere; }
+.rankboard__sub:last-child { grid-column: 2 / -1; }
+/* 押すと和了の形が開く印 */
+summary .rankboard__sub::before { content: '▶'; display: inline-block; width: 1.4em; font-size: 10px; color: #b5651d; transition: transform 0.15s; }
+details[open] > summary .rankboard__sub::before { transform: rotate(90deg); }
+.rankboard__points { font-size: 12px; color: #666; white-space: nowrap; text-align: right; }
+.rankboard__hand { padding: 10px; border-top: 1px dashed #0002; }
+.rankboard__date { display: block; padding: 0 10px 10px; font-size: 12px; color: #666; text-align: right; }
+.rankboard__empty { padding: 12px; border-radius: 8px; background: #fff9; font-size: 13px; color: #888; text-align: center; }
+.rankboard__rules { margin: 0 0 4px; font-size: 13px; font-weight: 700; color: #6b5b3e; }
 .stat-children { padding-left: 1.1em; border-left: 2px solid #f2b33d55; margin-left: 0.45em; }
 .stat-children .stat-row { font-size: 13px; }
 
@@ -1002,3 +1101,46 @@ input[type=text], input[type=number], select {
   .tutor-coach__text { font-size: 13px; line-height: 1.6; }
 }
 @media (prefers-reduced-motion: reduce) { .tutor-ring { animation: none; transition: none; } }
+
+/* ---------- カスタムモード ---------- */
+/* ルールのチェックボックス（部屋を作る・待機室）。デッキの決め方は必ずどれか1つ */
+.custom-rules { grid-column: 1 / -1; display: flex; flex-direction: column; gap: 10px; padding: 10px; border-radius: 8px; background: #f3eddc; }
+.custom-rules__group { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 6px 12px; }
+.custom-rules__title { grid-column: 1 / -1; font-size: 13px; font-weight: 700; }
+.rule-form label.custom-rule { flex-direction: row; align-items: flex-start; gap: 6px; font-size: 13px; cursor: pointer; }
+.custom-rule input { flex: none; margin: 2px 0 0; }
+.custom-rule__text { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.custom-rule__name { font-weight: 700; }
+.custom-rule__desc { font-size: 11px; color: #666; line-height: 1.35; }
+.rule-form select:disabled, .rule-form input:disabled, .rule-form label.check:has(input:disabled) { opacity: 0.55; }
+
+/* 対局の初めの選択: 決まっているフルパワー・絞り込み・2つ以上選ぶ時の印・ドラフトのセットと選んだカード */
+.pregame-filter { display: block; width: min(420px, 100%); margin: 0 auto 12px; }
+.pregame-fixed, .draft-picked { margin: 12px auto; text-align: center; }
+.pregame-row__label { font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+.pregame-row { display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; }
+.pregame-row .card { --cw: 54px; }
+.fp-grid .card.is-chosen { outline: 3px solid #e67e22; outline-offset: 2px; transform: translateY(-4px); }
+#fp-actions { margin-top: 14px; }
+.fp-grid.is-sets { flex-direction: column; flex-wrap: nowrap; align-items: stretch; gap: 12px; }
+.draft-set { background: var(--panel); border-radius: 10px; padding: 8px 8px 10px; }
+.draft-set__head { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 6px; font-weight: 700; }
+.draft-set__head .main-button { padding: 6px 14px; }
+.draft-set__cards { display: flex; gap: 6px; justify-content: center; }
+.fp-grid .draft-set__cards .card { --cw: min(104px, calc((100vw - 64px) / 5.3)); }
+
+/* フルパワーが2つ以上（文殊の知恵）: クールタイムをカードの下に出す。手札が多い時（リミットブレイク）は少し小さく */
+.my-cards__fp-item { display: flex; flex-direction: column; align-items: center; gap: 1px; }
+.my-cards__cd { font-size: 10px; color: var(--muted); line-height: 1; }
+/* 場のパワーが8スロット（リミットブレイク） */
+.seat__field.is-wide .card--tiny { --cw: 26px; }
+@media (max-width: 899px) {
+  .seat .seat__field.is-wide .card--tiny { --cw: min(26px, calc((100vw - 60px) / 3 / 8.6)); }
+  .seat--bottom .seat__field.is-wide .card--tiny { --cw: 26px; }
+}
+@media (max-width: 699px) {
+  .my-cards.is-many .card--mini { --cw: min(60px, calc((100vw - 46px) / 9)); }
+}
+/* サドンデス〜ヤギは赤文字 */
+.custom-rule.is-red .custom-rule__name { color: #c0392b; }
+.custom-rule.is-red .custom-rule__desc { color: #d0665a; }

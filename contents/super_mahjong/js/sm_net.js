@@ -3,6 +3,8 @@
   const SM = (window.SuperMahjong = window.SuperMahjong || {});
   const TOKEN_KEY = 'super_mahjong_token';
   const NAME_KEY = 'super_mahjong_name';
+  // プレイヤーID（ランキングで同じ人を見分ける。サーバーが作って welcome で渡す。他の人には送られない）
+  const PID_KEY = 'super_mahjong_pid';
 
   const store = {
     get(k) { try { return localStorage.getItem(k); } catch { return null; } },
@@ -31,7 +33,7 @@
     ws.onopen = () => {
       retry = 0;
       statusCb('open');
-      ws.send(JSON.stringify({ type: 'hello', token: store.get(TOKEN_KEY), name: getName(), icon: SM.Icons ? SM.Icons.mine() : null }));
+      ws.send(JSON.stringify({ type: 'hello', token: store.get(TOKEN_KEY), name: getName(), icon: SM.Icons ? SM.Icons.mine() : null, pid: store.get(PID_KEY) }));
       const pending = queue;
       queue = [];
       for (const m of pending) ws.send(JSON.stringify(m));
@@ -39,7 +41,10 @@
     ws.onmessage = (e) => {
       let m;
       try { m = JSON.parse(e.data); } catch { return; }
-      if (m.type === 'welcome') store.set(TOKEN_KEY, m.token);
+      if (m.type === 'welcome') {
+        store.set(TOKEN_KEY, m.token);
+        if (m.pid) store.set(PID_KEY, m.pid);
+      }
       if (local && m.type !== 'welcome') return;
       deliver(m);
     };
@@ -58,8 +63,9 @@
   function send(obj) {
     if (local) return Boolean(local(obj));
     if (ws && ws.readyState === 1) { ws.send(JSON.stringify(obj)); return true; }
-    // 回答は古くなるので溜めない。部屋の操作などは接続後に送る
-    if (obj.type !== 'answer' && obj.type !== 'ready') queue.push(obj);
+    // 回答は古くなるので溜めない。ランキングは開いている時につながったら問い合わせ直し、登録はつながってから押し直してもらう。
+    // 部屋の操作などは接続後に送る
+    if (!['answer', 'ready', 'getRanking', 'submitRanking'].includes(obj.type)) queue.push(obj);
     return false;
   }
 

@@ -1,9 +1,10 @@
-// 統計: いちばん翻数の高い和了（結果の画面と同じ表示・Xで共有）と、これまでの記録（階層になっていて、下の項目は上を押すと開く）。
+// 統計: いちばん翻数の高い和了（結果の画面と同じ表示・Xで共有・ランキングに登録）と、これまでの記録（階層になっていて、下の項目は上を押すと開く）。
 // 記録はサーバーが数えて 'achievements' で送ってきたものを、実績と同じくこのブラウザに保存している（SM.Achievements.stats()）
 (function () {
   const SM = (window.SuperMahjong = window.SuperMahjong || {});
   const $ = (id) => document.getElementById(id);
-  const BEST_KEY = 'super_mahjong_best_win';   // { result, label(局), red, n, names, doraKinds, allDora, at }
+  // { result, label(局), red, n, names, doraKinds, allDora, at, proof（ランキングに登録する証明書。機能の追加前の和了には無い）, ranked（登録した） }
+  const BEST_KEY = 'super_mahjong_best_win';
   const CARDS = new Map((window.SM_CARDS || []).map((c) => [c.key, c]));
 
   // ---- いちばん翻数の高い和了 ----
@@ -14,14 +15,27 @@
     } catch { return null; }
   }
 
-  /** 和了した時（サーバーから届く）: 翻数が多い方、同じなら和了点（本場・供託を除く）が高い方を残す */
-  function offerWin(w) {
+  /**
+   * 和了した時（サーバーから届く。proof はランキングに登録する証明書）: 翻数が多い方、同じなら和了点（本場・供託を除く）が高い方を残す。
+   * 証明書の無い前の記録は、同じ翻数・和了点の証明書のある和了で置き換える（登録できるように）
+   */
+  function offerWin(w, proof) {
     if (!w || !w.result) return;
     const best = loadBest();
-    const better = !best || w.result.han > best.result.han
-      || (w.result.han === best.result.han && (w.result.points || 0) > (best.result.points || 0));
+    const han = w.result.han;
+    const pts = w.result.points || 0;
+    const better = !best || han > best.result.han || (han === best.result.han && pts > (best.result.points || 0))
+      || (proof && !best.proof && han === best.result.han && pts === (best.result.points || 0));
     if (!better) return;
-    SM.Net.store.set(BEST_KEY, JSON.stringify({ ...w, at: Date.now() }));
+    SM.Net.store.set(BEST_KEY, JSON.stringify({ ...w, at: Date.now(), proof: proof || null }));
+  }
+
+  /** ランキングに登録した印を保存する（その間に別の和了に置き換わっていたら何もしない） */
+  function markRanked(proof) {
+    const cur = loadBest();
+    if (!cur || !proof || cur.proof !== proof) return;
+    cur.ranked = true;
+    SM.Net.store.set(BEST_KEY, JSON.stringify(cur));
   }
 
   // 牌の文字（共有する文に手牌を並べる）
@@ -53,11 +67,13 @@
     return `スーパー麻雀で${yaku}を和了しました！\n${value}　${r.label}\n${tiles}\n#スーパー麻雀`;
   }
 
-  function share(b) {
+  /** Xの投稿画面を開く（文と、このページのURL。デイリーミッションの記録の共有でも使う） */
+  function postToX(text) {
     const url = `${location.origin}${location.pathname}`;
-    const href = `https://x.com/intent/post?text=${encodeURIComponent(shareText(b))}&url=${encodeURIComponent(url)}`;
+    const href = `https://x.com/intent/post?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`;
     window.open(href, '_blank', 'noopener');
   }
+  const share = (b) => postToX(shareText(b));
 
   function renderBest() {
     const box = $('stats-best');
@@ -70,12 +86,9 @@
       box.appendChild(p);
       return;
     }
-    // 結果の画面と同じ表示（その時のドラの牌種・赤ドラの設定・席の名前で描く）
     const hand = document.createElement('div');
     hand.className = 'stats-best__hand';
-    const room = { seats: (b.names || []).map((name) => ({ name })) };
-    SM.Tiles.setView({ tiles: {}, reds: [], allDora: b.allDora, doraKinds: b.doraKinds || [], doraTiles: [], asKinds: {} });
-    SM.Tiles.withKnown(b.result, () => SM.Result.agariBlock(hand, room, b.result, b.red !== false, b.label));
+    drawWin(hand, b);
     box.appendChild(hand);
     const foot = document.createElement('div');
     foot.className = 'stats-best__foot';
@@ -87,8 +100,26 @@
     btn.className = 'main-button stats-share';
     btn.textContent = 'Xで共有';
     btn.addEventListener('click', () => share(b));
-    foot.append(date, btn);
+    // 「Xで共有」の横に「ランキングに登録」（証明書の無い前の記録は押せない）
+    const rank = SM.Ranking.button('best', loadBest, markRanked,
+      'この和了はランキング機能の追加前の記録のため、ランキングに登録できません。これ以上の和了をすると登録できるようになります。');
+    const buttons = document.createElement('span');
+    buttons.className = 'share-buttons';
+    buttons.append(btn, rank.btn);
+    foot.append(date, buttons, rank.note);
     box.appendChild(foot);
+  }
+
+  /**
+   * 和了を結果の画面と同じ形で描く（その時のドラの牌種・赤ドラの設定・席の名前で）。
+   * winnerName を渡すと和了した人の名前をそれにする（ランキングでは登録した時の名前）
+   */
+  function drawWin(box, b, winnerName) {
+    const names = (b.names || []).slice();
+    if (winnerName !== undefined) names[b.result.winner] = winnerName;
+    const room = { seats: names.map((name) => ({ name })) };
+    SM.Tiles.setView({ tiles: {}, reds: [], allDora: b.allDora, doraKinds: b.doraKinds || [], doraTiles: [], asKinds: {} });
+    SM.Tiles.withKnown(b.result, () => SM.Result.agariBlock(box, room, b.result, b.red !== false, b.label));
   }
 
   // ---- 記録の一覧 ----
@@ -133,11 +164,15 @@
           { label: '人間2人以上でデッキ構築戦', value: count('played:deck:multi') },
         ] },
         { label: 'ミッションモード', value: count('played:mission') },
+        { label: 'カスタム', value: count('played:custom'), children: [
+          { label: '人間2人以上でカスタム', value: count('played:custom:multi') },
+        ] },
       ] },
-      { label: 'プレイ時間（対局していた時間）', value: time('time:normal', 'time:deck', 'time:mission'), children: [
+      { label: 'プレイ時間（対局していた時間）', value: time('time:normal', 'time:deck', 'time:mission', 'time:custom'), children: [
         { label: '通常戦', value: time('time:normal') },
         { label: 'デッキ構築戦', value: time('time:deck') },
         { label: 'ミッションモード', value: time('time:mission') },
+        { label: 'カスタム', value: time('time:custom') },
       ] },
       { label: '牌を手牌に加えた回数', value: count('tile:deal', 'tile:tsumo', 'tile:cardTsumo', 'tile:cardOther'), children: [
         { label: '配牌で手牌に加えた回数', value: count('tile:deal') },
@@ -256,5 +291,5 @@
     for (const it of items()) list.appendChild(itemEl(it));
   }
 
-  SM.Stats = { render, offerWin, shareText };
+  SM.Stats = { render, offerWin, shareText, postToX, drawWin };
 })();
