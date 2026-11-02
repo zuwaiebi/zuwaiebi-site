@@ -1,6 +1,6 @@
 // 牌の表示。SVGで自作描画し、data/tile_img/<名前>.png があればそちらに差し替える。
 // 名前: 1m..9m, 1p..9p, 1s..9s, 1z..7z(東南西北白發中), 1f..4f(春夏秋冬)。赤ドラは後ろに r（5mr・3pr・1zr など）、
-// オールマイティ牌は joker（赤ドラなら jokerr）、裏面は back
+// 青ドラ（最終兵器・激辛パフェ）は後ろに b（5mb・1zb など）、オールマイティ牌は joker（赤ドラなら jokerr、青ドラなら jokerb）、裏面は back
 (function () {
   const SM = (window.SuperMahjong = window.SuperMahjong || {});
 
@@ -11,7 +11,12 @@
   // 赤ドラの牌: サーバーから届く見えている赤ドラ（山の赤5と、カードで赤ドラにした5以外の牌も）と、
   // 赤ドラありの部屋の山の赤5（牌IDで決まっている。別の牌に変化したものは除く）
   let reds = new Set();
-  const isRed = (id, useRed) => reds.has(id) || (useRed && overrides[id] === undefined && (id === 16 || id === 52 || id === 88));
+  // 青ドラの牌（サーバーから届く見えている青ドラ）。青ドラになった牌は赤ドラではない（山の赤5も）
+  let blues = new Set();
+  const isRed = (id, useRed) => !blues.has(id) && (reds.has(id) || (useRed && overrides[id] === undefined && (id === 16 || id === 52 || id === 88)));
+  const isBlue = (id) => blues.has(id);
+  // 牌の名前の後ろに付ける印（赤ドラ r・青ドラ b）
+  const mark = (id, useRed) => (isBlue(id) ? 'b' : isRed(id, useRed) ? 'r' : '');
   // ドラになる牌種、カードの効果でドラになっている牌（ワイマール憲法の1・9など）、
   // カードの効果で別の牌として扱っている牌 { 牌ID: 牌種 / 'J'（オールマイティ牌） }
   let doraKinds = new Set();
@@ -27,7 +32,7 @@
   const phase = (period) => `${-(Date.now() % period)}ms`;
 
   function nameOf(id, useRed) {
-    return kindNameOf(kindOf(id)) + (isRed(id, useRed) ? 'r' : '');
+    return kindNameOf(kindOf(id)) + mark(id, useRed);
   }
   function kindName(k) { return k >= 27 ? `${k - 26}z` : `${(k % 9) + 1}${SUITS[Math.floor(k / 9)]}`; }
 
@@ -36,8 +41,9 @@
   const FLOWER = ['春', '夏', '秋', '冬'];
   const LABEL = (name) => {
     if (name === 'mask') return '？';
-    // 赤ドラは「3mr」のように3文字目が r（オールマイティ牌は jokerr）
-    const red = name === 'jokerr' || (name.length === 3 && name[2] === 'r') ? '(赤)' : '';
+    // 赤ドラは「3mr」のように3文字目が r（オールマイティ牌は jokerr）。青ドラは b
+    const red = name === 'jokerr' || (name.length === 3 && name[2] === 'r') ? '(赤)'
+      : name === 'jokerb' || (name.length === 3 && name[2] === 'b') ? '(青)' : '';
     if (name.startsWith('joker')) return `オールマイティ${red}`;
     const n = Number(name[0]), s = name[1];
     if (s === 'f') return FLOWER[n - 1] + red;
@@ -68,50 +74,57 @@
     9: [[14, 15], [30, 15], [46, 15], [14, 40], [30, 40], [46, 40], [14, 65], [30, 65], [46, 65]],
   };
 
+  // 青ドラの牌の色（画像が無い時のSVG）
+  const BLUE_DORA = '#1565d8';
+
   function face(name) {
     const n = Number(name[0]), s = name[1];
     const red = name[2] === 'r';
+    const blue = name[2] === 'b';
+    // 赤ドラ・青ドラは牌の絵をその色で描く
+    const tint = red ? RED : blue ? BLUE_DORA : null;
     const num = n;
     let g = '';
     if (s === 'm') {
-      g += `<text x="30" y="34" font-size="27" text-anchor="middle" fill="${red ? RED : INK}" font-weight="700">${KANJI_NUM[num]}</text>`;
-      g += `<text x="30" y="68" font-size="28" text-anchor="middle" fill="${RED}" font-weight="700">萬</text>`;
+      g += `<text x="30" y="34" font-size="27" text-anchor="middle" fill="${tint || INK}" font-weight="700">${KANJI_NUM[num]}</text>`;
+      g += `<text x="30" y="68" font-size="28" text-anchor="middle" fill="${blue ? BLUE_DORA : RED}" font-weight="700">萬</text>`;
     } else if (s === 'p') {
       const pts = PIN[num];
       const r = num === 1 ? 17 : num >= 7 ? 7 : num >= 5 ? 8.5 : 9.5;
       pts.forEach(([x, y], i) => {
-        const col = red ? RED : COLOR[PIN_COL[num][i]];
+        const col = tint || COLOR[PIN_COL[num][i]];
         g += `<circle cx="${x}" cy="${y}" r="${r}" fill="none" stroke="${col}" stroke-width="2.6"/>`;
         g += `<circle cx="${x}" cy="${y}" r="${r * 0.42}" fill="${col}"/>`;
       });
     } else if (s === 's') {
       if (num === 1) {
-        g += `<ellipse cx="30" cy="30" rx="12" ry="14" fill="${red ? RED : GREEN}"/>`;
+        g += `<ellipse cx="30" cy="30" rx="12" ry="14" fill="${tint || GREEN}"/>`;
         g += `<circle cx="34" cy="24" r="3" fill="#fff"/><circle cx="34" cy="24" r="1.6" fill="${INK}"/>`;
-        g += `<path d="M18 40 Q30 72 42 40 Z" fill="${RED}"/><path d="M26 44 L30 70 L34 44 Z" fill="${BLUE}"/>`;
+        g += `<path d="M18 40 Q30 72 42 40 Z" fill="${blue ? BLUE_DORA : RED}"/><path d="M26 44 L30 70 L34 44 Z" fill="${BLUE}"/>`;
       } else {
         const h = num >= 7 ? 15 : 17;
         SOU[num].forEach(([x, y], i) => {
           let col = GREEN;
           if (red || (num === 5 && i === 2) || (num === 7 && i === 0) || (num === 9 && i % 3 === 1)) col = RED;
+          if (blue) col = BLUE_DORA;
           g += `<rect x="${x - 3.2}" y="${y - h / 2}" width="6.4" height="${h}" rx="3" fill="${col}"/>`;
           g += `<line x1="${x - 3.2}" y1="${y}" x2="${x + 3.2}" y2="${y}" stroke="#fff" stroke-width="1.2"/>`;
         });
       }
     } else if (s === 'f') {
-      const col = red ? RED : ['#d1477a', '#2a8c4a', '#c86b1e', '#3d6fb8'][n - 1];
+      const col = tint || ['#d1477a', '#2a8c4a', '#c86b1e', '#3d6fb8'][n - 1];
       g += `<circle cx="30" cy="40" r="20" fill="none" stroke="${col}" stroke-width="3"/>`;
       g += `<text x="30" y="52" font-size="30" text-anchor="middle" fill="${col}" font-weight="700">${FLOWER[n - 1]}</text>`;
     } else {
       if (n === 5) {
-        g += `<rect x="12" y="14" width="36" height="52" rx="4" fill="none" stroke="${red ? RED : BLUE}" stroke-width="2.4"/>`;
+        g += `<rect x="12" y="14" width="36" height="52" rx="4" fill="none" stroke="${tint || BLUE}" stroke-width="2.4"/>`;
       } else {
-        const col = red || n === 7 ? RED : n === 6 ? GREEN : INK;
+        const col = tint || (n === 7 ? RED : n === 6 ? GREEN : INK);
         g += `<text x="30" y="53" font-size="36" text-anchor="middle" fill="${col}" font-weight="700">${HONOR[n - 1]}</text>`;
       }
     }
-    // 赤ドラは色だけでは分かりにくい牌（中など）もあるので、右上に赤い印を付ける
-    if (red) g += `<circle cx="50" cy="10" r="4" fill="${RED}"/>`;
+    // 赤ドラ・青ドラは色だけでは分かりにくい牌（中・五筒など）もあるので、右上にその色の印を付ける
+    if (tint) g += `<circle cx="50" cy="10" r="4" fill="${tint}"/>`;
     return g;
   }
 
@@ -128,7 +141,7 @@
         + ['#e74c3c', '#f39c12', '#27ae60', '#2980b9'].map((c, i) => `<circle cx="30" cy="43" r="${21 - i * 4.5}" fill="none" stroke="${c}" stroke-width="3"/>`).join('')
         + '<text x="30" y="51" font-size="20" text-anchor="middle" fill="#8e44ad" font-weight="700">★</text>'
         + '<text x="30" y="17" font-size="11" text-anchor="middle" fill="#8e44ad" font-weight="700" font-family="sans-serif">ALL</text>'
-        + (name === 'jokerr' ? `<circle cx="50" cy="10" r="4" fill="${RED}"/>` : '');
+        + (name === 'jokerr' ? `<circle cx="50" cy="10" r="4" fill="${RED}"/>` : name === 'jokerb' ? `<circle cx="50" cy="10" r="4" fill="${BLUE_DORA}"/>` : '');
     } else if (name === 'back') {
       body = '<rect x="1" y="1" width="58" height="78" rx="7" fill="#e58a2c" stroke="#9b5513" stroke-width="2"/>'
         + '<rect x="7" y="7" width="46" height="66" rx="4" fill="none" stroke="#ffd29a" stroke-width="1.5"/>';
@@ -142,7 +155,7 @@
 
   // 画像差し替え: 1m.png が読めたら画像で表示する。画像が無い牌（読めなかった牌）だけ自作SVGに戻す
   // ファイル名: 1m〜9s.png、字牌は 東南西北白發中.png、花牌は 春夏秋冬.png、オールマイティ牌は almighty.png、裏は 裏.png。
-  // 赤ドラは後ろに r（5mr.png・3pr.png・東r.png・春r.png・almightyr.png など）
+  // 赤ドラは後ろに r（5mr.png・3pr.png・東r.png・春r.png・almightyr.png など）、青ドラは後ろに b（5mb.png・東b.png・almightyb.png など）
   // （以前の名前 0m.png・1z.png・back.png でもよい）
   let useImages = false;
   const IMG_DIR = 'data/tile_img/';
@@ -151,10 +164,13 @@
     if (name === 'back') return ['裏.png', 'back.png'];
     if (name === 'joker') return ['almighty.png'];
     if (name === 'jokerr') return ['almightyr.png'];
+    if (name === 'jokerb') return ['almightyb.png'];
     const n = Number(name[0]), s = name[1];
     const red = name[2] === 'r';
-    if (s === 'z') return red ? [`${HONOR[n - 1]}r.png`] : [`${HONOR[n - 1]}.png`, `${name}.png`];
-    if (s === 'f') return [`${FLOWER[n - 1]}${red ? 'r' : ''}.png`];
+    const blue = name[2] === 'b';
+    if (s === 'z') return red || blue ? [`${HONOR[n - 1]}${name[2]}.png`] : [`${HONOR[n - 1]}.png`, `${name}.png`];
+    if (s === 'f') return [`${FLOWER[n - 1]}${red || blue ? name[2] : ''}.png`];
+    if (blue) return [`${n}${s}b.png`];
     if (red) return n === 5 ? [`5${s}r.png`, `0${s}.png`] : [`${n}${s}r.png`];
     return [`${name}.png`];
   }
@@ -194,9 +210,9 @@
   function el(id, o = {}) {
     const known = !o.mask && id !== null && id !== undefined;
     const useRed = o.red !== false;
-    // 赤ドラの牌は、別の牌として見せる時もその牌の赤ドラ（赤5を別の色の5として扱うならその色の赤5）
-    const red = known && isRed(id, useRed);
-    const r = red ? 'r' : '';
+    // 赤ドラ・青ドラの牌は、別の牌として見せる時もその牌の赤ドラ・青ドラ（赤5を別の色の5として扱うならその色の赤5）
+    const r = known ? mark(id, useRed) : '';
+    const red = r === 'r';
     const fixed = known && !o.plain && o.treat ? o.treat : null;
     const shown = fixed && typeof fixed.kind === 'number' ? fixed.kind : null;
     const name = o.mask ? 'mask' : !known ? 'back' : (shown !== null ? kindNameOf(shown) : kindNameOf(kindOf(id))) + r;
@@ -312,6 +328,7 @@
     setView(game) {
       overrides = game.tiles || {};
       reds = new Set(game.reds || []);
+      blues = new Set(game.blues || []);
       allDora = Boolean(game.allDora);
       doraKinds = new Set(game.doraKinds || []);
       doraTiles = new Set(game.doraTiles || []);
@@ -322,14 +339,16 @@
      * （他家の手牌は対局中は見えていないので、卓の情報だけでは正しく描けない）
      */
     withKnown(info, fn) {
-      const saved = { overrides, reds };
+      const saved = { overrides, reds, blues };
       overrides = { ...overrides, ...((info && info.tiles) || {}) };
       reds = new Set([...reds, ...((info && info.reds) || [])]);
+      blues = new Set([...blues, ...((info && info.blues) || [])]);
       try {
         return fn();
       } finally {
         overrides = saved.overrides;
         reds = saved.reds;
+        blues = saved.blues;
       }
     },
   };

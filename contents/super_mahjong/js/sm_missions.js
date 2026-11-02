@@ -1,19 +1,22 @@
 // ミッションモード（画面）: ロビーの「ミッション」タブ（デイリーミッション・挑戦できるミッション・成功回数/挑戦回数・デッキを選んで挑戦）、
 // 終局画面のミッションの結果、ミッションをクリアして解放したもの（ネームドCPU・Cカード）、待機室の「CPUを変更」。
-// ミッションのデータは js/sm_missions_data.js（自動生成）。成功・挑戦の回数はサーバーが統計の記録として送ってくる
-// （SM.Achievements.stats() の mission:clear:<番号>・mission:try:<番号>）。最初は3つまで挑戦でき、1つクリアするたびに1つ増える
+// ミッションのデータは js/sm_missions_data.js（自動生成）。ミッションは id（成功・挑戦の回数と実績で覚えるID。変わらない）と
+// no（一覧の並び順。画面の「ミッション○」。ミッション一覧.txt で付け直されることがある）を持つ。成功・挑戦の回数はサーバーが統計の記録として
+// 送ってくる（SM.Achievements.stats() の mission:clear:<ID>・mission:try:<ID>）。最初は3つまで挑戦でき、1つクリアするたびに1つ増える
 (function () {
   const SM = (window.SuperMahjong = window.SuperMahjong || {});
   const $ = (id) => document.getElementById(id);
   const DATA = window.SM_MISSIONS || { missions: [], cpus: {}, iconFiles: {} };
-  const MISSIONS = DATA.missions.slice().sort((a, b) => a.id - b.id);
+  const MISSIONS = DATA.missions.slice().sort((a, b) => a.no - b.no);
   const BY_ID = new Map(MISSIONS.map((m) => [m.id, m]));
   const FIRST_OPEN = 3;   // 最初から挑戦できるミッションの数
-  const DECK_KEY = 'super_mahjong_mission_deck';   // ミッションで使うデッキの id
+  const DECK_KEY = 'super_mahjong_mission_deck';   // ミッション・デイリーミッションのデッキを選ぶ欄の保存キー（SM.Decks.pickedIn）
   const CARD_BY_KEY = new Map((window.SM_CARDS || []).map((c) => [c.key, c]));
   const LENGTH = { ikkyoku: '一局戦', tonpuu: '東風戦', hanchan: '半荘戦' };
+  // 自分だけに働くルール（ミッションの「自分だけ〇〇状態で」）の説明で、全員のルールの説明（SM.Lobby.CUSTOM_FLAGS）と違うもの
+  const SELF_DESC = { yagi: '自分の場にヤギがある状態で局が始まる' };
 
-  let open = null;          // 開いているミッションの番号
+  let open = null;          // 開いているミッションのID
   let last = null;          // 最後に挑戦したミッション { id, deckId }（終局画面の「もう一度挑戦」）
   const finals = new Map(); // 終局画面: `部屋コード:対局の番号` -> 初めてのクリアで解放したもの（描き直しても消えないように）
 
@@ -24,8 +27,19 @@
   }
   const isCleared = (id) => progress(id).clear > 0;
   const clearedCount = () => MISSIONS.filter((m) => isCleared(m.id)).length;
-  /** 挑戦できるミッション（番号の小さい順に、3 + クリアした数だけ。それ以外は出さない） */
-  const visible = () => MISSIONS.slice(0, FIRST_OPEN + clearedCount());
+  /** 番号の小さい順に挑戦できるミッションの数（3 + クリアした数） */
+  const openCount = () => FIRST_OPEN + clearedCount();
+  /**
+   * 挑戦できるミッション（番号の小さい順に、3 + クリアした数だけ。それ以外は出さない）。クリアしたもの・挑戦したことがあるものは、
+   * 一覧の並びが変わって後ろになってもそのまま出す
+   */
+  const visible = () => MISSIONS.filter((m, i) => {
+    if (i < openCount()) return true;
+    const p = progress(m.id);
+    return p.clear > 0 || p.tries > 0;
+  });
+  /** 挑戦する前に自分のデッキを選ぶミッションか（オールフォーワンなどは対局の初めに選ぶ。サーバーの missions.js の needsDeck と同じ） */
+  const needsDeck = (m) => !m.custom || m.custom.deck === 'duelist';
   /** ミッションに出てくるネームドCPU（鏡のCPUは入らない） */
   const cpusOf = (m) => [...new Set(m.seats.filter((s) => s.cpu).map((s) => s.cpu))];
   /** CPUたちが使うCカード */
@@ -33,8 +47,19 @@
     .map((k) => CARD_BY_KEY.get(k)).filter(Boolean);
   /** クリアしたミッションのCPU（通常の部屋の「CPUを変更」で選べる） */
   const unlockedCpus = () => [...new Set(MISSIONS.filter((m) => isCleared(m.id)).flatMap(cpusOf))];
-  /** 解放したCカードのID（そのCPUたちが使うCカード） */
-  const unlockedCIds = () => cCardsOf(unlockedCpus()).map((c) => c.id);
+  // 部屋のコード「CMPLT」（全開放）を使った: どのネームドCPUのデッキにも入っていないCカードも解放する（2026-10-31 相談して決めた）
+  const UNLOCK_ALL_KEY = 'super_mahjong_unlock_all';
+  const unlockedAll = () => SM.Net && SM.Net.store.get(UNLOCK_ALL_KEY) === '1';
+  /** どのネームドCPUのデッキにも入っていないCカード（ミッションでは解放されない） */
+  const orphanCCards = () => {
+    const inDecks = new Set(Object.values(DATA.cpus).flatMap((c) => c.cCards || []));
+    return (window.SM_CARDS || []).filter((c) => c.c === true && !inDecks.has(c.key));
+  };
+  /** 解放したCカードのID（そのCPUたちが使うCカード。CMPLTを使っていれば、どのデッキにも入っていないCカードも） */
+  const unlockedCIds = () => [
+    ...cCardsOf(unlockedCpus()).map((c) => c.id),
+    ...(unlockedAll() ? orphanCCards().map((c) => c.id) : []),
+  ];
   /** ネームドCPUのアイコンのID（サーバーと同じ「n:アイコン名」） */
   const cpuIcon = (name) => `n:${(DATA.cpus[name] && DATA.cpus[name].icons[0]) || name}`;
   const bgmOf = (id) => (BY_ID.get(id) ? BY_ID.get(id).bgm.file : null);
@@ -45,8 +70,11 @@
     const before = unlockedCpus();
     const cpus = cpusOf(m).filter((n) => !before.includes(n));
     const had = new Set(unlockedCIds());
+    // 次のミッションは、番号の順に挑戦できる数が1つ増えて出てくるもの（クリア・挑戦したことがあって、もう出ているものなら無し）
+    const shown = new Set(visible().map((x) => x.id));
+    const next = MISSIONS[openCount()] || null;
     return {
-      next: MISSIONS[visible().length] || null,
+      next: next && !shown.has(next.id) ? next : null,
       cpus,
       cards: cCardsOf(cpus).filter((c) => !had.has(c.id)),
     };
@@ -84,40 +112,73 @@
     head.type = 'button';
     head.className = 'mission__head';
     head.setAttribute('aria-expanded', String(open === m.id));
-    head.append(span('mission__no', `ミッション${m.id}`), span('mission__title', m.title));
+    head.append(span('mission__no', `ミッション${m.no}`), span('mission__title', m.title));
     const score = span('mission__score', `${p.clear ? '✓ ' : ''}${p.clear}/${p.tries}`);
     score.title = '成功回数/挑戦回数';
     head.appendChild(score);
     head.addEventListener('click', () => { open = open === m.id ? null : m.id; render(); });
     const body = document.createElement('div');
     body.className = 'mission__body';
-    // 一覧に出すのは番号・名前・条件・人数と長さだけ（相手のCPUや曲は挑戦するまで見せない）
+    // 一覧に出すのは番号・名前・条件・人数と長さ・ルールだけ（相手のCPUや曲は挑戦するまで見せない）
     body.append(
       span('mission__cond', `条件: ${m.cond}`),
       span('mission__meta', `${m.players === 3 ? '三麻（3人）' : '四麻（4人）'}・${LENGTH[m.length] || ''}`),
     );
+    const rules = missionRulesList(m);
+    if (rules) body.appendChild(rules);
+    if (m.early) body.appendChild(span('mission__hint', '条件を満たした時点で、対局の途中でやめても成功になります（点滅する「退出」から）。'));
     li.append(head, body);
     if (open === m.id) li.appendChild(goBox(m));
     return li;
   }
 
+  /** ルールの一覧（[種類, [キー, 名前, 説明, 赤文字]] の並び。赤のルールは赤文字）。デイリーミッションと同じ形 */
+  function rulesList(rows) {
+    const ul = document.createElement('ul');
+    ul.className = 'daily__rules';
+    for (const [kind, def] of rows) {
+      if (!def) continue;
+      const [, name, desc, red] = def;
+      const li = document.createElement('li');
+      li.className = `daily__rule${red ? ' is-red' : ''}`;
+      li.append(span('daily__rule-kind', kind), span('daily__rule-name', name), span('daily__rule-desc', desc));
+      ul.appendChild(li);
+    }
+    return ul;
+  }
+
+  /** ミッションのルール（全員に働くカスタムモードのルールと、自分だけに働くルール。どちらも無ければ null） */
+  function missionRulesList(m) {
+    const rows = [];
+    if (m.custom) {
+      rows.push(['デッキ', SM.Lobby.CUSTOM_DECKS.find(([k]) => k === m.custom.deck)]);
+      for (const f of SM.Lobby.CUSTOM_FLAGS.filter(([k]) => m.custom[k])) rows.push(['ルール', f]);
+    }
+    for (const key of m.selfRules || []) {
+      const f = SM.Lobby.CUSTOM_FLAGS.find(([k]) => k === key);
+      if (f) rows.push(['自分だけ', [f[0], f[1], SELF_DESC[key] || f[2], f[3]]]);
+    }
+    return rows.length ? rulesList(rows) : null;
+  }
+
   /** デッキの検査のルール rule（'recommended' 推奨ルール / 'zero' 殿堂ゼロ）に合うか */
   const deckOk = (d, rule = 'recommended') => !SM.Decks.check(d, rule).problems.length;
-  /** ミッションで使うデッキ（rule に合うもの。前に選んだもの、無ければ最初のもの） */
+  /** ミッションで使うデッキ（「自分のデッキ」「サンプルデッキ」の今の出どころで rule に合うもの。前に選んだもの、無ければ最初のもの） */
   function deckPick(rule = 'recommended') {
-    const ok = SM.Decks.list().filter((d) => deckOk(d, rule));
-    const id = SM.Net.store.get(DECK_KEY);
-    return ok.find((d) => d.id === id) || ok[0] || null;
+    const ok = SM.Decks.listIn(SM.Decks.srcIn(DECK_KEY)).filter((d) => deckOk(d, rule));
+    const cur = SM.Decks.pickedIn(DECK_KEY);
+    return (cur && ok.includes(cur) ? cur : null) || ok[0] || null;
   }
 
   /**
-   * デッキを選ぶ欄を box に足す（rule に合うものだけ選べる）。選んでいるデッキを返す関数を返す。
+   * デッキを選ぶ欄を box に足す（「自分のデッキ」「サンプルデッキ」を切り替えて、rule に合うものだけ選べる）。選んでいるデッキを返す関数を返す。
    * 合うデッキが無ければ「デッキ構築へ」を出して null
    */
   function deckField(box, rule, ruleName) {
+    box.appendChild(SM.Decks.srcTabs(DECK_KEY, () => render()));
     const pick = deckPick(rule);
     if (!pick) {
-      box.appendChild(span('mission__nodeck', `${ruleName}に合うデッキがありません。「デッキ構築」でデッキを作ってください。`));
+      box.appendChild(span('mission__nodeck', `${ruleName}に合うデッキがありません。「デッキ構築」でデッキを作るか、「サンプルデッキ」から選んでください。`));
       const b = document.createElement('button');
       b.type = 'button';
       b.className = 'sub-button';
@@ -126,7 +187,7 @@
       box.appendChild(b);
       return null;
     }
-    const list = SM.Decks.list();
+    const list = SM.Decks.listIn(SM.Decks.srcIn(DECK_KEY));
     const label = document.createElement('label');
     label.className = 'mission__deck';
     label.append('デッキ ');
@@ -140,7 +201,7 @@
       sel.appendChild(o);
     }
     sel.value = pick.id;
-    sel.addEventListener('change', () => SM.Net.store.set(DECK_KEY, sel.value));
+    sel.addEventListener('change', () => SM.Decks.setPickedIn(DECK_KEY, list.find((d) => d.id === sel.value) || null));
     label.appendChild(sel);
     box.appendChild(label);
     return () => list.find((d) => d.id === sel.value);
@@ -155,23 +216,29 @@
     return go;
   };
 
-  /** 開いたミッションの、デッキを選んで挑戦する欄 */
+  /** 開いたミッションの、デッキを選んで挑戦する欄（自分のデッキを使わないミッションは「挑戦する」だけ） */
   function goBox(m) {
     const box = document.createElement('div');
     box.className = 'mission__go';
+    if (!needsDeck(m)) {
+      box.append(goButton(() => start(m.id, null)), span('mission__hint', 'このミッションでは自分のデッキを使いません（対局の初めに選びます）。'));
+      return box;
+    }
     const deck = deckField(box, 'recommended', '推奨ルール');
     if (!deck) return box;
     box.append(goButton(() => start(m.id, deck())), span('mission__hint', 'デッキは推奨ルールに合うものだけ使えます。'));
     return box;
   }
 
-  /** ミッションに挑戦する（サーバーが一人用の部屋を作って、すぐ始める） */
+  /** ミッション（ID）に挑戦する（サーバーが一人用の部屋を作って、すぐ始める）。自分のデッキを使わないミッションは deck が null */
   function start(id, deck) {
-    if (!deck || !deckOk(deck)) { SM.Main.toast('推奨ルールに合うデッキを選んでください'); return; }
-    SM.Net.store.set(DECK_KEY, deck.id);
+    const m = BY_ID.get(id);
+    const own = !m || needsDeck(m);
+    if (own && (!deck || !deckOk(deck))) { SM.Main.toast('推奨ルールに合うデッキを選んでください'); return; }
+    if (own) SM.Decks.setPickedIn(DECK_KEY, deck);
     SM.Net.setName(myName());
-    last = { id, deckId: deck.id };
-    SM.Net.send({ type: 'startMission', mission: id, deck: SM.Decks.toServer(deck) });
+    last = { id, deckId: own ? deck.id : null };
+    SM.Net.send({ type: 'startMission', mission: id, deck: own ? SM.Decks.toServer(deck) : null });
   }
 
   /** 終局画面の「もう一度挑戦」: 同じミッションに同じデッキで（デッキが無くなっていたら、選べるデッキで） */
@@ -179,7 +246,9 @@
     if (room && room.daily) { retryDaily(room); return; }
     const id = (last && last.id) || (room && room.mission && room.mission.id);
     if (!id) return;
-    const d = (last && SM.Decks.list().find((x) => x.id === last.deckId && deckOk(x))) || deckPick();
+    if (BY_ID.has(id) && !needsDeck(BY_ID.get(id))) { start(id, null); return; }
+    const prev = last && SM.Decks.byId(last.deckId);
+    const d = (prev && deckOk(prev) ? prev : null) || deckPick();
     if (!d) { SM.Main.toast('推奨ルールに合うデッキがありません'); return; }
     start(id, d);
   }
@@ -324,19 +393,10 @@
     }
     box.appendChild(span('daily__meta', `${daily.players === 3 ? '三麻（3人）' : '四麻（4人）'}・${LENGTH[daily.length] || ''}・カスタム`));
     // ルール: デッキの決め方1つ・黒のルール2つ・赤のルール1つ（名前と説明。赤のルールは赤文字）
-    const rules = document.createElement('ul');
-    rules.className = 'daily__rules';
-    const rule = (kind, def) => {
-      if (!def) return;
-      const [, name, desc, red] = def;
-      const li = document.createElement('li');
-      li.className = `daily__rule${red ? ' is-red' : ''}`;
-      li.append(span('daily__rule-kind', kind), span('daily__rule-name', name), span('daily__rule-desc', desc));
-      rules.appendChild(li);
-    };
-    rule('デッキ', SM.Lobby.CUSTOM_DECKS.find(([k]) => k === daily.custom.deck));
-    for (const f of SM.Lobby.CUSTOM_FLAGS.filter(([k]) => daily.custom[k])) rule('ルール', f);
-    box.appendChild(rules);
+    box.appendChild(rulesList([
+      ['デッキ', SM.Lobby.CUSTOM_DECKS.find(([k]) => k === daily.custom.deck)],
+      ...SM.Lobby.CUSTOM_FLAGS.filter(([k]) => daily.custom[k]).map((f) => ['ルール', f]),
+    ]));
     // 対戦相手のCPU（通常のミッションと違い、誰が出るかも見せる）
     const cpus = document.createElement('div');
     cpus.className = 'daily__cpus';
@@ -368,7 +428,7 @@
     if (!daily) return;
     const duelist = daily.custom.deck === 'duelist';
     if (duelist && (!deck || !deckOk(deck, deckRuleOf(daily)))) { SM.Main.toast('デイリーミッションのルールに合うデッキを選んでください'); return; }
-    if (deck) SM.Net.store.set(DECK_KEY, deck.id);
+    if (deck) SM.Decks.setPickedIn(DECK_KEY, deck);
     dailyDeckId = deck ? deck.id : null;
     SM.Net.setName(myName());
     SM.Net.send({ type: 'startDaily', date: daily.date, deck: deck ? SM.Decks.toServer(deck) : null, cUnlocked: unlockedCIds() });
@@ -380,7 +440,8 @@
     let deck = null;
     if (daily.custom.deck === 'duelist') {
       const rule = deckRuleOf(daily);
-      deck = SM.Decks.list().find((d) => d.id === dailyDeckId && deckOk(d, rule)) || deckPick(rule);
+      const prev = SM.Decks.byId(dailyDeckId);
+      deck = (prev && deckOk(prev, rule) ? prev : null) || deckPick(rule);
       if (!deck) { SM.Main.toast('デイリーミッションのルールに合うデッキがありません'); return; }
     }
     startDaily(deck);
@@ -426,7 +487,10 @@
     const box = document.createElement('div');
     box.className = `mission-final ${res && res.cleared ? 'is-clear' : 'is-fail'}`;
     box.appendChild(span('mission-final__title', !res ? 'ミッション中断' : res.cleared ? 'ミッションクリア！' : 'ミッション失敗'));
-    box.appendChild(span('mission-final__name', `ミッション${m.id}「${m.title}」　条件: ${m.cond}`));
+    box.appendChild(span('mission-final__name', `ミッション${m.no}「${m.title}」${res && res.stage === 2 ? '（2回戦）' : ''}　条件: ${m.cond}`));
+    // 終局を待たずに条件を満たして、途中でやめた時・次の対局に進まなかった時
+    if (res && res.quit) box.appendChild(span('mission-final__note', '条件を満たしたので、対局の途中でやめました（順位と点数はやめた時のものです）。'));
+    if (res && res.declined) box.appendChild(span('mission-final__note', '「いいえ」を選んだので、ミッション失敗になりました。'));
     box.appendChild(span('mission-final__score', ''));
     if (unlocks) {
       const ul = document.createElement('ul');
@@ -437,7 +501,7 @@
         fill(li);
         ul.appendChild(li);
       };
-      if (unlocks.next) add('新しいミッション', (li) => li.append(`ミッション${unlocks.next.id}「${unlocks.next.title}」`));
+      if (unlocks.next) add('新しいミッション', (li) => li.append(`ミッション${unlocks.next.no}「${unlocks.next.title}」`));
       // CPU・Cカードは1つずつ縦に並べる
       if (unlocks.cpus.length) {
         add('CPU（「CPUを変更」で選べます）', (li) => {
@@ -468,6 +532,163 @@
     if (!el) return;
     const p = progress(id || (SM.Main.state.room && SM.Main.state.room.mission && SM.Main.state.room.mission.id));
     el.textContent = `成功 ${p.clear}回 / 挑戦 ${p.tries}回`;
+  }
+
+  // ---- 次の対局に進むかを聞く暗転した画面 ----
+  // 2回戦のあるミッションで1回戦の条件を満たして終局すると、部屋が 'interlude' になる。見せる文・ゆっくり見せる部分・選択肢は
+  // サーバーが部屋情報の interlude（{ message: { lines, slow }, choices }）で送る。黒地に白の明朝体で1文字ずつ出し、
+  // 出し終えたら選択肢（選んでいる方を橙のかっこで囲む。既定は最後）。1つ目なら次の対局、それ以外ならやめる（missionChoice）
+  const TYPE_MS = 110;        // 1文字
+  const LINE_MS = 400;        // 改行
+  const BLANK_MS = 1000;      // 空行
+  const SLOW_PAUSE_MS = 1200; // ゆっくり見せる部分の前
+  const SLOW_MS = 560;        // ゆっくり見せる部分の1文字
+  const CHOICE_MS = 700;      // 文を出し終えてから選択肢を出すまで
+  let interKey = null;        // 出している暗転（`部屋コード:対局の番号`。同じ知らせが何度届いても始めから出し直さない）
+  let interTimer = null;
+  let interPick = 0;
+  let interDone = null;       // 文を最後まですぐ出す（押した時）
+
+  /** 文を1文字ずつ出す手順 [{ ch, wait }]（wait はその文字を出すまでの待ち） */
+  function typeSteps({ lines = [], slow = '' }) {
+    const steps = [];
+    lines.forEach((line, i) => {
+      if (i > 0) steps.push({ ch: '\n', wait: line ? LINE_MS : 0 });
+      if (!line) { steps.push({ ch: '', wait: BLANK_MS }); return; }
+      const at = slow ? line.indexOf(slow) : -1;
+      [...line].forEach((ch, j) => {
+        const inSlow = at >= 0 && j >= at && j < at + slow.length;
+        steps.push({ ch, wait: j === at ? SLOW_PAUSE_MS : inSlow ? SLOW_MS : TYPE_MS });
+      });
+    });
+    return steps;
+  }
+
+  function showInterlude(room) {
+    const key = `${room.code}:${room.gameNo}`;
+    if (interKey === key) return;
+    interKey = key;
+    clearTimeout(interTimer);
+    const info = room.interlude || {};
+    const text = $('interlude-text');
+    const box = $('interlude-choices');
+    text.textContent = '';
+    box.hidden = true;
+    box.innerHTML = '';
+    const steps = typeSteps(info.message || {});
+    const choices = info.choices && info.choices.length ? info.choices : ['はい', 'いいえ'];
+    interPick = choices.length - 1;
+    const buttons = choices.map((label, i) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'interlude__choice';
+      b.textContent = label;
+      b.addEventListener('mouseenter', () => markChoice(i));
+      b.addEventListener('focus', () => markChoice(i));
+      b.addEventListener('click', () => choose(i));
+      return b;
+    });
+    box.append(...buttons);
+    markChoice(interPick);
+    const showChoices = () => {
+      interDone = null;
+      box.hidden = false;
+      buttons[interPick].focus({ preventScroll: true });
+    };
+    let i = 0;
+    const next = () => {
+      if (i >= steps.length) { interTimer = setTimeout(showChoices, CHOICE_MS); return; }
+      const step = steps[i++];
+      interTimer = setTimeout(() => { text.textContent += step.ch; next(); }, step.wait);
+    };
+    // 文の途中で押すと、最後まですぐ出す
+    interDone = () => {
+      clearTimeout(interTimer);
+      text.textContent = steps.map((x) => x.ch).join('');
+      showChoices();
+    };
+    next();
+  }
+
+  function markChoice(i) {
+    interPick = i;
+    document.querySelectorAll('#interlude-choices .interlude__choice').forEach((b, j) => b.classList.toggle('is-on', j === i));
+  }
+
+  function choose(i) {
+    const box = $('interlude-choices');
+    if (box.hidden || box.dataset.sent === interKey) return;
+    box.dataset.sent = interKey;
+    for (const b of box.querySelectorAll('button')) b.disabled = true;
+    SM.Net.send({ type: 'missionChoice', yes: i === 0 });
+  }
+
+  function interludeKeys(e) {
+    if (!$('screen-interlude').classList.contains('active')) return;
+    const box = $('interlude-choices');
+    if (box.hidden) {
+      if ((e.key === 'Enter' || e.key === ' ') && interDone) { e.preventDefault(); interDone(); }
+      return;
+    }
+    const n = box.querySelectorAll('button').length;
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { e.preventDefault(); markChoice((interPick + n - 1) % n); }
+    else if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { e.preventDefault(); markChoice((interPick + 1) % n); }
+    else if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); choose(interPick); }
+  }
+
+  // ---- 結果の画面の後に見せる画像 ----
+  // ミッションの結果に treasure（{ img, text }。サーバーから。2回戦をクリアした時）があれば、結果の画面から出る時（ミッション一覧へ・
+  // もう一度挑戦）に、画面に収まる一番大きな大きさの画像と、余った所に文を見せる。押すと閉じて続ける（同じ対局では1回だけ）
+  const treasureShown = new Set();
+  let treasureThen = null;
+
+  function afterResult(room, then) {
+    const t = room && room.missionResult && room.missionResult.treasure;
+    const key = room ? `${room.code}:${room.gameNo}` : '';
+    if (!t || treasureShown.has(key)) { then(); return; }
+    treasureShown.add(key);
+    treasureThen = then;
+    const img = $('treasure-img');
+    $('treasure-text').textContent = t.text || '';
+    img.onload = layoutTreasure;
+    img.src = t.img;
+    $('treasure').hidden = false;
+    layoutTreasure();
+  }
+
+  function closeTreasure() {
+    if ($('treasure').hidden) return;
+    $('treasure').hidden = true;
+    const then = treasureThen;
+    treasureThen = null;
+    if (then) then();
+  }
+
+  /** 画像を画面に収まる一番大きな大きさにし、余った向き（横か縦）に文を置く。余りが狭すぎる時は文の分だけ画像を小さくする */
+  function layoutTreasure() {
+    const box = $('treasure');
+    const img = $('treasure-img');
+    const text = $('treasure-text');
+    if (box.hidden || !img.naturalWidth) return;
+    const W = box.clientWidth;
+    const H = box.clientHeight;
+    const MIN_TEXT = 0.2;   // 文に残す、画面の幅（高さ）の割合の最小
+    const side = W / H > img.naturalWidth / img.naturalHeight;   // 横に余る
+    const scale = side
+      ? Math.min(H / img.naturalHeight, (W * (1 - MIN_TEXT)) / img.naturalWidth)
+      : Math.min(W / img.naturalWidth, (H * (1 - MIN_TEXT)) / img.naturalHeight);
+    img.style.width = `${Math.floor(img.naturalWidth * scale)}px`;
+    img.style.height = `${Math.floor(img.naturalHeight * scale)}px`;
+    box.classList.toggle('is-column', !side);
+    // 文は余った所に収まる一番大きな文字に
+    const room = side ? { w: W - img.naturalWidth * scale, h: H } : { w: W, h: H - img.naturalHeight * scale };
+    let size = Math.min(room.w / 4, room.h / 2, 64);
+    text.style.padding = `${Math.round(Math.min(room.w, room.h) * 0.06)}px`;
+    for (let i = 0; i < 30 && size > 10; i++) {
+      text.style.fontSize = `${size}px`;
+      if (text.scrollWidth <= text.clientWidth + 1 && text.scrollHeight <= text.clientHeight + 1) break;
+      size *= 0.9;
+    }
   }
 
   // ---- 待機室の「CPUを変更」 ----
@@ -515,13 +736,23 @@
       if (shown()) render();
     });
     SM.Net.on('room', trackDaily);
+    // 次の対局に進むかを聞く暗転した画面: 文の途中で押すと最後まで出す。キーでも選べる
+    $('interlude-text').addEventListener('click', () => { if (interDone) interDone(); });
+    document.addEventListener('keydown', interludeKeys);
+    // 結果の画面の後の画像: 押すと閉じる
+    $('treasure').addEventListener('click', closeTreasure);
+    document.addEventListener('keydown', (e) => { if (!$('treasure').hidden && ['Enter', ' ', 'Escape'].includes(e.key)) { e.preventDefault(); closeTreasure(); } });
+    window.addEventListener('resize', layoutTreasure);
   }
 
   SM.Missions = {
     init, render, visible, progress, isCleared, unlockedCpus, unlockedCIds, cpuIcon, bgmOf, finalBlock, retry, openCpuPicker, isFirstDaily,
+    showInterlude, afterResult,
     get: (id) => BY_ID.get(id) || null,
-    /** すべてのミッションの番号（部屋のコード「CMPLT」で、すべてクリア済みにする時） */
+    /** すべてのミッションのID（部屋のコード「CMPLT」で、すべてクリア済みにする時） */
     allIds: () => MISSIONS.map((m) => m.id),
+    /** 部屋のコード「CMPLT」: どのネームドCPUのデッキにも入っていないCカードも解放する */
+    unlockOrphans: () => SM.Net.store.set(UNLOCK_ALL_KEY, '1'),
     /** 読み込んだ今日のデイリーミッション（ランキングの画面に出す日付とルールの文。まだ届いていなければ null） */
     dailyInfo: () => (daily ? { date: daily.date, label: dailyRulesText(daily) } : null),
   };

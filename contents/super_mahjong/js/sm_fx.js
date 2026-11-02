@@ -1,4 +1,4 @@
-// 演出: サイコロを投げる・じゃんけんでお互いに何を出したか・ルーレット（新世界より）
+// 演出: サイコロを投げる・じゃんけんでお互いに何を出したか・ルーレット（新世界より）・みんなで詠んだ和歌（藤原頼通）
 // 画面の操作の邪魔をしないよう、クリックは下に通す（#fx-layer は pointer-events: none）
 (function () {
   const SM = (window.SuperMahjong = window.SuperMahjong || {});
@@ -37,18 +37,32 @@
     + PIPS[v].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="${v === 1 ? 14 : 9}" fill="${v === 1 ? '#d0202e' : '#222'}"/>`).join('')
     + '</svg>';
 
-  /** サイコロを投げる演出（転がりながら目が変わり、最後に結果で止まる） */
-  function dice(seat, values, label) {
+  // 6面でないサイコロ（千載一遇の10面ダイス）: 十角形に目の数字
+  const polyFace = (v, sides) => {
+    const pts = Array.from({ length: sides }, (_, i) => {
+      const a = (Math.PI * 2 * i) / sides - Math.PI / 2;
+      return `${(50 + 46 * Math.cos(a)).toFixed(1)},${(50 + 46 * Math.sin(a)).toFixed(1)}`;
+    }).join(' ');
+    return '<svg viewBox="0 0 100 100" aria-hidden="true">'
+      + `<polygon points="${pts}" fill="#fdfdfd" stroke="#2a2a2a" stroke-width="3"/>`
+      + `<text x="50" y="64" font-size="40" font-weight="700" text-anchor="middle" fill="${v === 1 ? '#d0202e' : '#222'}" font-family="sans-serif">${v}</text>`
+      + '</svg>';
+  };
+
+  /** サイコロを投げる演出（転がりながら目が変わり、最後に結果で止まる）。sides: 面の数（無ければ6） */
+  function dice(seat, values, label, sides = 6) {
+    const n = sides || 6;
+    const draw = (v) => (n === 6 ? face(v) : polyFace(v, n));
     const box = document.createElement('div');
     box.className = 'fx-box fx-dice';
-    box.appendChild(caption(seat, `のサイコロ${label ? `（${label}）` : ''}`));
+    box.appendChild(caption(seat, `の${n === 6 ? 'サイコロ' : `${n}面ダイス`}${label ? `（${label}）` : ''}`));
     const row = document.createElement('div');
     row.className = 'fx-dice__row';
     const dies = values.map((v, i) => {
       const d = document.createElement('div');
       d.className = 'fx-die';
       d.style.animationDelay = `${i * 0.08}s`;
-      d.innerHTML = face(1 + Math.floor(Math.random() * 6));
+      d.innerHTML = draw(1 + Math.floor(Math.random() * n));
       row.appendChild(d);
       return d;
     });
@@ -60,11 +74,11 @@
     const start = performance.now();
     rollTimer = setInterval(() => {
       if (performance.now() - start < 650) {
-        for (const d of dies) d.innerHTML = face(1 + Math.floor(Math.random() * 6));
+        for (const d of dies) d.innerHTML = draw(1 + Math.floor(Math.random() * n));
         return;
       }
       clearInterval(rollTimer);
-      dies.forEach((d, i) => { d.innerHTML = face(values[i]); d.classList.add('is-landed'); });
+      dies.forEach((d, i) => { d.innerHTML = draw(values[i]); d.classList.add('is-landed'); });
       total.textContent = values.length > 1 ? `${values.join(' + ')} = ${values.reduce((a, b) => a + b, 0)}` : `${values[0]}`;
     }, 70);
   }
@@ -210,5 +224,42 @@
     step();
   }
 
-  SM.Fx = { dice, rps, compare, roulette };
+  // ---- みんなで和歌を詠む（藤原頼通） ----
+  // 1文字ずつ出す間隔と、出そろってから見せる時間（サーバーの src/engine/waka.js の WAKA_CHAR_MS・WAKA_HOLD_MS と同じ）
+  const WAKA_CHAR_MS = 110;
+  const WAKA_HOLD_MS = 3000;
+  /**
+   * できた和歌を、色紙に筆の文字で縦書きに一文字ずつ出す（初句が右）。句の下に詠んだ人の名前。
+   * e: { lines: 5句, seats: 句ごとの詠んだ人 }。句はプレイヤーが入力した文なので、文字として入れる（HTMLにしない）
+   */
+  function waka(e) {
+    const box = document.createElement('div');
+    box.className = 'fx-box fx-waka';
+    const paper = document.createElement('div');
+    paper.className = 'fx-waka__paper';
+    const cols = e.lines.map((line, i) => {
+      const col = document.createElement('div');
+      col.className = 'fx-waka__line';
+      const text = document.createElement('span');
+      text.className = 'fx-waka__text';
+      col.appendChild(text);
+      const who = document.createElement('span');
+      who.className = 'fx-waka__who';
+      who.textContent = SM.Main.seatName(e.seats[i]);
+      col.appendChild(who);
+      paper.appendChild(col);
+      return { text, chars: [...String(line)] };
+    });
+    box.appendChild(paper);
+    const all = cols.flatMap((c) => c.chars.map((ch) => [c.text, ch]));
+    show(box, all.length * WAKA_CHAR_MS + WAKA_HOLD_MS);
+    let k = 0;
+    rollTimer = setInterval(() => {
+      if (k >= all.length) { clearInterval(rollTimer); return; }
+      const [text, ch] = all[k++];
+      text.append(ch);
+    }, WAKA_CHAR_MS);
+  }
+
+  SM.Fx = { dice, rps, compare, roulette, waka };
 })();

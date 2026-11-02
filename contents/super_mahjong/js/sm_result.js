@@ -3,8 +3,10 @@
   const SM = (window.SuperMahjong = window.SuperMahjong || {});
   const $ = (id) => document.getElementById(id);
 
+  // withdraw: 《Independence Day》で離脱していない人が1人以下になった。sakuya: 《過大強化咲夜》で強制的に終局した
   const REASON = {
     exhaustive: '流局', forced: '流局', kyuushu: '九種九牌', suufon: '四風連打', suucha: '四家立直', suukaikan: '四開槓',
+    withdraw: '流局（離脱）', sakuya: '強制終局（過大強化咲夜）',
   };
 
   const nameOf = (room, seat) => {
@@ -175,12 +177,18 @@
       $('btn-ready').disabled = true;
     });
     $('btn-back-room').addEventListener('click', () => SM.Net.send({ type: 'backToRoom' }));
+    // ミッションの結果に画像があれば（2回戦をクリアした時）、先にそれを見せてから
     $('btn-final-leave').addEventListener('click', () => {
       const room = SM.Main.state.room;
-      if (room && (room.mission || room.daily)) SM.Lobby.showTab('missions');
-      SM.Net.send({ type: 'leaveRoom' });
+      SM.Missions.afterResult(room, () => {
+        if (room && (room.mission || room.daily)) SM.Lobby.showTab('missions');
+        SM.Net.send({ type: 'leaveRoom' });
+      });
     });
-    $('btn-mission-retry').addEventListener('click', () => SM.Missions.retry(SM.Main.state.room));
+    $('btn-mission-retry').addEventListener('click', () => {
+      const room = SM.Main.state.room;
+      SM.Missions.afterResult(room, () => SM.Missions.retry(room));
+    });
   }
 
   // agariBlock: 和了1つ分の表示（統計のいちばん翻数の高い和了でも使う）

@@ -7,8 +7,10 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Yusei+Magic&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+<link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Yusei+Magic&family=Yuji+Syuku&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
 <link rel="stylesheet" href="super_mahjong.css">
+<link rel="icon" type="image/png" href="data/favicon.png">
+<link rel="apple-touch-icon" href="data/favicon.png">
 </head>
 <body>
   <div id="status-bar" class="status-bar" hidden></div>
@@ -21,7 +23,7 @@
     <div class="panel lobby">
       <h1 class="logo">スーパー麻雀</h1>
       <!-- バージョン（データタブの「更新履歴」の一番上と合わせる） -->
-      <p class="version-label">ver 0.91</p>
+      <p class="version-label">ver 1.00</p>
       <div class="field">
         <label for="lobby-name">名前とアイコン</label>
         <div class="profile-row">
@@ -111,7 +113,7 @@
         </section>
         <section class="lobby-box">
           <h2>ミッション <span id="mission-count" class="ach-count"></span></h2>
-          <p class="note">自分のデッキ（推奨ルールに合うもの）で、個性的なCPUたちとデッキ構築戦で対局します。条件を満たして終局するとクリアです。クリアすると次のミッションに挑戦できるようになり、そのミッションのCPUとCPUが使うCカードが、通常戦・デッキ構築戦で使えるようになります。数字は成功回数/挑戦回数です（記録はこのブラウザに保存されます）。</p>
+          <p class="note">自分のデッキ（推奨ルールに合うもの）で、個性的なCPUたちとデッキ構築戦で対局します（カスタムモードのルールで遊ぶミッションもあります）。条件を満たして終局するとクリアです（「他家に3回以上振り込む」のように終局が条件に無いミッションは、条件を満たした時点で、対局の途中でやめてもクリアになります）。クリアすると次のミッションに挑戦できるようになり、そのミッションのCPUとCPUが使うCカードが、通常戦・デッキ構築戦で使えるようになります。数字は成功回数/挑戦回数です（記録はこのブラウザに保存されます）。</p>
           <ul id="mission-list" class="mission-list"></ul>
         </section>
       </div>
@@ -119,11 +121,11 @@
       <div class="tab-panel" data-panel="decks" hidden>
         <section class="lobby-box">
           <h2>デッキ構築</h2>
-          <p class="note">デッキ構築戦では、自分で組んだデッキ（カードとフルパワー）を持ち寄って対戦します。山札は各自のデッキから作り、捨て場は全員共有です。推奨ルール: 60枚以上・同名カードは3枚まで（「天和・地和」・3つの願いは1枚まで。カチコミ・目からビーム・否認は何枚でも）・《おばさん》とCカード、フルパワーの《ネクロノミコン》は使えない（制限なしの部屋なら使える。Cカードは自分がミッションをクリアして解放したものだけ。部屋を作った人が解放していなくてもよい）。デッキに入れた「ランダム」は、山札を作るたびにランダムなカードになります。デッキはこのブラウザに保存されます。</p>
+          <p class="note">デッキ構築戦では、自分で組んだデッキ（カードとフルパワー）を持ち寄って対戦します。山札は各自のデッキから作り、捨て場は全員共有です。推奨ルール: 60枚以上・同名カードは3枚まで（「天和・地和」・3つの願い・ジャッジメントは1枚まで。カチコミ・目からビーム・否認は何枚でも）・《おばさん》とCカード、フルパワーの《ネクロノミコン》は使えない（制限なしの部屋なら使える。Cカードは自分がミッションをクリアして解放したものだけ。部屋を作った人が解放していなくてもよい）。デッキに入れた「ランダム」は、山札を作るたびにランダムなカードになります。デッキはこのブラウザに保存されます。デッキを選ぶ所では「サンプルデッキ」に切り替えると、用意されたデッキでも遊べます（「サンプルデッキから作る」で、それを元に自分のデッキを作れます）。</p>
           <ul class="decks__list" data-decks-list></ul>
           <div class="button-row button-row--center decks__actions">
             <button type="button" class="sub-button" data-deck-act="new">新しいデッキ</button>
-            <button type="button" class="sub-button" data-deck-act="new-default">既定の山札から作る</button>
+            <button type="button" class="sub-button" data-deck-act="new-sample">サンプルデッキから作る</button>
             <button type="button" class="sub-button" data-deck-act="import">読み込む</button>
           </div>
         </section>
@@ -150,6 +152,23 @@
         <!-- 更新履歴: 新しい版を上に足す。ロビーの ver 表示も合わせて変える。既定は畳んでおき、見出しの▶を押すと開く -->
         <details class="lobby-box version-history">
           <summary><h2>更新履歴</h2></summary>
+          <h3>ver 1.00</h3>
+          <ul>
+            <li>新カード《やだ！》《しまこ》《守銭奴》《リーフドラゴン》《激辛パフェ》《キッス》《ボヘミアン・ラプソディー》《フー・ファイターズ》《アヌビス神》《ラバーズ》《ビーチボーイ》《お殿様》《へっちゃら》《千載一遇》《省エネ》《ジャッジメント》を追加しました。</li>
+            <li>新しいカードタイプ「クエスト」（《ダウジング》《ビャードニスの卵》《双炎祭壇アポロヌス・パトス》《蒼神龍スペル・グレートブルー》）を追加しました。クエストはプレイできず、書かれた条件を満たすと手札の中でイベント＋・パワー＋のカードに変化します（残りの回数はカードに出ます）。</li>
+            <li>新しいCカード44枚（《帝》《Independence Day》《藤原頼通》《ちびもす》《ザ・ワールド》《スタープラチナ》など）を追加しました。</li>
+            <li>「魔物の契約」（普通にツモるたびに点数を供託する）と「魔物使い」（魔物の契約を払わずに済む）を持つカードを追加しました。</li>
+            <li>青ドラを追加しました（《最終兵器》《激辛パフェ》）。和了の形にある青ドラは1枚につき-1翻されます（0翻未満にはなりません）。</li>
+            <li>《藤原頼通》の効果で「みんなで和歌を詠む」ことがあります（全員で同時に句を入力し、できた和歌が縦書きで表示されます）。</li>
+            <li>パワー＋・イベント＋・フルパワー＋（＋カード）のカードタイプの帯をどれも緑色にし、カード一覧の「パワー＋」の絞り込みを「＋カード」にまとめました。</li>
+            <li>ミッションを10個（「最終決戦の傍観者」「これ一枚で十分かな♣」「オカ研活動記録」「99年ハンデ」「マゾヒズム」「禁じられた帝王」「「鍵」争奪戦」「ノーホーラ」「デバッファー」「空前絶後」）と、そのクリアの実績を追加し、ミッションの並び（番号）を変えました。これまでの成功回数・挑戦回数・解放したCPUとCカードは、そのまま同じミッションに引き継がれます。</li>
+            <li>「他家に3回以上振り込む」のように終局が条件に無いミッションは、条件を満たすと「退出」が点滅し、そこでやめても成功になるようにしました（やめた時の順位と点数で結果の画面に移ります）。</li>
+            <li>新しいネームドCPU13人のアイコンを追加し、水瀬名雪・水瀬秋子・沢渡真琴のアイコンを新しい絵にしました。</li>
+            <li>サンプルデッキを追加しました。デッキ構築戦（とカスタムのデュエリスト）の待機室、ミッション・デイリーミッションのデッキ選びで「自分のデッキ」「サンプルデッキ」を切り替えて選べます。デッキ構築の「既定の山札から作る」は「サンプルデッキから作る」になりました。</li>
+            <li>ミッション「Ph」の名前を「Phantasm」にし、ミッション「負けヒロインズ」の対戦相手を1人変えました。</li>
+            <li>デッキ構築戦の推奨ルールで、《ジャッジメント》はデッキに1枚までにしました。デッキ編集では、1枚までのカードに「1枚まで」の印を付け、使用不可のカードを一覧の最後に並べるようにしました。</li>
+            <li>ブラウザのタブにアイコン（ファビコン）を付けました。</li>
+          </ul>
           <h3>ver 0.91</h3>
           <ul>
             <li>対戦形式に「カスタム」を追加しました。狂乱・デュエリスト・ドラフト・オールフォーワンのデッキの決め方と、殿堂ゼロ・レッドアウト・青天井など17のルールを組み合わせて遊べます（ルールの内容はガイドの「6. 対戦の形式」）。</li>
@@ -308,8 +327,12 @@
                 </ul>
               </div>
               <div class="tut-type" style="--tc:#00B050">
-                <h4>パワー＋</h4>
-                <p>山札に入らない特別なパワーです。他のカードの効果で場に出ます（例: 《おばさん》や《大富豪》から）。場を離れると、捨て場には行かず消えます。</p>
+                <h4>＋カード（パワー＋・イベント＋・フルパワー＋）</h4>
+                <p>山札に入らない特別なカードです。他のカードの効果で場に出たり（例: 《おばさん》や《大富豪》から）、クエストが変化して手札に入ったりします。場を離れたり使ったりすると、捨て場には行かず消えます。</p>
+              </div>
+              <div class="tut-type" style="--tc:#8C6A3F">
+                <h4>クエスト</h4>
+                <p>使えません。手札にある間に、書かれた条件を満たすと（残りの回数はカードに出ます）、手札の中でイベント＋やパワー＋のカードに変化して、使えるようになります。</p>
               </div>
               <div class="tut-type" style="--tc:#7030A0">
                 <h4>ハプニング</h4>
@@ -326,9 +349,9 @@
                 <tr><th>記号</th><th>意味</th></tr>
                 <tr><td>■</td><td>効果の文です。</td></tr>
                 <tr><td>▲</td><td>使える条件や割り込みのタイミングです。これがあるカードは、その条件の時にしか使えません。</td></tr>
-                <tr><td>●</td><td>キーワード能力です。「スペースチャージ」（条件を満たすと≒の能力が働く）、「プロテクター」、「タイルフォース」（手牌が条件を満たすと✨の能力が使える）、「逆転撃」など。</td></tr>
+                <tr><td>●</td><td>キーワード能力です。「スペースチャージ」（条件を満たすと≒の能力が働く）、「プロテクター」、「タイルフォース」（手牌が条件を満たすと✨の能力が使える）、「逆転撃」、「魔物の契約」（普通にツモるたびに点数を供託する。「魔物使い」のパワーが場にあれば払わない）など。</td></tr>
                 <tr><td>§</td><td>そのカードが追加する役です（7章・8章を参照）。</td></tr>
-                <tr><td>★</td><td>《リサイクル》の別の効果の印です。</td></tr>
+                <tr><td>★</td><td>別の効果の印です（《リサイクル》、「下の★効果」と書かれたカードなど）。</td></tr>
               </table>
               <p>カードの文の中の《カード名》は、押すとそのカードの詳細が出ます。</p>
             </div>
@@ -338,11 +361,11 @@
             <summary>6. 対戦の形式</summary>
             <div class="tut-body">
               <h4>通常戦</h4>
-              <p>全員が共通の山札と捨て場を使います。山札に入れるカードと枚数は、部屋を作る時の「カード枚数設定」で決められます。既定は、すべてのイベント・パワー・ハプニングが1枚ずつ（《カチコミ》《否認》《目からビーム》だけ15枚）です。</p>
+              <p>全員が共通の山札と捨て場を使います。山札に入れるカードと枚数は、部屋を作る時の「カード枚数設定」で決められます。既定は、すべてのイベント・パワー・ハプニング・クエストが1枚ずつ（《カチコミ》《否認》《目からビーム》だけ15枚。Cカードは0枚）です。</p>
               <h4>デッキ構築戦</h4>
               <p>各自が持ち寄ったデッキから山札を作ります。捨て場は全員で共有です。デッキはロビーの「デッキ構築」で作り、このブラウザに保存されます。</p>
               <ul>
-                <li><b>推奨ルール</b>: 60枚以上、同じ名前のカードは3枚まで（《「天和・地和」》《3つの願い》は1枚まで、《カチコミ》《目からビーム》《否認》は何枚でも）、《おばさん》は入れられません。フルパワーを1枚決める必要があります（《ネクロノミコン》は選べません）。</li>
+                <li><b>推奨ルール</b>: 60枚以上、同じ名前のカードは3枚まで（《「天和・地和」》《3つの願い》《ジャッジメント》は1枚まで、《カチコミ》《目からビーム》《否認》は何枚でも）、《おばさん》は入れられません。フルパワーを1枚決める必要があります（《ネクロノミコン》は選べません）。</li>
                 <li><b>制限なし</b>: 同じカードは99枚まで、合計999枚まで。フルパワーは必要です（《ネクロノミコン》も選べます）。</li>
                 <li>デッキに入れた「ランダム」は、山札を作るたびにランダムなカードに変わります。</li>
               </ul>
@@ -472,11 +495,11 @@
           <div class="card-count-row"><button id="room-card-counts" class="sub-button" type="button">カード枚数設定</button><span id="room-card-counts-text" class="card-count-row__text"></span></div>
         </form>
         <div id="room-card-counts-view" class="card-count-row" hidden><button id="room-card-counts-show" class="sub-button" type="button">山札のカードを見る</button></div>
-        <!-- デッキ構築戦: 自分のデッキを選ぶ -->
+        <!-- デッキ構築戦: 使うデッキを選ぶ（「自分のデッキ」「サンプルデッキ」を切り替えて） -->
         <div id="room-deck" class="room-deck" hidden>
-          <label for="room-deck-select" class="room-deck__label">自分のデッキ</label>
+          <div id="room-deck-src" class="room-deck__src"></div>
           <div class="room-deck__row">
-            <select id="room-deck-select"></select>
+            <select id="room-deck-select" aria-label="使うデッキ"></select>
             <button id="room-deck-edit" class="sub-button" type="button">作る・編集</button>
           </div>
           <p id="room-deck-status" class="room-deck__status"></p>
@@ -596,6 +619,20 @@
     </div>
   </div>
 
+  <!-- ミッションの次の対局に進むかを聞く暗転した画面（文と選択肢はサーバーから。sm_missions.js の showInterlude） -->
+  <div id="screen-interlude" class="screen interlude">
+    <div class="interlude__box">
+      <p id="interlude-text" class="interlude__text"></p>
+      <div id="interlude-choices" class="interlude__choices" hidden></div>
+    </div>
+  </div>
+
+  <!-- ミッションの結果の画面の後に見せる画像と文（サーバーから。sm_missions.js の afterResult） -->
+  <div id="treasure" class="treasure" hidden>
+    <img id="treasure-img" class="treasure__img" alt="">
+    <p id="treasure-text" class="treasure__text"></p>
+  </div>
+
   <div id="card-detail" class="overlay card-detail" hidden><div id="card-detail-body" class="card-detail__body"></div></div>
 
   <!-- アイコンを選ぶ -->
@@ -622,6 +659,16 @@
     </div>
   </div>
 
+  <!-- デッキ構築: サンプルデッキから作る（選んだサンプルデッキの写しを、自分のデッキとして編集する） -->
+  <div id="sample-picker" class="overlay cpu-picker" hidden>
+    <div class="overlay__box cpu-picker__box">
+      <h2 class="result-title">サンプルデッキから作る</h2>
+      <p class="card-counts__note">元にするサンプルデッキを選んでください。そのデッキの写しを自分のデッキとして編集できます（保存するまで自分のデッキには入りません）。</p>
+      <ul id="sample-picker-list" class="cpu-picker__list"></ul>
+      <div class="button-row button-row--center"><button id="sample-picker-close" class="sub-button">閉じる</button></div>
+    </div>
+  </div>
+
   <!-- カード枚数設定（山札に入れるカードと枚数） -->
   <div id="card-counts" class="overlay card-counts" hidden>
     <div class="overlay__box card-counts__box">
@@ -644,11 +691,11 @@
   <div id="decks" class="overlay decks" hidden>
     <div class="overlay__box decks__box">
       <h2 class="result-title">デッキ</h2>
-      <p class="card-counts__note">デッキ構築戦で使うデッキです（このブラウザに保存されます）。推奨ルール: 60枚以上・同名カードは3枚まで（「天和・地和」・3つの願いは1枚まで。カチコミ・目からビーム・否認は何枚でも）・《おばさん》とCカード、フルパワーの《ネクロノミコン》は使えない（制限なしの部屋なら使える。Cカードは自分がミッションをクリアして解放したものだけ。部屋を作った人が解放していなくてもよい）。「ランダム」は何枚でも入れられ、山札を作るたびに、使用不可のカード・ハプニング・デッキに入れたカード以外からランダムなカードになります。どちらのルールでもフルパワーを1枚決めておきます。</p>
+      <p class="card-counts__note">デッキ構築戦で使うデッキです（このブラウザに保存されます）。推奨ルール: 60枚以上・同名カードは3枚まで（「天和・地和」・3つの願い・ジャッジメントは1枚まで。カチコミ・目からビーム・否認は何枚でも）・《おばさん》とCカード、フルパワーの《ネクロノミコン》は使えない（制限なしの部屋なら使える。Cカードは自分がミッションをクリアして解放したものだけ。部屋を作った人が解放していなくてもよい）。「ランダム」は何枚でも入れられ、山札を作るたびに、使用不可のカード・ハプニング・デッキに入れたカード以外からランダムなカードになります。どちらのルールでもフルパワーを1枚決めておきます。</p>
       <ul id="decks-list" class="decks__list" data-decks-list></ul>
       <div class="button-row button-row--center">
         <button id="decks-new" class="sub-button" data-deck-act="new">新しいデッキ</button>
-        <button id="decks-new-default" class="sub-button" data-deck-act="new-default">既定の山札から作る</button>
+        <button id="decks-new-sample" class="sub-button" data-deck-act="new-sample">サンプルデッキから作る</button>
         <button id="decks-import" class="sub-button" data-deck-act="import">読み込む</button>
         <button id="decks-close" class="main-button">閉じる</button>
       </div>
@@ -735,6 +782,7 @@
   <script src="js/sm_bgm_data.js"></script>
   <script src="js/sm_achievements_data.js"></script>
   <script src="js/sm_missions_data.js"></script>
+  <script src="js/sm_sample_decks_data.js"></script>
   <script src="js/sm_tiles.js"></script>
   <script src="js/sm_cards.js"></script>
   <script src="js/sm_icons.js"></script>

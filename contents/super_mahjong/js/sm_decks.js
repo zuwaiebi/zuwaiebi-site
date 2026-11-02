@@ -11,7 +11,7 @@
   const DECK_MIN = 60;
   const SAME_NAME_MAX = 3;
   // 上限が SAME_NAME_MAX より少ないカード { カード名: 枚数 }
-  const NAME_LIMITS = { '「天和・地和」': 1, '3つの願い': 1 };
+  const NAME_LIMITS = { '「天和・地和」': 1, '3つの願い': 1, ジャッジメント: 1 };
   const sameNameMax = (name) => NAME_LIMITS[name] ?? SAME_NAME_MAX;
   const UNLIMITED_NAMES = ['カチコミ', '目からビーム', '否認'];
   const BANNED_NAMES = ['おばさん'];
@@ -21,9 +21,10 @@
   const NAME_MAX = 20;
   const TEXT_HEAD = 'スーパー麻雀デッキ';
 
-  const DECK_TYPES = ['event', 'power', 'happening', 'happeningPower'];
+  // 山札に入るカード（クエストも。＋のカード（イベント＋など）は入らない。サーバーの isDeckDef と同じ）
+  const DECK_TYPES = ['event', 'power', 'happening', 'happeningPower', 'quest'];
   const ALL = window.SM_CARDS || [];
-  const CARDS = ALL.filter((c) => DECK_TYPES.includes(c.typeKey));
+  const CARDS = ALL.filter((c) => DECK_TYPES.includes(c.typeKey) && !c.plus);
   // 「ランダム」: 山札を作るたびに、使用不可のカード・ハプニング・デッキに入れたカード以外からランダムに選ばれる。何枚でも入れられる。
   // id はサーバーの decks.js の RANDOM_ID と同じ。カードと同じ見た目・詳細で出すため SM.Cards に登録する（initで）
   const RANDOM = {
@@ -36,7 +37,8 @@
   const copyMax = (c) => (c === RANDOM ? TOTAL_MAX : COPY_MAX);
   // デッキのフルパワーとして選べるもの（すべてのフルパワー。《ネクロノミコン》のように、ゲーム開始時のフルパワーとして
   // 選べないものも選べるが、推奨ルールには合わない（isBannedFp））
-  const FULLS = ALL.filter((c) => c.typeKey === 'full');
+  // フルパワー＋（《過大強化咲夜》。《咲夜》からだけ出る）は選べない
+  const FULLS = ALL.filter((c) => c.typeKey === 'full' && !c.plus);
   const BY_ID = new Map([...ALL, RANDOM].map((c) => [c.id, c]));
   const BY_KEY = new Map([...ALL, RANDOM].map((c) => [c.key, c]));
   // 同じ名前のカードが何種類あるか（《プレゼント！》は4種類を合わせて3枚まで）
@@ -100,12 +102,103 @@
     for (const f of listeners) f();
   }
 
-  /** 待機室で使うデッキ（消したデッキなら null） */
-  function picked() {
-    const id = SM.Net.store.get(PICK_KEY);
-    return decks.find((d) => d.id === id) || null;
+  // ---- サンプルデッキ（js/sm_sample_decks_data.js。自動生成）: デッキを選ぶ欄で自分のデッキと切り替えて選べ、
+  // 「サンプルデッキから作る」で自分のデッキの元にできる。sample: true が付く
+  const SAMPLES = (window.SM_SAMPLE_DECKS || []).map((raw) => ({ ...fromStore(raw), sample: true }));
+  /** 自分のデッキにする時の名前（サンプルデッキの名前の「(サンプルデッキ)」を除く） */
+  const ownName = (name) => cleanName(String(name).replace(/\s*[（(]\s*サンプルデッキ\s*[)）]\s*$/, ''));
+  /** 出どころ src（'mine' 自分のデッキ / 'sample' サンプルデッキ）のデッキの並び */
+  const listIn = (src) => (src === 'sample' ? SAMPLES.slice() : decks.slice());
+  const byId = (id) => decks.find((d) => d.id === id) || SAMPLES.find((d) => d.id === id) || null;
+
+  // ---- デッキを選ぶ欄（待機室・ミッション）ごとの覚え ----
+  // 保存キーごとに JSON { src: 'mine' | 'sample', mine: 自分のデッキの id, sample: サンプルデッキの id }。
+  // 前の版の保存（自分のデッキの id だけ）も読める
+  function pickState(key) {
+    const raw = SM.Net.store.get(key) || '';
+    try {
+      const v = JSON.parse(raw);
+      if (v && typeof v === 'object') return { src: v.src === 'sample' ? 'sample' : 'mine', mine: String(v.mine || ''), sample: String(v.sample || '') };
+    } catch { /* 前の版の保存 */ }
+    return { src: 'mine', mine: raw, sample: '' };
   }
-  function setPicked(id) { SM.Net.store.set(PICK_KEY, id || ''); }
+  const savePick = (key, st) => SM.Net.store.set(key, JSON.stringify(st));
+  /** 保存キー key の欄で、今の出どころで選んでいるデッキ（消したデッキなら null） */
+  function pickedIn(key) {
+    const st = pickState(key);
+    return st.src === 'sample' ? SAMPLES.find((d) => d.id === st.sample) || null : decks.find((d) => d.id === st.mine) || null;
+  }
+  /** 保存キー key の欄で選んだデッキを覚える（そのデッキの出どころにする。null なら今の出どころの選択を外す） */
+  function setPickedIn(key, d) {
+    const st = pickState(key);
+    if (d) st.src = d.sample ? 'sample' : 'mine';
+    st[st.src] = d ? d.id : '';
+    savePick(key, st);
+  }
+  const srcIn = (key) => pickState(key).src;
+
+  /**
+   * 「自分のデッキ」「サンプルデッキ」の切り替え（保存キー key の欄の出どころ）。押すと出どころを変えて onSwitch(src)。
+   * 返す要素の refresh() で、覚えている出どころに合わせて表示を直す
+   */
+  function srcTabs(key, onSwitch) {
+    const box = document.createElement('div');
+    box.className = 'deck-src';
+    box.setAttribute('role', 'tablist');
+    const tabs = [['mine', '自分のデッキ'], ['sample', 'サンプルデッキ']].map(([src, label]) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'deck-src__tab';
+      b.dataset.src = src;
+      b.setAttribute('role', 'tab');
+      b.textContent = label;
+      b.addEventListener('click', () => {
+        if (srcIn(key) === src) return;
+        const st = pickState(key);
+        st.src = src;
+        savePick(key, st);
+        box.refresh();
+        onSwitch(src);
+      });
+      return b;
+    });
+    box.append(...tabs);
+    box.refresh = () => {
+      const now = srcIn(key);
+      for (const b of tabs) {
+        b.classList.toggle('is-on', b.dataset.src === now);
+        b.setAttribute('aria-selected', String(b.dataset.src === now));
+      }
+    };
+    box.refresh();
+    return box;
+  }
+
+  // ---- サンプルデッキから作る（選んだサンプルデッキの写しを、自分のデッキとして編集する） ----
+  function openSamplePicker() {
+    const ul = $('sample-picker-list');
+    ul.innerHTML = '';
+    for (const d of SAMPLES) {
+      const li = document.createElement('li');
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'cpu-picker__item sample-picker__item';
+      const name = document.createElement('span');
+      name.className = 'sample-picker__name';
+      name.textContent = d.name;
+      const sub = document.createElement('span');
+      sub.className = 'sample-picker__sub';
+      sub.textContent = `${totalOf(d)}枚 / フルパワー: ${d.fp ? BY_ID.get(d.fp).name : 'なし'}`;
+      b.append(name, sub);
+      b.addEventListener('click', () => {
+        $('sample-picker').hidden = true;
+        openEdit({ id: newId(), name: ownName(d.name), fp: d.fp, counts: { ...d.counts } });
+      });
+      li.appendChild(b);
+      ul.appendChild(li);
+    }
+    $('sample-picker').hidden = false;
+  }
 
   // ---- 検査 ----
   /**
@@ -176,32 +269,6 @@
     return '';
   }
 
-  /**
-   * 既定の山札から推奨ルールで使えないカードを除き、同名カードを推奨ルールの上限までにしたもの。
-   * 上限を超える同名カードは番号（key の #n）の小さい方から残す（《プレゼント！》は蛇・正倉院・手記。CPUのデッキはランダムに3種類）
-   */
-  function defaultCounts() {
-    const counts = {};
-    for (const c of CARDS) if (!isBanned(c) && c.copies > 0) counts[c.id] = c.copies;
-    const no = (c) => Number((/#(\d+)$/.exec(c.key) || [])[1] || 0);
-    const groups = new Map();
-    for (const c of CARDS) {
-      if (!counts[c.id] || UNLIMITED_NAMES.includes(c.name)) continue;
-      if (!groups.has(c.name)) groups.set(c.name, []);
-      groups.get(c.name).push(c);
-    }
-    for (const group of groups.values()) {
-      let room = sameNameMax(group[0].name);
-      for (const c of group.slice().sort((a, b) => no(a) - no(b))) {
-        const n = Math.min(counts[c.id], room);
-        room -= n;
-        if (n) counts[c.id] = n;
-        else delete counts[c.id];
-      }
-    }
-    return counts;
-  }
-
   /** サーバーに送る形 */
   // サーバーへ送る形。cUnlocked は自分が解放したCカード（制限なしの部屋で、サーバーもこれでデッキを検査する）
   const toServer = (d) => ({ name: d.name, counts: { ...d.counts }, fp: d.fp, cUnlocked: myUnlocked() });
@@ -267,7 +334,7 @@
     if (!decks.length) {
       const li = document.createElement('li');
       li.className = 'deck-row deck-row--empty';
-      li.textContent = 'まだデッキがありません。「新しいデッキ」か「既定の山札から作る」で作れます。';
+      li.textContent = 'まだデッキがありません。「新しいデッキ」か「サンプルデッキから作る」で作れます。';
       ul.appendChild(li);
     }
     for (const d of decks) {
@@ -378,12 +445,15 @@
     renderSummary();
   }
 
+  // デッキ編集の並び: 推奨ルールで使用不可のカード（《おばさん》とCカード）は最後にまとめる
+  const GRID_CARDS = [...EDIT_CARDS.filter((c) => !isBanned(c)), ...EDIT_CARDS.filter((c) => isBanned(c))];
+
   function renderGrid() {
     const grid = $('deck-edit-grid');
     grid.innerHTML = '';
     const q = norm($('deck-edit-filter').value);
     const only = $('deck-edit-only').checked;
-    for (const c of EDIT_CARDS) {
+    for (const c of GRID_CARDS) {
       if (only && !edit.deck.counts[c.id]) continue;
       if (q && !norm(c.name).includes(q)) continue;
       // まだ解放していないCカードは出さない（前から入っている分は、減らせるように出す）
@@ -404,10 +474,11 @@
     box.className = 'card-count deck-card';
     box.dataset.cid = c.id;
     box.appendChild(SM.Cards.el(c.id, { size: 'mini', onClick: () => detail(c) }));
-    if (isBanned(c)) {
+    // 推奨ルールで使用不可のカード・枚数が3枚より少ないカード（NAME_LIMITS。1枚まで）の印
+    if (isBanned(c) || (c !== RANDOM && sameNameMax(c.name) < SAME_NAME_MAX)) {
       const tag = document.createElement('span');
-      tag.className = 'deck-card__tag';
-      tag.textContent = isLockedC(c) ? '🔒 未解放' : '使用不可';
+      tag.className = `deck-card__tag${isBanned(c) ? '' : ' is-limit'}`;
+      tag.textContent = isLockedC(c) ? '🔒 未解放' : isBanned(c) ? '使用不可' : `${sameNameMax(c.name)}枚まで`;
       box.appendChild(tag);
     }
     const ctrl = document.createElement('div');
@@ -442,16 +513,17 @@
   function renderSummary() {
     const d = edit.deck;
     const { total, problems } = check(d);
-    const by = { event: 0, power: 0, happening: 0 };
+    const by = { event: 0, power: 0, happening: 0, quest: 0 };
     for (const c of CARDS) {
       const n = d.counts[c.id] || 0;
       if (c.typeKey === 'event') by.event += n;
       else if (c.typeKey === 'power') by.power += n;
+      else if (c.typeKey === 'quest') by.quest += n;
       else by.happening += n;
     }
     const random = d.counts[RANDOM.id] || 0;
     $('deck-edit-total').textContent = `${total}枚`;
-    $('deck-edit-types').textContent = `イベント${by.event}・パワー${by.power}・ハプニング${by.happening}${random ? `・ランダム${random}` : ''}`;
+    $('deck-edit-types').textContent = `イベント${by.event}・パワー${by.power}・ハプニング${by.happening}${by.quest ? `・クエスト${by.quest}` : ''}${random ? `・ランダム${random}` : ''}`;
     const st = $('deck-edit-check');
     st.className = `deck-edit__check ${problems.length ? 'is-ng' : 'is-ok'}`;
     st.textContent = problems.length ? `推奨ルールに合いません: ${problems.join(' / ')}` : '推奨ルールOK';
@@ -543,9 +615,12 @@
   function openText(mode, d) {
     textMode = mode;
     const area = $('deck-text-area');
-    if (mode === 'export') {
-      $('deck-text-title').textContent = `デッキ「${d.name}」を書き出す`;
-      $('deck-text-note').textContent = 'このテキストを送ると、受け取った人は「読み込む」で同じデッキを作れます。';
+    if (mode === 'export' || mode === 'view') {
+      // view はサンプルデッキの中身を見る時
+      $('deck-text-title').textContent = mode === 'view' ? `「${d.name}」の中身` : `デッキ「${d.name}」を書き出す`;
+      $('deck-text-note').textContent = mode === 'view'
+        ? 'サンプルデッキの中身です。デッキ構築の「サンプルデッキから作る」で、これを元に自分のデッキを作れます。'
+        : 'このテキストを送ると、受け取った人は「読み込む」で同じデッキを作れます。';
       area.value = toText(d);
       area.readOnly = true;
       $('deck-text-ok').textContent = 'コピーする';
@@ -599,13 +674,15 @@
     load();
     $('decks-close').addEventListener('click', () => { $('decks').hidden = true; });
     $('decks').addEventListener('click', (e) => { if (e.target.id === 'decks') $('decks').hidden = true; });
-    // 新しいデッキ・既定の山札から作る・読み込む（ロビーの「デッキ構築」とデッキ一覧の画面の両方のボタン）
+    // 新しいデッキ・サンプルデッキから作る・読み込む（ロビーの「デッキ構築」とデッキ一覧の画面の両方のボタン）
     const acts = {
       new: () => openEdit({ id: newId(), name: '新しいデッキ', fp: null, counts: {} }),
-      'new-default': () => openEdit({ id: newId(), name: '既定の山札', fp: null, counts: defaultCounts() }),
+      'new-sample': openSamplePicker,
       import: () => openText('import'),
     };
     for (const b of document.querySelectorAll('[data-deck-act]')) b.addEventListener('click', () => acts[b.dataset.deckAct]());
+    $('sample-picker-close').addEventListener('click', () => { $('sample-picker').hidden = true; });
+    $('sample-picker').addEventListener('click', (e) => { if (e.target.id === 'sample-picker') $('sample-picker').hidden = true; });
     $('deck-edit-save').addEventListener('click', saveEdit);
     $('deck-edit-cancel').addEventListener('click', cancelEdit);
     $('deck-edit-name').addEventListener('input', () => { if (edit) edit.dirty = true; });
@@ -624,13 +701,19 @@
     $('deck-fp').addEventListener('click', (e) => { if (e.target.id === 'deck-fp') $('deck-fp').hidden = true; });
     $('deck-text-cancel').addEventListener('click', () => { $('deck-text').hidden = true; });
     $('deck-text').addEventListener('click', (e) => { if (e.target.id === 'deck-text') $('deck-text').hidden = true; });
-    $('deck-text-ok').addEventListener('click', () => (textMode === 'export' ? copyText() : importText()));
+    $('deck-text-ok').addEventListener('click', () => (textMode === 'import' ? importText() : copyText()));
     renderList();
   }
 
   SM.Decks = {
-    init, openList, renderList, close, check, picked, setPicked, toServer, toText, fromText,
+    init, openList, renderList, close, check, toServer, toText, fromText,
     list: () => decks.slice(),
     onChange: (f) => listeners.push(f),
+    // サンプルデッキと、デッキを選ぶ欄（保存キーごと）の「自分のデッキ」「サンプルデッキ」の切り替え・選んでいるデッキ
+    samples: () => SAMPLES.slice(), listIn, byId, pickedIn, setPickedIn, srcIn, srcTabs,
+    /** 待機室のデッキを選ぶ欄の保存キー */
+    ROOM_KEY: PICK_KEY,
+    /** デッキの中身をテキストで見せる（サンプルデッキの「中身を見る」） */
+    view: (d) => openText('view', d),
   };
 })();

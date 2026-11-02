@@ -5,7 +5,7 @@
 
   const DEFS = new Map((window.SM_CARDS || []).map((c) => [c.id, c]));
   const TYPE_COLOR = {
-    power: '#0070C0', full: '#FF0000', plus: '#00B050', event: '#FFC000', happening: '#7030A0', random: '#5f6b7a',
+    power: '#0070C0', full: '#FF0000', plus: '#00B050', event: '#FFC000', happening: '#7030A0', random: '#5f6b7a', quest: '#8C6A3F',
   };
   const IMG_DIR = 'data/card_img/';
   // ミッションで解放していないCカード（カード一覧の locked）: イラストは鍵の絵、テキストはこの文にする
@@ -43,27 +43,38 @@
   // フルパワー共通のルールの注釈（テキストの最後に灰色の小さい文字で足す）
   const FULL_NOTE = '（フルパワーをプレイした手番の間は捨牌以外の一切の行動を行えない。）';
 
-  function formatText(def) {
-    const lines = def.text.split('\n').map((line) => {
+  /**
+   * テキストの {3} は、カードごとに変わる数（クエストの残り回数・《超神星アポロヌス・ドラゲリオン》の回数）。
+   * count があればその数、無ければ書いてある数で出す
+   */
+  const withCount = (text, count) => text.replace(/\{(\d+)\}/g, (m, n) => String(count ?? n));
+
+  function formatText(def, count) {
+    const lines = withCount(def.text, count).split('\n').map((line) => {
       const t = line.trim();
       if (/^\*.*\*$/.test(t)) return `<p class="card__flavor">${esc(t.slice(1, -1))}</p>`;
       return `<p>${linkHtml(t)}</p>`;
     });
-    if (def.typeKey === 'full') lines.push(`<p class="card__note">${esc(FULL_NOTE)}</p>`);
+    // フルパワー＋（《過大強化咲夜》）はプレイしない（変化して出てくる）ので注釈を付けない
+    if (def.typeKey === 'full' && !def.plus) lines.push(`<p class="card__note">${esc(FULL_NOTE)}</p>`);
     return lines.join('');
   }
+
+  /** カードタイプの色（＋カード（パワー＋・イベント＋・フルパワー＋）はどれも緑。ハプニングなパワーはパワーの色） */
+  const colorOf = (def) => TYPE_COLOR[def.plus ? 'plus' : def.typeKey === 'happeningPower' ? 'power' : def.typeKey];
 
   function typeBadge(def) {
     if (def.typeKey === 'happeningPower') {
       return `<span class="card__badge card__badge--split" style="background:linear-gradient(90deg, ${TYPE_COLOR.happening} 50%, ${TYPE_COLOR.power} 50%)">${esc(def.type)}</span>`;
     }
-    return `<span class="card__badge" style="background:${TYPE_COLOR[def.typeKey] || '#555'}">${esc(def.type)}</span>`;
+    return `<span class="card__badge" style="background:${colorOf(def) || '#555'}">${esc(def.type)}</span>`;
   }
 
   /**
    * カード要素を作る
    * @param {string|null} cid カードID（null なら裏向き）
-   * @param {object} o { size: 'full'|'mini'|'tiny', onClick, cls, locked: 解放していないCカードとして出す（イラストとテキストを伏せる。詳細も同じ） }
+   * @param {object} o { size: 'full'|'mini'|'tiny', onClick, cls, locked: 解放していないCカードとして出す（イラストとテキストを伏せる。詳細も同じ）,
+   *                    count: テキストの {3} の所に出す数（クエストの残り回数など。詳細も同じ） }
    */
   function el(cid, o = {}) {
     const size = o.size || 'mini';
@@ -83,21 +94,28 @@
         // イラストがまだ無いカード（新カードなど）は仮の絵（NO IMAGE）。画像を data/card_img/ に置いて build-cards を実行すると差し替わる
         + `<div class="card__art${img || def.typeKey === 'random' ? '' : ' card__art--empty'}">${img ? `<img src="${IMG_DIR}${encodeURIComponent(img)}" alt="" loading="lazy" draggable="false">` : ''}</div>`
         + `<div class="card__type">${typeBadge(def)}</div>`
-        + (size === 'full' ? `<div class="card__text">${o.locked ? `<p>${esc(LOCKED_TEXT)}</p>` : formatText(def)}</div>` : '');
+        + (size === 'full' ? `<div class="card__text">${o.locked ? `<p>${esc(LOCKED_TEXT)}</p>` : formatText(def, o.count)}</div>` : '');
+      // カードごとに変わる数（クエストの残り回数など）は、小さい表示でも右上に出す
+      if (o.count !== undefined && o.count !== null && size !== 'full') {
+        const badge = document.createElement('span');
+        badge.className = 'card__count';
+        badge.textContent = `あと${o.count}`;
+        d.appendChild(badge);
+      }
     }
     if (o.onClick) {
       d.classList.add('is-clickable');
       d.addEventListener('click', (e) => { e.stopPropagation(); o.onClick(cid, d); });
     } else if (def && o.detail !== false) {
       d.classList.add('is-clickable');
-      d.addEventListener('click', (e) => { e.stopPropagation(); showDetail(cid, o.locked ? { locked: true } : {}); });
+      d.addEventListener('click', (e) => { e.stopPropagation(); showDetail(cid, o.locked ? { locked: true } : { count: o.count }); });
     }
     return d;
   }
 
   /**
    * カードの詳細を大きく表示する。actions: [{label, cls, onClick}]、extra: カードの下に出す要素（枚数の増減など）、
-   * locked: 解放していないCカードとして出す（カード一覧）
+   * locked: 解放していないCカードとして出す（カード一覧）、count: テキストの {3} の所に出す数（クエストの残り回数など）
    */
   let shownDetail = null;  // 表示中の詳細（《》のカード名から別のカードを開いた時に「戻る」で戻すため）
   function showDetail(cid, o = {}) {
@@ -105,7 +123,7 @@
     const box = $('card-detail');
     const body = $('card-detail-body');
     body.innerHTML = '';
-    body.appendChild(el(cid, { size: 'full', detail: false, locked: o.locked }));
+    body.appendChild(el(cid, { size: 'full', detail: false, locked: o.locked, count: o.count }));
     // 場のパワーのメモ（唯我独尊で宣言した種類・タイルフォースで選んだ牌など）
     if (o.note) {
       const note = document.createElement('p');
@@ -170,7 +188,7 @@
     const wrap = document.createElement('div');
     wrap.className = 'trigger-wrap';
     const def = DEFS.get(cid);
-    wrap.style.setProperty('--rc', (def && TYPE_COLOR[def.typeKey === 'happeningPower' ? 'power' : def.typeKey]) || '#ffd34d');
+    wrap.style.setProperty('--rc', (def && colorOf(def)) || '#ffd34d');
     for (let i = 0; i < 3; i++) {
       const ring = document.createElement('span');
       ring.className = 'trigger-ripple';

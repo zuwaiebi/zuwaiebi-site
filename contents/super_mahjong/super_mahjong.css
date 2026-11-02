@@ -17,6 +17,8 @@
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
 html, body { margin: 0; height: 100%; }
+/* 画面の色を変える部屋（部屋情報の mission.theme。sm_main.js が body の data-theme にする） */
+body[data-theme="purple"] { --felt: #4e2a72; --felt-dark: #2b1342; --muted: #cbbad9; }
 body {
   background: radial-gradient(circle at 50% 40%, var(--felt), var(--felt-dark));
   color: var(--ink);
@@ -352,6 +354,10 @@ input[type=text], input[type=number], select {
 /* .overlay（後の行）の z-index に負けないよう、詰めて書く（選択ウィンドウ・カード詳細より前に出す） */
 .overlay.exit-box { z-index: 58; }
 .exit-text { font-size: 14px; line-height: 1.6; margin: 0 0 4px; }
+/* ミッションの条件を終局を待たずに満たした時の「退出」（押すと、やめても成功になることを知らせる） */
+[data-exit].is-blink { animation: exitBlink 1s ease-in-out infinite; }
+@keyframes exitBlink { 50% { background: var(--accent); color: #2b1a00; box-shadow: 0 0 0 3px #f2b33d77, 0 0 14px #f2b33d; } }
+@media (prefers-reduced-motion: reduce) { [data-exit].is-blink { animation: none; background: var(--accent); color: #2b1a00; } }
 
 .chooser {
   position: fixed; left: 50%; bottom: 140px; transform: translateX(-50%); z-index: 30;
@@ -759,6 +765,17 @@ input[type=text], input[type=number], select {
 /* 待機室: 自分のデッキを選ぶ・席ごとのデッキの準備 */
 .room-deck { margin: 10px 0; padding: 10px; border-radius: 8px; background: #f3eddc; }
 .room-deck__label { display: block; font-size: 13px; font-weight: 700; margin-bottom: 4px; }
+/* デッキを選ぶ欄の「自分のデッキ」「サンプルデッキ」の切り替え（待機室・ミッション・デイリーミッション） */
+.deck-src { display: flex; gap: 0; margin-bottom: 6px; flex-basis: 100%; }
+.deck-src__tab {
+  flex: 1; padding: 6px 10px; border: 1px solid #b9ab88; background: #fffaf0; color: #6b5b3e; font-size: 13px; font-weight: 700;
+}
+.deck-src__tab:first-child { border-radius: 8px 0 0 8px; }
+.deck-src__tab:last-child { border-radius: 0 8px 8px 0; border-left: none; }
+.deck-src__tab.is-on { background: #6b5b3e; border-color: #6b5b3e; color: #fff; }
+.cpu-picker__item.sample-picker__item { flex-direction: column; align-items: flex-start; gap: 2px; }
+.sample-picker__name { font-weight: 700; }
+.sample-picker__sub { font-size: 11px; color: #777; }
 .room-deck__row { display: flex; gap: 8px; align-items: center; }
 .room-deck__row select { flex: 1; min-width: 0; }
 .room-deck__row button { flex: none; white-space: nowrap; padding: 8px 12px; }
@@ -825,6 +842,8 @@ input[type=text], input[type=number], select {
   position: absolute; top: 18px; left: 50%; transform: translateX(-50%); padding: 1px 5px; border-radius: 4px;
   background: #c0392bdd; color: #fff; font-size: 10px; font-weight: 700; white-space: nowrap; pointer-events: none;
 }
+/* 推奨ルールで枚数が少ないカード（1枚まで） */
+.deck-card__tag.is-limit { background: #b5651ddd; }
 .card-count-edit__def.is-over { color: #ff8a80; }
 
 /* デッキのフルパワーを選ぶ */
@@ -941,6 +960,37 @@ input[type=text], input[type=number], select {
 .mission-final__row { display: inline-flex; align-items: center; gap: 6px; padding-left: 4px; }
 .mission-final__unlocks .picon { --pi: 26px; }
 .mission-final__label { font-size: 11px; color: #fff; background: #b5651d; border-radius: 4px; padding: 1px 6px; }
+
+/* ミッションの次の対局に進むかを聞く暗転した画面: 黒地に白の明朝体で1文字ずつ。選んでいる方を橙のかっこで囲む */
+.screen.interlude { position: fixed; inset: 0; z-index: 70; align-items: center; justify-content: center; background: #000; color: #f4f4f4; }
+.interlude__box { padding: 24px 16px; max-width: 100%; }
+.interlude__text {
+  margin: 0; min-height: 9em; white-space: pre-wrap; text-align: left;
+  font-family: "Yu Mincho", "YuMincho", "Hiragino Mincho ProN", "Noto Serif CJK JP", "Noto Serif JP", "MS PMincho", serif;
+  font-size: clamp(20px, 5vw, 34px); line-height: 1.55; letter-spacing: 0.04em;
+}
+.interlude__choices { display: flex; justify-content: center; gap: 1.5em; margin-top: 1.2em; font-size: clamp(20px, 5vw, 34px); }
+.interlude__choice {
+  border: none; background: none; color: #f4f4f4; padding: 0.1em 0.2em;
+  font-family: "Yu Mincho", "YuMincho", "Hiragino Mincho ProN", "Noto Serif CJK JP", "Noto Serif JP", "MS PMincho", serif;
+}
+.interlude__choice::before, .interlude__choice::after { color: transparent; font-weight: 900; }
+.interlude__choice::before { content: '（'; }
+.interlude__choice::after { content: '）'; }
+.interlude__choice.is-on::before, .interlude__choice.is-on::after { color: #f2a33a; -webkit-text-stroke: 0.07em #f2a33a; }
+.interlude__choice:focus-visible { outline: 1px dotted #f2a33a; }
+
+/* ミッションの結果の画面の後に見せる画像: 画面に収まる一番大きな大きさで、余った所に文（大きさは sm_missions.js の layoutTreasure） */
+.treasure { position: fixed; inset: 0; z-index: 75; display: flex; align-items: center; justify-content: center; background: #000; cursor: pointer; }
+.treasure[hidden] { display: none; }
+.treasure.is-column { flex-direction: column; }
+.treasure__img { display: block; flex: none; }
+.treasure__text {
+  flex: 1 1 0; align-self: stretch; min-width: 0; min-height: 0; margin: 0; overflow: hidden; box-sizing: border-box;
+  display: flex; align-items: center; justify-content: center; text-align: center;
+  color: #fff; font-weight: 700; letter-spacing: 0.06em; line-height: 1.3;
+  font-family: "Yu Mincho", "YuMincho", "Hiragino Mincho ProN", "Noto Serif CJK JP", "Noto Serif JP", serif;
+}
 .mission-final__cpu { font-weight: 700; margin-right: 6px; }
 
 /* 待機室: CPUを変更 */
@@ -1144,3 +1194,40 @@ details[open] > summary .rankboard__sub::before { transform: rotate(90deg); }
 /* サドンデス〜ヤギは赤文字 */
 .custom-rule.is-red .custom-rule__name { color: #c0392b; }
 .custom-rule.is-red .custom-rule__desc { color: #d0665a; }
+
+/* ---------- 2026-10-31: クエストの残り回数・離脱・見えている他家の手札・陰陽師・和歌 ---------- */
+/* カードごとに変わる数（クエストの残り回数など）。手札・場の小さい表示の、名前の下（イラストの右上） */
+.card__count {
+  position: absolute; top: calc(var(--cw) * 0.27); right: calc(var(--cw) * 0.06); z-index: 1;
+  background: #8C6A3F; color: #fff; font-family: sans-serif; font-weight: 800; border-radius: 6px;
+  font-size: max(9px, calc(var(--cw) * 0.13)); padding: 0 0.3em; line-height: 1.4; box-shadow: 0 1px 3px #0006;
+}
+.card--tiny .card__count { font-size: 8px; padding: 0 2px; top: 1px; right: 1px; border-radius: 3px; }
+/* 《Independence Day》でこの局を離脱した人 */
+.seat.is-out { opacity: 0.55; }
+.seat__out { background: #555; color: #fff; border-radius: 10px; padding: 0 8px; font-size: 11px; font-weight: 700; }
+/* 他家の手札が見えている時（リーフバード・陰陽師で操作している手番） */
+.seat__hand-cards { display: flex; flex-wrap: wrap; gap: 2px; align-items: center; margin: 0 0 4px; }
+.seat__hand-cards-label { font-size: 10px; color: var(--muted); margin-right: 2px; }
+/* 陰陽師で手番を代わりに行っている */
+.effect-chip.is-control { background: #7a4fd0; color: #fff; font-weight: 700; }
+/* みんなで和歌を詠む: 入力欄（誰がどの句か・自分の句） */
+.prompt__waka { display: flex; flex-direction: column; gap: 8px; }
+.prompt__waka-order { display: flex; flex-wrap: wrap; gap: 4px 12px; margin: 0; padding: 0; list-style: none; font-size: 12px; color: #666; }
+.prompt__waka-order li.is-mine { color: #b5651d; font-weight: 800; }
+.prompt__waka-field { display: flex; flex-direction: column; gap: 3px; font-size: 13px; font-weight: 700; }
+.prompt__waka-input { font-family: "Yuji Syuku", "Yu Mincho", serif; font-size: 20px; padding: 6px 8px; border: 1px solid #999; border-radius: 6px; min-width: 0; }
+/* みんなで和歌を詠む: 色紙に筆の文字で縦書き（初句が右。句の下に詠んだ人） */
+.fx-box.fx-waka { background: none; box-shadow: none; padding: 0; }
+.fx-waka__paper {
+  writing-mode: vertical-rl; display: flex; flex-direction: column; gap: 14px; padding: 24px 22px;
+  height: min(62vh, 440px); max-width: calc(100vw - 24px); overflow: hidden;
+  background: linear-gradient(135deg, #fbf6e8, #efe2c2); color: #1b1b1b;
+  border: 6px double #b89a5a; border-radius: 6px; box-shadow: 0 10px 28px #000a;
+  font-family: "Yuji Syuku", "Yu Mincho", "Hiragino Mincho ProN", serif;
+}
+.fx-waka__line { display: flex; justify-content: space-between; align-items: center; height: 100%; }
+.fx-waka__text { font-size: min(34px, 6vh); letter-spacing: 0.08em; white-space: nowrap; }
+.fx-waka__who { font-family: "Yu Gothic", sans-serif; font-size: 11px; color: #7a6a4a; margin-top: 6px; white-space: nowrap; }
+/* 陰陽師で他家の手番を代わりに行う時: 牌の後のカード・行動は次の行から */
+.prompt__break { flex-basis: 100%; height: 0; }

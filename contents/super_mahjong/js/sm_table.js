@@ -100,6 +100,14 @@
       r.textContent = 'リーチ';
       head.appendChild(r);
     }
+    // 《Independence Day》でこの局を離脱している
+    panel.classList.toggle('is-out', Boolean(p.out));
+    if (p.out) {
+      const o = document.createElement('span');
+      o.className = 'seat__out';
+      o.textContent = '離脱';
+      head.appendChild(o);
+    }
     if (game.cardsEnabled && !self) {
       const hc = document.createElement('span');
       hc.className = 'seat__cards';
@@ -121,14 +129,34 @@
     field.classList.toggle('is-wide', slots > 5);
     for (let i = 0; i < slots; i++) {
       const c = p.cards.field[i];
-      // タイルフォースが有効なパワーは緑の縁。詳細にはメモ（唯我独尊の宣言など）も出す
-      if (c) field.appendChild(SM.Cards.el(c.cid, { size: 'tiny', cls: c.force ? 'is-force' : '', onClick: () => SM.Cards.showDetail(c.cid, { note: c.note }) }));
-      else {
+      // タイルフォースが有効なパワーは緑の縁。詳細にはメモ（唯我独尊の宣言など）と、カードごとに変わる数（残り回数など）も出す
+      if (c) {
+        field.appendChild(SM.Cards.el(c.cid, {
+          size: 'tiny', count: c.n, cls: c.force ? 'is-force' : '', onClick: () => SM.Cards.showDetail(c.cid, { note: c.note, count: c.n }),
+        }));
+      } else {
         const e = document.createElement('div');
         e.className = 'card card--tiny card--empty';
         field.appendChild(e);
       }
     }
+    // 他家の手札が見えている時（《リーフバード》・《陰陽師》で操作している手番）は、場のパワーの下に並べる
+    let seen = panel.querySelector('.seat__hand-cards');
+    if (p.cards.hand && !self) {
+      if (!seen) {
+        seen = document.createElement('div');
+        seen.className = 'seat__hand-cards';
+        field.after(seen);
+      }
+      seen.innerHTML = '';
+      const label = document.createElement('span');
+      label.className = 'seat__hand-cards-label';
+      label.textContent = '手札';
+      seen.appendChild(label);
+      for (const c of p.cards.hand) {
+        seen.appendChild(SM.Cards.el(c.cid, { size: 'tiny', count: c.n, onClick: () => SM.Cards.showDetail(c.cid, { count: c.n }) }));
+      }
+    } else if (seen) seen.remove();
 
     const river = panel.querySelector('.seat__river');
     river.innerHTML = '';
@@ -201,6 +229,17 @@
     }
     const eff = $('center-effects');
     eff.innerHTML = '';
+    // 《陰陽師》: 自分が他家の手番を代わりに行っている／自分の手番を他家が行っている
+    if (game.control) {
+      const li = document.createElement('div');
+      li.className = 'effect-chip is-control';
+      const c = game.control;
+      const name = SM.Main.seatName;
+      SM.Cards.linkify(li, c.by === game.you ? `《陰陽師》: ${name(c.seat)}の手番を代わりに行っています`
+        : c.seat === game.you ? `《陰陽師》: ${name(c.by)}があなたの手番を代わりに行っています`
+          : `《陰陽師》: ${name(c.by)}が${name(c.seat)}の手番を代わりに行っています`);
+      eff.appendChild(li);
+    }
     for (const e of game.effects) {
       const li = document.createElement('div');
       li.className = 'effect-chip';
@@ -226,8 +265,10 @@
     const input = SM.Input;
     // タイルフォースが有効なパワーで選んでいる牌は緑の縁
     const forced = new Set(me.forceTiles || []);
+    // 《ダウジング》: ツモった手番の間だけ？で見せる牌
+    const masked = new Set(me.maskTiles || []);
     const make = (t, extraCls) => {
-      const e = tileEl(t, { red: game.red, size: 'hand', cls: `${extraCls}${forced.has(t) ? ' is-force' : ''}`, mask: me.masked });
+      const e = tileEl(t, { red: game.red, size: 'hand', cls: `${extraCls}${forced.has(t) ? ' is-force' : ''}`, mask: me.masked || masked.has(t) });
       input.decorateHandTile(e, t);
       return e;
     };
@@ -372,7 +413,11 @@
         const who = SM.Main.seatName(e.seat);
         SM.Cards.showTriggered(e.cid, e.ability ? `${who}が能力を使った` : `${who}の《${d ? d.name : 'パワー'}》が発動`);
       } else if (e.type === 'dice') {
-        SM.Fx.dice(e.seat, e.values, e.label);
+        SM.Fx.dice(e.seat, e.values, e.label, e.sides);
+      } else if (e.type === 'waka') {
+        SM.Fx.waka(e);
+      } else if (e.type === 'withdraw') {
+        text = '離脱';
       } else if (e.type === 'rps') {
         SM.Fx.rps(e.a, e.b, e.ha, e.hb);
       } else if (e.type === 'compare') {

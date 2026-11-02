@@ -165,6 +165,8 @@
         else chooser('どの形でチーしますか', chi.options.map((o) => ({ tiles: [...o, tile] })), (i) => sendAction({ type: 'chi', option: i }));
       }));
     }
+    // 《リーフドラゴン》: 手牌2枚を捨牌と同じ牌に変えてポン（変える2枚は次に手牌から選ぶ）
+    if (has('leafPon').length) top.appendChild(button('リーフドラゴンでポン', 'is-pon', () => sendAction({ type: 'leafPon' })));
     if (has('minkan').length) top.appendChild(button('カン', 'is-kan', () => sendAction({ type: 'minkan' })));
     if (has('akan').length) top.appendChild(button('亜空槓', 'is-kan', () => sendAction({ type: 'akan' })));
     const kans = [...has('ankan'), ...has('kakan')];
@@ -187,6 +189,8 @@
     // フルパワーはボタンではなく、手札の横のフルパワーの画像を押してプレイする（renderMyCards）
     for (const a of has('ability')) box.appendChild(button(a.label, 'is-ability', () => sendAction({ type: 'ability', iid: a.iid })));
     if (has('endTurn').length) box.appendChild(button('手番を終える', 'is-sub', () => sendAction({ type: 'endTurn' })));
+    // 《アヌビス神》: カードを使わなければ、打牌などの麻雀の行動はCPU（アヌビス神）に任せる
+    if (has('anubis').length) box.appendChild(button('アヌビス神に任せる', 'is-sub', () => sendAction({ type: 'anubis' })));
     const d = has('discard')[0];
     if (d && d.faceDown) {
       box.appendChild(button(faceDown ? '裏向き: ON' : '裏向き: OFF', 'is-sub', () => { faceDown = !faceDown; renderButtons(); }));
@@ -194,6 +198,7 @@
     if (has('pass').length) top.appendChild(button('スキップ', 'is-sub', () => sendAction({ type: 'pass' })));
 
     if (riichiMode) hint.textContent = 'リーチ宣言牌を選んでください';
+    else if (has('anubis').length) hint.textContent = 'カードを使うか、アヌビス神に任せてください';
     else if (prompt.kind === 'call') hint.textContent = `${SM.Tiles.label(tile, game.red)} に対して`;
     else if (discardSet.size && !actions.some((a) => a.type === 'tsumo')) hint.textContent = oneClick() ? '切る牌をクリック' : '切る牌を選んでもう一度タップ';
   }
@@ -214,10 +219,14 @@
     box.appendChild(label);
     for (const c of game.myCards) {
       const can = playable.has(c.iid);
+      // c.n: カードごとに変わる数（クエストの残り回数など）
       const e = SM.Cards.el(c.cid, {
         size: 'mini',
+        count: c.n,
         cls: can ? 'is-playable' : '',
-        onClick: () => SM.Cards.showDetail(c.cid, can ? { actions: [{ label: 'このカードをプレイする', onClick: () => sendAction({ type: 'card', iid: c.iid }) }] } : {}),
+        onClick: () => SM.Cards.showDetail(c.cid, {
+          count: c.n, ...(can ? { actions: [{ label: 'このカードをプレイする', onClick: () => sendAction({ type: 'card', iid: c.iid }) }] } : {}),
+        }),
       });
       e.dataset.iid = c.iid; // チュートリアルが光らせるカードを探す
       box.appendChild(e);

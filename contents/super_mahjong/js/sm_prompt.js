@@ -200,6 +200,8 @@
         row.appendChild(b);
       });
       body.appendChild(row);
+    } else if (p.kind === 'waka') {
+      body.appendChild(wakaForm(p));
     } else {
       const items = p.items || [];
       const min = p.min ?? 1;
@@ -221,6 +223,12 @@
         refresh();
       };
       items.forEach((it, i) => {
+        // 《陰陽師》で他家の手番を代わりに行う時（asSeat）は、切る牌の後のカード・行動を次の行から並べる
+        if (p.asSeat !== undefined && i > 0 && it.tile === undefined && items[i - 1].tile !== undefined) {
+          const br = document.createElement('div');
+          br.className = 'prompt__break';
+          row.appendChild(br);
+        }
         const e = itemEl(p, it, i, onPick);
         els.push(e);
         row.appendChild(e);
@@ -268,6 +276,58 @@
     body.appendChild(timer);
     setPeek(false);
     box.hidden = false;
+  }
+
+  // みんなで和歌を詠む（藤原頼通）: 句の並び（誰がどの句か）と、自分が受け持つ句の入力欄。空のまま送ると百人一首の句が入る
+  const WAKA_LINES = ['初句', '第二句', '第三句', '第四句', '結句'];
+  function wakaForm(p) {
+    const form = document.createElement('div');
+    form.className = 'prompt__waka';
+    const order = document.createElement('ol');
+    order.className = 'prompt__waka-order';
+    const mine = new Set((p.fields || []).map((f) => f.line));
+    (p.owners || []).forEach((seat, i) => {
+      const li = document.createElement('li');
+      if (mine.has(i)) li.classList.add('is-mine');
+      li.append(`${WAKA_LINES[i] || ''}: `, SM.Main.seatName(seat));
+      order.appendChild(li);
+    });
+    form.appendChild(order);
+    const inputs = (p.fields || []).map((f) => {
+      const label = document.createElement('label');
+      label.className = 'prompt__waka-field';
+      const cap = document.createElement('span');
+      cap.textContent = f.label;
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.className = 'prompt__waka-input';
+      input.maxLength = f.max || 16;
+      input.autocomplete = 'off';
+      label.append(cap, input);
+      form.appendChild(label);
+      return input;
+    });
+    const go = () => send(p, { texts: inputs.map((i) => i.value) });
+    // Enter で次の欄へ（最後の欄なら送る）。日本語の変換を確定する Enter では動かさない
+    inputs.forEach((input, i) => input.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter' || e.isComposing || e.keyCode === 229) return;
+      e.preventDefault();
+      if (inputs[i + 1]) inputs[i + 1].focus(); else go();
+    }));
+    const note = document.createElement('div');
+    note.className = 'prompt__note';
+    note.textContent = '空のまま送ると、百人一首からその音の数の句が入ります';
+    form.appendChild(note);
+    const acts = document.createElement('div');
+    acts.className = 'prompt__actions';
+    const btn = document.createElement('button');
+    btn.className = 'main-button';
+    btn.textContent = '詠む';
+    btn.addEventListener('click', go);
+    acts.appendChild(btn);
+    form.appendChild(acts);
+    setTimeout(() => { if (inputs[0] && current === p) inputs[0].focus(); }, 0);
+    return form;
   }
 
   function update(prompt, timeLeft) {

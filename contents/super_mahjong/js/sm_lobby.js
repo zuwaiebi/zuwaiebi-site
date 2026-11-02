@@ -246,8 +246,9 @@
       const code = $('join-code').value.trim().toUpperCase();
       if (!code) return;
       // 「CMPLT」: 部屋には入らず、実績をすべて達成にし、ミッションをすべてクリア済みにする（ネームドCPU・Cカードも解放される。
-      // サーバーはこのコードの部屋を作らない）
+      // どのネームドCPUのデッキにも入っていないCカードも解放する。サーバーはこのコードの部屋を作らない）
       if (code === UNLOCK_ALL_CODE) {
+        SM.Missions.unlockOrphans();
         SM.Achievements.unlockAll(SM.Missions.allIds());
         $('join-code').value = '';
         SM.Main.toast('実績とミッションをすべて開放しました');
@@ -279,18 +280,31 @@
     });
     $('btn-leave').addEventListener('click', () => SM.Net.send({ type: 'leaveRoom' }));
     $('btn-start').addEventListener('click', () => SM.Net.send({ type: 'startGame' }));
-    // デッキ構築戦: 自分のデッキを選ぶ
+    // デッキ構築戦: 使うデッキを選ぶ（「自分のデッキ」「サンプルデッキ」を切り替えて）。切り替えたら、その出どころで選んでいるデッキ
+    // （無ければ部屋のルールに合う最初のもの）を席に送る
+    const KEY = SM.Decks.ROOM_KEY;
+    deckSrc = SM.Decks.srcTabs(KEY, () => {
+      const room = SM.Main.state.room;
+      if (!room || room.state !== 'waiting' || !usesDeckSelect(room.rules)) return;
+      renderMyDeck(room);
+      sendDeck(SM.Decks.pickedIn(KEY));
+    });
+    $('room-deck-src').appendChild(deckSrc);
     $('room-deck-select').addEventListener('change', (e) => {
-      const d = SM.Decks.list().find((x) => x.id === e.target.value) || null;
-      SM.Decks.setPicked(d ? d.id : '');
+      const d = SM.Decks.listIn(SM.Decks.srcIn(KEY)).find((x) => x.id === e.target.value) || null;
+      SM.Decks.setPickedIn(KEY, d);
       sendDeck(d);
     });
-    $('room-deck-edit').addEventListener('click', () => SM.Decks.openList());
+    // 自分のデッキは作る・編集、サンプルデッキは中身を見る
+    $('room-deck-edit').addEventListener('click', () => {
+      const d = SM.Decks.pickedIn(KEY);
+      if (SM.Decks.srcIn(KEY) === 'sample') { if (d) SM.Decks.view(d); } else SM.Decks.openList();
+    });
     // 使っているデッキを編集・削除したら、席のデッキも送り直す（待機室にいる時だけ）
     SM.Decks.onChange(() => {
       const room = SM.Main.state.room;
       if (!lastRoom || !room || room.state !== 'waiting' || !usesDeckSelect(room.rules)) return;
-      sendDeck(SM.Decks.picked());
+      sendDeck(SM.Decks.pickedIn(KEY));
       renderRoom(room);
     });
     const leftRoom = () => { lastRoom = null; deckSentKey = null; };
@@ -373,21 +387,26 @@
     return el;
   }
 
-  // 自分のデッキを選ぶ欄
+  // 使うデッキを選ぶ欄（「自分のデッキ」「サンプルデッキ」の切り替え deckSrc と、その出どころのデッキの選択）
+  let deckSrc = null;
   let deckOptionsKey = '';
   let deckSentKey = null;   // 自動で送ったデッキ（送っても席に反映されない時に、何度も送らないため）
   function renderMyDeck(room) {
     const box = $('room-deck');
     box.hidden = !usesDeckSelect(room.rules) || room.you < 0;
     if (box.hidden) return;
+    const KEY = SM.Decks.ROOM_KEY;
+    const sample = SM.Decks.srcIn(KEY) === 'sample';
+    deckSrc.refresh();
+    $('room-deck-edit').textContent = sample ? '中身を見る' : '作る・編集';
     const mine = room.seats[room.you];
-    const list = SM.Decks.list();
-    let pick = SM.Decks.picked();
+    const list = SM.Decks.listIn(sample ? 'sample' : 'mine');
+    let pick = SM.Decks.pickedIn(KEY);
     // まだ選んでいなければ、部屋のルールで使えるデッキを選んでおく（Cカードは自分が解放したもの。ホストが解放していなくてもよい）
     const checkRoom = (d) => SM.Decks.check(d, deckRuleOf(room.rules));
     if (!pick) {
       pick = list.find((d) => !checkRoom(d).problems.length) || null;
-      if (pick) SM.Decks.setPicked(pick.id);
+      if (pick) SM.Decks.setPickedIn(KEY, pick);
     }
     const opts = (pick ? [] : [['', list.length ? '（デッキを選ぶ）' : '（デッキがありません）']]).concat(list.map((d) => {
       const { total, problems } = checkRoom(d);
@@ -415,7 +434,7 @@
     const st = $('room-deck-status');
     const d = mine.deck;
     st.className = `room-deck__status ${d && d.ok ? 'is-ok' : 'is-ng'}`;
-    if (!list.length && !d) st.textContent = 'デッキがありません。「作る・編集」で作ってください。';
+    if (!list.length && !d) st.textContent = 'デッキがありません。「作る・編集」で作るか、「サンプルデッキ」から選んでください。';
     else if (!d) st.textContent = 'デッキを選んでください';
     else if (d.ok) st.textContent = `「${d.name}」（${d.total}枚）で準備OK`;
     else st.textContent = `部屋のルールに合いません: ${(d.problems || []).join(' / ')}`;

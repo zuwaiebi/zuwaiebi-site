@@ -1,18 +1,20 @@
-// カード一覧: すべてのカード（イベント・パワー・フルパワー・パワー＋・ハプニング）を見る。
+// カード一覧: すべてのカード（イベント・パワー・フルパワー・＋カード・ハプニング・クエスト）を見る。
 // カード名・テキストで検索し（空白で区切るとすべてを含むもの）、カードタイプで絞り込む。カードを押すと詳細。
 // ミッションで解放していないCカードは、イラストを鍵の絵、テキストを「ミッションを進めることで明かされる…」にして出す（検索もその文で）
 (function () {
   const SM = (window.SuperMahjong = window.SuperMahjong || {});
   const $ = (id) => document.getElementById(id);
   const CARDS = window.SM_CARDS || [];
-  // 絞り込み（ハプニングなパワーは「パワー」と「ハプニング」のどちらにも入る）
+  // 絞り込み（ハプニングなパワーは「パワー」と「ハプニング」のどちらにも入る。
+  // ＋カード（パワー＋・イベント＋・フルパワー＋）は「＋カード」だけに入り、イベント・フルパワーには入らない）
   const TYPES = [
     { key: 'all', label: 'すべて', has: () => true },
-    { key: 'event', label: 'イベント', has: (c) => c.typeKey === 'event' },
+    { key: 'event', label: 'イベント', has: (c) => c.typeKey === 'event' && !c.plus },
     { key: 'power', label: 'パワー', has: (c) => c.typeKey === 'power' || c.typeKey === 'happeningPower' },
-    { key: 'full', label: 'フルパワー', has: (c) => c.typeKey === 'full' },
-    { key: 'plus', label: 'パワー＋', has: (c) => c.typeKey === 'plus' },
+    { key: 'full', label: 'フルパワー', has: (c) => c.typeKey === 'full' && !c.plus },
+    { key: 'plus', label: '＋カード', has: (c) => c.plus === true },
     { key: 'happening', label: 'ハプニング', has: (c) => c.typeKey === 'happening' || c.typeKey === 'happeningPower' },
+    { key: 'quest', label: 'クエスト', has: (c) => c.typeKey === 'quest' },
     // Cカード（Cイベント・Cパワー・Cフルパワー。ミッションモード用）
     { key: 'c', label: 'Cカード', has: (c) => c.c === true },
   ];

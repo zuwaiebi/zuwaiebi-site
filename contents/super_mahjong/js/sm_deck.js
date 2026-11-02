@@ -5,8 +5,9 @@
   const $ = (id) => document.getElementById(id);
   const STORE_KEY = 'super_mahjong_card_counts';   // 部屋を作る時の設定（CSVの並びが変わっても困らないようカードのkeyで覚える）
   const MAX = 30;
-  const DECK_TYPES = ['event', 'power', 'happening', 'happeningPower'];
-  const CARDS = (window.SM_CARDS || []).filter((c) => DECK_TYPES.includes(c.typeKey));
+  // 山札に入るカード（クエストも。＋のカード（イベント＋など）は入らない。サーバーの isDeckDef と同じ）
+  const DECK_TYPES = ['event', 'power', 'happening', 'happeningPower', 'quest'];
+  const CARDS = (window.SM_CARDS || []).filter((c) => DECK_TYPES.includes(c.typeKey) && !c.plus);
   const BY_ID = new Map(CARDS.map((c) => [c.id, c]));
 
   const countOf = (counts, c) => (counts && counts[c.id] !== undefined ? counts[c.id] : c.copies);

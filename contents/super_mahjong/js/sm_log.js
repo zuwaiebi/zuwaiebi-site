@@ -29,7 +29,7 @@
       case 'ability': return `${who(e.seat)}が${cardName(e.cid)}の能力を使った`;
       case 'powerTrigger': return e.ability ? `${who(e.seat)}が${cardName(e.cid)}の能力を使った` : `${who(e.seat)}の${cardName(e.cid)}が発動`;
       case 'payment': return `${who(e.from)} → ${who(e.to)} ${e.amount}点`;
-      case 'dice': return `${who(e.seat)}のサイコロ: ${e.values.join(' ・ ')}${e.label ? `（${e.label}）` : ''}`;
+      case 'dice': return `${who(e.seat)}の${e.sides && e.sides !== 6 ? `${e.sides}面ダイス` : 'サイコロ'}: ${e.values.join(' ・ ')}${e.label ? `（${e.label}）` : ''}`;
       // 結果は書かない（回っている間にログで分からないように。止まった後にカードの効果のログで出す）
       case 'roulette': return `${who(e.seat)}のルーレット${e.label ? `（${e.label}）` : ''}`;
       case 'rps': return `じゃんけん ${who(e.a)} ${HAND[e.ha]} ー ${HAND[e.hb]} ${who(e.b)}`;
