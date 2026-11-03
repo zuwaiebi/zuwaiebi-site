@@ -133,9 +133,11 @@
     render(game);
   }
 
+  // 0.25秒ごとに呼ぶので、文が変わる時だけ書き換える
   function tick() {
     if (!timerEl) return;
-    timerEl.textContent = prompt && deadline !== null ? `残り ${Math.max(0, Math.ceil((deadline - performance.now()) / 1000))}秒` : '';
+    const text = prompt && deadline !== null ? `残り ${Math.max(0, Math.ceil((deadline - performance.now()) / 1000))}秒` : '';
+    if (timerEl.textContent !== text) timerEl.textContent = text;
   }
 
   function init() { setInterval(tick, 250); }

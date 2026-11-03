@@ -227,11 +227,20 @@
     // ドラの牌（扱っている牌種で判定。赤5は赤ドラありの時。カードの効果でドラになっている牌も）
     const k = shown !== null ? shown : typeof as === 'number' ? as : kindOf(id);
     const cardDora = fixed ? Boolean(fixed.dora) : doraTiles.has(id);
-    if (known && (allDora || (!o.plain && (red || doraKinds.has(k) || cardDora)))) {
-      d.classList.add('is-dora');
-      d.style.setProperty('--shine-delay', phase(SHINE_MS));
-    }
+    if (known && (allDora || (!o.plain && (red || doraKinds.has(k) || cardDora)))) addShine(d);
     return d;
+  }
+
+  /**
+   * ドラの光沢を付ける。縁の光と金色の筋は、牌の形で切り抜いた .tile__shine の中を transform で動かす
+   * （opacity・transform だけの動きは描き直しが要らないので、スマホでも毎コマ重くならない）
+   */
+  function addShine(d) {
+    d.classList.add('is-dora');
+    d.style.setProperty('--shine-delay', phase(SHINE_MS));
+    const s = document.createElement('i');
+    s.className = 'tile__shine';
+    d.appendChild(s);
   }
 
   /**
@@ -243,10 +252,7 @@
     const name = kindNameOf(k) + (o.red ? 'r' : '');
     const d = build(name, o);
     d.dataset.k = k;
-    if (o.shine && (allDora || o.red || doraKinds.has(k))) {
-      d.classList.add('is-dora');
-      d.style.setProperty('--shine-delay', phase(SHINE_MS));
-    }
+    if (o.shine && (allDora || o.red || doraKinds.has(k))) addShine(d);
     return d;
   }
 

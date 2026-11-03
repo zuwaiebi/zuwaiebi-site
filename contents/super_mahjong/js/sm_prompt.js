@@ -340,14 +340,15 @@
     show(prompt);
   }
 
+  // 0.25秒ごとに呼ぶので、文が変わる時だけ書き換える（同じ文を書いても、画面の配置の計算がやり直しになる）
   function tick() {
     const text = deadline === null || !current ? '' : `残り ${Math.max(0, Math.ceil((deadline - performance.now()) / 1000))}秒`;
-    const ht = $('hand-pick-timer');
-    if (ht) ht.textContent = text;
+    const set = (el) => { if (el && el.textContent !== text) el.textContent = text; };
+    set($('hand-pick-timer'));
     const el = $('prompt-timer');
     if (!el) return;
-    el.textContent = text;
-    $('prompt-peek').querySelector('.prompt-peek__timer').textContent = text;
+    set(el);
+    set($('prompt-peek').querySelector('.prompt-peek__timer'));
   }
 
   // ---- 自分の手牌から選ぶ（ウィンドウを出さず、画面の手牌を押して選ぶ） ----
@@ -367,6 +368,9 @@
     bar.innerHTML = '';
     SM.Table.rerender();
   }
+
+  /** 手牌から選んでいる最中の状態（卓の手牌を作り直すかの目印。sm_table）。選んでいなければ null */
+  const handPickState = () => (hand ? [hand.p.id, [...hand.sel]] : null);
 
   /** 手牌の牌を飾る（sm_input から）。手牌から選んでいる最中でなければ false を返す */
   function decorateHandPick(el, t) {
@@ -592,5 +596,5 @@
     $('fp-filter').addEventListener('input', filterPregame);
   }
 
-  SM.Prompt = { init, update, hide, reset, showPregame, sendAnswer: send, decorateHandPick, isAnswered: (p) => Boolean(p) && answeredId === p.id };
+  SM.Prompt = { init, update, hide, reset, showPregame, sendAnswer: send, decorateHandPick, handPickState, isAnswered: (p) => Boolean(p) && answeredId === p.id };
 })();

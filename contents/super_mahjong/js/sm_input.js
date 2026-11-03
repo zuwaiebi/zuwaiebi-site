@@ -203,15 +203,25 @@
     else if (discardSet.size && !actions.some((a) => a.type === 'tsumo')) hint.textContent = oneClick() ? '切る牌をクリック' : '切る牌を選んでもう一度タップ';
   }
 
+  // 前に描いた手札・フルパワーの目印（中身と押せるかが同じなら作り直さない。届く卓の情報の多くでは変わらない）
+  let myCardsKey = '';
+
   function renderMyCards() {
     const box = $('my-cards');
     if (!box || !game) return;
-    box.innerHTML = '';
-    box.hidden = !game.cardsEnabled;
-    if (!game.cardsEnabled) return;
     const playable = new Set();
     const cardAct = actions.find((a) => a.type === 'card');
     if (cardAct && !sent()) for (const iid of cardAct.iids) playable.add(iid);
+    const me = game.players[game.you];
+    // フルパワー（カスタムモードの文殊の知恵では3つ。idx でどれかを送る）。前の形（fp だけ）の記録でも出せるように
+    const fps = me.fps || (me.fp ? [{ ...me.fp, idx: 0 }] : []);
+    const canFps = fps.map((fp) => !sent() && actions.some((a) => a.type === 'fullPower' && (a.idx ?? 0) === fp.idx));
+    const key = JSON.stringify([game.cardsEnabled, game.myCards, game.handLimit, fps, [...playable], canFps]);
+    if (key === myCardsKey) return;
+    myCardsKey = key;
+    box.innerHTML = '';
+    box.hidden = !game.cardsEnabled;
+    if (!game.cardsEnabled) return;
     const label = document.createElement('div');
     label.className = 'my-cards__label';
     // 手札の上限（カスタムモードのリミットブレイクで8）
@@ -231,9 +241,6 @@
       e.dataset.iid = c.iid; // チュートリアルが光らせるカードを探す
       box.appendChild(e);
     }
-    const me = game.players[game.you];
-    // フルパワー（カスタムモードの文殊の知恵では3つ。idx でどれかを送る）。前の形（fp だけ）の記録でも出せるように
-    const fps = me.fps || (me.fp ? [{ ...me.fp, idx: 0 }] : []);
     // 手札とフルパワーが多い時（リミットブレイク・文殊の知恵）は、スマホでは少し小さくする
     box.classList.toggle('is-many', game.myCards.length + fps.length > 6);
     if (fps.length) {
@@ -246,8 +253,8 @@
       cap.textContent = fps.length > 1 ? 'フルパワー'
         : one.playable ? 'フルパワー（使える）' : (one.cooldown ? `フルパワー（あと${one.cooldown}ツモ番）` : 'フルパワー');
       wrap.appendChild(cap);
-      for (const fp of fps) {
-        const canFp = !sent() && actions.some((a) => a.type === 'fullPower' && (a.idx ?? 0) === fp.idx);
+      fps.forEach((fp, i) => {
+        const canFp = canFps[i];
         const e = SM.Cards.el(fp.cid, {
           size: 'mini',
           cls: canFp ? 'is-playable' : fp.playable ? '' : 'is-dim',
@@ -263,16 +270,18 @@
           holder.append(e, cd);
           wrap.appendChild(holder);
         } else wrap.appendChild(e);
-      }
+      });
       box.appendChild(wrap);
     }
   }
 
+  // 0.25秒ごとに呼ぶので、文が変わる時だけ書き換える（同じ文を書いても、画面の配置の計算がやり直しになる）
   function tickTimer() {
     const el = $('my-timer');
-    if (deadline === null || sent()) { el.textContent = ''; return; }
+    const set = (text) => { if (el.textContent !== text) el.textContent = text; };
+    if (deadline === null || sent()) { set(''); return; }
     const sec = Math.max(0, Math.ceil((deadline - performance.now()) / 1000));
-    el.textContent = `残り ${sec}秒`;
+    set(`残り ${sec}秒`);
     el.classList.toggle('is-urgent', sec <= 5);
   }
 
@@ -294,7 +303,10 @@
   }
 
   /** 新しい対局が始まった時: 前の対局で送った問い合わせの覚えを消す */
-  function reset() { sentId = null; prompt = null; }
+  function reset() { sentId = null; prompt = null; myCardsKey = ''; }
 
-  SM.Input = { init, update, reset, decorateHandTile, onRejected, oneClick };
+  /** 手牌の飾りに使う状態（卓の手牌を作り直すかの目印。sm_table） */
+  const handState = () => [sent(), riichiMode, selected, [...discardSet], [...riichiSet]];
+
+  SM.Input = { init, update, reset, decorateHandTile, handState, onRejected, oneClick };
 })();

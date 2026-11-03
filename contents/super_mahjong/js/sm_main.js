@@ -192,7 +192,7 @@
   }
 
   function init() {
-    SM.Tiles.probeImages(() => SM.Table.rerender());
+    SM.Tiles.probeImages(() => SM.Table.rerender(true));
     SM.Tiles.initHighlight();
     SM.Cards.init();
     SM.Icons.init();

@@ -166,10 +166,10 @@
       targetLine.classList.add('card-play__target');
       box.appendChild(targetLine);
     }
+    // カードの要素は毎回新しく作るので、is-anim を付けておけば入れた時に飛び出す動きが始まる
+    // （以前は is-anim を付け直すために offsetWidth を読んでいたが、卓を描き直した直後だと画面全体の配置の計算をその場でさせて重かった）
     box.appendChild(el(cid, { size: 'full', detail: false }));
     box.hidden = false;
-    box.classList.remove('is-anim');
-    void box.offsetWidth;
     box.classList.add('is-anim');
     clearTimeout(overlayTimer);
     overlayTimer = setTimeout(() => { box.hidden = true; }, 1700);

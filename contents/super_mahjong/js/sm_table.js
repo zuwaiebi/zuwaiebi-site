@@ -13,6 +13,22 @@
 
   let lastGame = null;
   let lastRoom = null;
+  // 各家の表示は、前に描いた時と同じ内容なら作り直さない（届く卓の情報の多くは1人分しか変わらないので、スマホでの描き直しを軽くする）。
+  // panelKeys: 位置ごとに前に描いた内容の目印。viewKey: 牌の見え方・並べ方を変える卓全体の情報（render の初めに作る）
+  const panelKeys = new Map();
+  let viewKey = '';
+  // 中央（ドラ表示牌・捨て場・効果の一覧）と自分の手牌の所も同じく、部分ごとに前に描いた内容の目印
+  let partKeys = {};
+  const partChanged = (part, data) => {
+    const k = JSON.stringify([viewKey, data]);
+    if (partKeys[part] === k) return false;
+    partKeys[part] = k;
+    return true;
+  };
+  // 文字だけの所は、同じ文なら書き換えない（書き換えると配置の計算がやり直しになる）
+  const setText = (el, text) => { if (el.textContent !== text) el.textContent = text; };
+  // 出す・隠すも、変わる時だけ（同じでも hidden を書くと、その中の要素すべての見た目の計算がやり直しになる）
+  const setHidden = (el, hidden) => { if (el.hidden !== hidden) el.hidden = hidden; };
 
   function posOf(game, seat) {
     const rel = (seat - game.you + game.n) % game.n;
@@ -64,15 +80,35 @@
   function renderPanel(game, room, p) {
     const pos = posOf(game, p.seat);
     const panel = $(`seat-${pos}`);
-    panel.hidden = false;
     const self = p.seat === game.you;
     const seatInfo = room.seats[p.seat] || {};
     const size = self ? 'river' : 'sm';
 
-    const head = panel.querySelector('.seat__head');
     panel.classList.toggle('is-turn', game.phase === 'play' && game.turn === p.seat);
     panel.classList.toggle('is-dealer', p.dealer);
     panel.classList.toggle('is-thinking', game.waitingFor.includes(p.seat) && !self);
+    // 《Independence Day》でこの局を離脱している
+    panel.classList.toggle('is-out', Boolean(p.out));
+    // 中身は部分（名前の行・場のパワー・河・手牌と副露）ごとに、使う情報が前に描いた時と同じなら作り直さない
+    // （ツモ・打牌で変わるのは、多くは1人の河と手牌の枚数だけ）。viewKey は牌の見え方・並べ方を変える卓全体の情報。
+    // **描く内容に新しい情報を使う時は、その部分の changed() に渡す情報にも足す**（足さないと、変わっても描き直されない）
+    let keys = panelKeys.get(pos);
+    if (!keys) panelKeys.set(pos, (keys = {}));
+    const changed = (part, data) => {
+      const k = JSON.stringify([viewKey, data]);
+      if (keys[part] === k) return false;
+      keys[part] = k;
+      return true;
+    };
+    if (changed('head', [seatInfo, p.wind, p.score, p.riichi, p.out, p.cards.handCount])) renderHead(game, panel, p, seatInfo, self);
+    if (changed('field', [p.cards.field, p.cards.hand])) renderField(game, panel, p, self);
+    if (changed('river', [p.discards, Boolean(game.lastDiscard && game.lastDiscard.seat === p.seat)])) renderRiver(game, panel, p, size);
+    if (changed('melds', [p.hand, p.shown, p.handCount, p.kita, p.melds, p.held, p.altCount])) renderMelds(game, panel, p, self);
+  }
+
+  /** 名前の行（上家などの関係・風・アイコン・名前・点数・リーチ・離脱・手札の枚数） */
+  function renderHead(game, panel, p, seatInfo, self) {
+    const head = panel.querySelector('.seat__head');
     head.innerHTML = '';
     if (!self) {
       const rel = document.createElement('span');
@@ -100,8 +136,6 @@
       r.textContent = 'リーチ';
       head.appendChild(r);
     }
-    // 《Independence Day》でこの局を離脱している
-    panel.classList.toggle('is-out', Boolean(p.out));
     if (p.out) {
       const o = document.createElement('span');
       o.className = 'seat__out';
@@ -115,8 +149,10 @@
       hc.title = `手札 ${p.cards.handCount}枚`;
       head.appendChild(hc);
     }
+  }
 
-    // 場のパワー（5スロット。カスタムモードのリミットブレイクで8）
+  /** 場のパワー（5スロット。カスタムモードのリミットブレイクで8）と、見えている他家の手札 */
+  function renderField(game, panel, p, self) {
     let field = panel.querySelector('.seat__field');
     if (!field) {
       field = document.createElement('div');
@@ -157,7 +193,9 @@
         seen.appendChild(SM.Cards.el(c.cid, { size: 'tiny', count: c.n, onClick: () => SM.Cards.showDetail(c.cid, { count: c.n }) }));
       }
     } else if (seen) seen.remove();
+  }
 
+  function renderRiver(game, panel, p, size) {
     const river = panel.querySelector('.seat__river');
     river.innerHTML = '';
     p.discards.forEach((d, i) => {
@@ -165,7 +203,10 @@
       const cls = [d.called ? 'is-called' : '', d.tsumogiri ? 'is-tsumogiri' : '', last ? 'is-last' : '', d.faceDown ? 'is-facedown' : ''].join(' ');
       river.appendChild(tileEl(d.tile, { red: game.red, size, sideways: d.riichi, cls }));
     });
+  }
 
+  /** 他家の手牌（裏向き・見えている牌）・抜き北・副露・握り込みなどの枚数 */
+  function renderMelds(game, panel, p, self) {
     const melds = panel.querySelector('.seat__melds');
     melds.innerHTML = '';
     if (!self) {
@@ -202,24 +243,27 @@
   }
 
   function renderCenter(game) {
-    $('center-label').textContent = game.label;
-    $('center-sticks').textContent = `${game.honba}本場 / 供託${SM.Main.points(game.pot)}点`;
-    $('center-wall').textContent = `残り ${game.wallRemaining}枚`;
-    const dora = $('center-dora');
-    dora.innerHTML = '';
-    for (let i = 0; i < Math.max(5, game.doraIndicators.length); i++) {
-      const t = game.doraIndicators[i];
-      dora.appendChild(tileEl(t === undefined ? null : t, { red: game.red, size: 'sm', plain: true }));
+    setText($('center-label'), game.label);
+    setText($('center-sticks'), `${game.honba}本場 / 供託${SM.Main.points(game.pot)}点`);
+    setText($('center-wall'), `残り ${game.wallRemaining}枚`);
+    if (partChanged('dora', game.doraIndicators)) {
+      const dora = $('center-dora');
+      dora.innerHTML = '';
+      for (let i = 0; i < Math.max(5, game.doraIndicators.length); i++) {
+        const t = game.doraIndicators[i];
+        dora.appendChild(tileEl(t === undefined ? null : t, { red: game.red, size: 'sm', plain: true }));
+      }
     }
     const cards = $('center-cards');
-    cards.hidden = !game.cardsEnabled;
-    if (game.cardsEnabled) {
+    setHidden(cards, !game.cardsEnabled);
+    if (game.cardsEnabled && partChanged('cards', [game.discardPile.length, game.dir])) {
       // 山札の残り枚数は対局中は非公開（サーバーも送らない）
       cards.innerHTML = '';
       const pile = document.createElement('button');
       pile.className = 'small-button';
       pile.textContent = `捨て場 ${game.discardPile.length}枚`;
-      pile.addEventListener('click', () => showPile(game));
+      // 作り直さなかった時も、押した時の最新の捨て場を見せる
+      pile.addEventListener('click', () => showPile(lastGame));
       cards.appendChild(pile);
       if (game.dir === -1) {
         const d = document.createElement('span');
@@ -227,6 +271,8 @@
         cards.appendChild(d);
       }
     }
+    // 効果の一覧（席の名前も出すので、名前が変わった時も作り直す）
+    if (!partChanged('effects', [game.control, game.effects, lastRoom && lastRoom.seats.map((x) => x && x.name)])) return;
     const eff = $('center-effects');
     eff.innerHTML = '';
     // 《陰陽師》: 自分が他家の手番を代わりに行っている／自分の手番を他家が行っている
@@ -260,6 +306,21 @@
 
   function renderHand(game) {
     const me = game.players[game.you];
+    // 手牌は、選んでいる牌・切れる牌など操作の状態（sm_input・手牌から選ぶ sm_prompt）も比べて、同じなら作り直さない
+    if (partChanged('hand', [me.hand, me.drawn, me.forceTiles, me.maskTiles, me.masked, me.heldTiles, SM.Input.handState(), SM.Prompt.handPickState()])) {
+      renderHandTiles(game, me);
+    }
+    if (partChanged('next', me.next)) renderNext(me.next);
+    if (partChanged('melds', [me.seat, me.melds])) {
+      const melds = $('my-melds');
+      melds.innerHTML = '';
+      me.melds.slice().reverse().forEach((m) => melds.appendChild(meldEl(m, me.seat, game.n, game.red, 'hand-sm')));
+    }
+    if (partChanged('alt', [me.seat, me.altHand, me.altMelds, me.masked])) renderAlt(game, me);
+    if (partChanged('info', [me.deckLeft, me.masked, me.waits, me.furiten, me.noWin])) renderInfo(me);
+  }
+
+  function renderHandTiles(game, me) {
     const hand = $('my-hand');
     hand.innerHTML = '';
     const input = SM.Input;
@@ -274,21 +335,18 @@
     };
     me.hand.forEach((t) => hand.appendChild(make(t, '')));
     if (me.drawn !== null && me.drawn !== undefined) hand.appendChild(make(me.drawn, 'is-drawn'));
-    renderNext(me.next);
     if (me.heldTiles && me.heldTiles.length) {
       const h = document.createElement('div');
       h.className = 'held-tiles';
       me.heldTiles.forEach((t) => h.appendChild(tileEl(t, { size: 'sm', red: game.red })));
       hand.appendChild(h);
     }
+  }
 
-    const melds = $('my-melds');
-    melds.innerHTML = '';
-    me.melds.slice().reverse().forEach((m) => melds.appendChild(meldEl(m, me.seat, game.n, game.red, 'hand-sm')));
-
-    // 二足の草鞋: 今使っていない方の手牌を、普通の手牌の下にいつも出す
+  // 二足の草鞋: 今使っていない方の手牌を、普通の手牌の下にいつも出す
+  function renderAlt(game, me) {
     const alt = $('my-alt');
-    alt.hidden = !me.altHand;
+    setHidden(alt, !me.altHand);
     if (me.altHand) {
       const ah = $('my-alt-hand');
       ah.innerHTML = '';
@@ -297,7 +355,10 @@
       am.innerHTML = '';
       (me.altMelds || []).slice().reverse().forEach((m) => am.appendChild(meldEl(m, me.seat, game.n, game.red, 'hand-sm')));
     }
+  }
 
+  /** 手牌の上の情報（山札の残り・待ち・フリテン・和了れない） */
+  function renderInfo(me) {
     const info = $('my-info');
     info.innerHTML = '';
     const addInfo = (text, cls) => {
@@ -321,7 +382,7 @@
    */
   function renderNext(next) {
     const box = $('my-next');
-    box.hidden = !next;
+    setHidden(box, !next);
     // 枠の分だけ手牌を小さくする（CSS の .my-area.has-next）
     box.closest('.my-area').classList.toggle('has-next', Boolean(next));
     const slot = box.querySelector('.my-next__tile');
@@ -341,11 +402,15 @@
     lastGame = game;
     lastRoom = room;
     T().setView(game);
+    viewKey = JSON.stringify([game.you, game.n, game.dir, game.red, game.cardsEnabled, game.slots, game.maskAll,
+      game.tiles, game.reds, game.blues, game.allDora, game.doraKinds, game.doraTiles, game.asKinds]);
     // 他の人が割り込み・鳴きを考えている間（自分は何も聞かれていない時）は、画面の中央に「他プレイヤーが思考中…」
-    $('thinking').hidden = !(game.othersThinking && !game.prompt);
+    setHidden($('thinking'), !(game.othersThinking && !game.prompt));
     const table = $('table');
-    table.dataset.players = game.n;
-    ['bottom', 'right', 'top', 'left'].forEach((pos) => { $(`seat-${pos}`).hidden = true; });
+    if (table.dataset.players !== String(game.n)) table.dataset.players = game.n;
+    // 席のいない位置（三麻の上）は隠す
+    const used = new Set(game.players.map((p) => posOf(game, p.seat)));
+    ['bottom', 'right', 'top', 'left'].forEach((pos) => setHidden($(`seat-${pos}`), !used.has(pos)));
     maskAll = Boolean(game.maskAll);
     try {
       game.players.forEach((p) => renderPanel(game, room, p));
@@ -436,5 +501,14 @@
     for (const snd of sounds) SM.Audio.se(snd);
   }
 
-  SM.Table = { render, showEvents, meldEl, posOf, rerender: () => lastGame && render(lastGame, lastRoom), WIND };
+  /** 最後に届いた卓の情報で描き直す。force: 各家の表示も必ず作り直す（牌の画像が使えると分かった時など、牌の描き方が変わった時） */
+  function rerender(force) {
+    if (force) {
+      panelKeys.clear();
+      partKeys = {};
+    }
+    if (lastGame) render(lastGame, lastRoom);
+  }
+
+  SM.Table = { render, showEvents, meldEl, posOf, rerender, WIND };
 })();
