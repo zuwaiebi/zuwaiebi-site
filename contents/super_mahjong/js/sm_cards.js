@@ -83,7 +83,8 @@
    * カード要素を作る
    * @param {string|null} cid カードID（null なら裏向き）
    * @param {object} o { size: 'full'|'mini'|'tiny', onClick, cls, locked: 解放していないCカードとして出す（イラストとテキストを伏せる。詳細も同じ）,
-   *                    count: テキストの {3} の所に出す数（クエストの残り回数など。詳細も同じ） }
+   *                    count: テキストの {3} の所に出す数（クエストの残り回数など。詳細も同じ）、
+   *                    unit: 小さい表示の「あと〇」の数に付ける単位（《光の護封剣》《はめつのねがい》の起きるまでの残りの巡は「巡」） }
    */
   function el(cid, o = {}) {
     const size = o.size || 'mini';
@@ -112,7 +113,7 @@
       if (o.count !== undefined && o.count !== null && size !== 'full') {
         const badge = document.createElement('span');
         badge.className = 'card__count';
-        badge.textContent = `あと${o.count}`;
+        badge.textContent = `あと${o.count}${o.unit || ''}`;
         d.appendChild(badge);
       }
     }

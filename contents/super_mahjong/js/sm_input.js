@@ -31,7 +31,9 @@
     // 接続が切れていて送れなかった時は送っていない扱いにする（つながり直すと同じ問い合わせが届くので、押し直せる）
     if (!SM.Net.send({ type: 'answer', promptId: prompt.id, answer: action })) return;
     sentId = prompt.id;
-    select(null);
+    // 選んで切った牌は、次の卓の情報が届いて手牌から出ていくまで持ち上げたままにする（手牌から出る演出をその高さから始める。
+    // 選んでいたのは update で問い合わせが変わった時に消す）
+    if (!((action.type === 'discard' || action.type === 'riichi') && action.tile === selected)) select(null);
     riichiMode = false;
     closeChooser();
     SM.Cards.hideDetail();
@@ -229,10 +231,11 @@
     box.appendChild(label);
     for (const c of game.myCards) {
       const can = playable.has(c.iid);
-      // c.n: カードごとに変わる数（クエストの残り回数など）
+      // c.n: カードごとに変わる数（クエストの残り回数など。c.unit はその単位）
       const e = SM.Cards.el(c.cid, {
         size: 'mini',
         count: c.n,
+        unit: c.unit,
         cls: can ? 'is-playable' : '',
         onClick: () => SM.Cards.showDetail(c.cid, {
           count: c.n, ...(can ? { actions: [{ label: 'このカードをプレイする', onClick: () => sendAction({ type: 'card', iid: c.iid }) }] } : {}),

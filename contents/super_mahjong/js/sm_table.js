@@ -167,10 +167,11 @@
     field.classList.toggle('is-wide', slots > 5);
     for (let i = 0; i < slots; i++) {
       const c = p.cards.field[i];
-      // タイルフォースが有効なパワーは緑の縁。詳細にはメモ（唯我独尊の宣言など）と、カードごとに変わる数（残り回数など）も出す
+      // タイルフォースが有効なパワーは緑の縁。詳細にはメモ（唯我独尊の宣言・《光の護封剣》の「あと〇巡で破壊される」など）と、
+      // カードごとに変わる数（残り回数など。c.unit はその単位で、《光の護封剣》《はめつのねがい》の残りの巡は「巡」）も出す
       if (c) {
         field.appendChild(SM.Cards.el(c.cid, {
-          size: 'tiny', count: c.n, cls: c.force ? 'is-force' : '', onClick: () => SM.Cards.showDetail(c.cid, { note: c.note, count: c.n }),
+          size: 'tiny', count: c.n, unit: c.unit, cls: c.force ? 'is-force' : '', onClick: () => SM.Cards.showDetail(c.cid, { note: c.note, count: c.n }),
         }));
       } else {
         const e = document.createElement('div');
@@ -192,7 +193,7 @@
       label.textContent = '手札';
       seen.appendChild(label);
       for (const c of p.cards.hand) {
-        seen.appendChild(SM.Cards.el(c.cid, { size: 'tiny', count: c.n, onClick: () => SM.Cards.showDetail(c.cid, { count: c.n }) }));
+        seen.appendChild(SM.Cards.el(c.cid, { size: 'tiny', count: c.n, unit: c.unit, onClick: () => SM.Cards.showDetail(c.cid, { count: c.n }) }));
       }
     } else if (seen) seen.remove();
   }
@@ -323,27 +324,99 @@
     if (partChanged('info', [me.deckLeft, me.masked, me.waits, me.furiten, me.noWin])) renderInfo(me);
   }
 
+  // 手牌の出入りの演出: 手牌に加わった牌は上からフェードイン（.is-enter）、手牌から出た牌は元の位置で上へフェードアウト（.is-leave）。
+  // 前に描いた手牌と牌IDで比べる（局が変わった時は比べず、配牌はすべて上から入る）。届く情報ごとに手牌を作り直すので、演出の途中で
+  // 描き直した時は、経った時間の分だけ進めた所から続ける（ツモの直後に切れる牌の情報が届いても途切れない）。
+  // round: 局の目印、ids: 前に描いた牌IDの並び（ツモった牌も）、els: 牌ID → 前に描いた要素、enter: 牌ID → 加わった時刻、
+  // leave: 出ていく途中の牌 { t: 牌ID, el: 前の要素, idx: 前に描いた手牌の何枚目にあったか, at: 出た時刻, lift: 出た時の持ち上げ(px) }
+  const HAND_FX_MS = 260;
+  let handFx = { round: null, ids: [], els: new Map(), enter: new Map(), leave: [], timer: null };
+  // 出た時に持ち上がっていた分（選んだ牌・立直で切れる牌・パソコンでマウスを乗せた牌。CSS の .my-hand .tile の transform と同じ）。
+  // 消える演出はその高さから始める（下がってから上がらないように）
+  const HOVER = window.matchMedia('(hover: hover)');
+  const liftOf = (el) => (el.classList.contains('is-selected') ? -12 : el.classList.contains('is-riichi-cand') ? -5
+    : HOVER.matches && !el.classList.contains('is-disabled') && el.matches(':hover') ? -8 : 0);
+
+  /** 出ていく演出の終わった牌を取り除き、まだ残っていれば次に終わる時にもう一度呼ぶ */
+  function sweepLeaving() {
+    clearTimeout(handFx.timer);
+    handFx.timer = null;
+    const now = performance.now();
+    handFx.leave = handFx.leave.filter((g) => {
+      if (now - g.at < HAND_FX_MS) return true;
+      g.el.remove();
+      return false;
+    });
+    if (handFx.leave.length) {
+      const next = Math.min(...handFx.leave.map((g) => g.at)) + HAND_FX_MS - now;
+      handFx.timer = setTimeout(sweepLeaving, Math.max(0, next) + 10);
+    }
+  }
+
   function renderHandTiles(game, me) {
     const hand = $('my-hand');
+    const now = performance.now();
+    const round = JSON.stringify([lastRoom && lastRoom.code, lastRoom && lastRoom.gameNo, game.label, game.honba]);
+    if (handFx.round !== round) {
+      clearTimeout(handFx.timer);
+      handFx = { round, ids: [], els: new Map(), enter: new Map(), leave: [], timer: null };
+    }
+    const fx = handFx;
+    const drawn = me.drawn !== null && me.drawn !== undefined ? me.drawn : null;
+    const ids = drawn !== null ? [...me.hand, drawn] : me.hand.slice();
+    const nowSet = new Set(ids);
+    const before = new Set(fx.ids);
+    for (const t of ids) if (!before.has(t)) fx.enter.set(t, now);
+    // 出ていく牌の位置は、前に描いた手牌（出ていく途中の牌も含む）の何枚目か。同じ枚目に置けば、ツモった牌が手牌の中へ
+    // 並び替わっても、押した所で消えていく（牌の幅はどれも同じ）
+    const shown = [...hand.querySelectorAll(':scope > .tile')];
+    for (const g of fx.leave) g.idx = shown.indexOf(g.el);
+    for (const t of fx.ids) {
+      const el = fx.els.get(t);
+      if (!nowSet.has(t) && el) fx.leave.push({ t, el, idx: shown.indexOf(el), at: now, lift: liftOf(el) });
+    }
+    for (const [t, at] of fx.enter) if (!nowSet.has(t) || now - at >= HAND_FX_MS) fx.enter.delete(t);
+    fx.leave = fx.leave.filter((g) => now - g.at < HAND_FX_MS && !nowSet.has(g.t) && g.idx >= 0);
+
     hand.innerHTML = '';
     const input = SM.Input;
     // タイルフォースが有効なパワーで選んでいる牌は緑の縁
     const forced = new Set(me.forceTiles || []);
     // 《ダウジング》: ツモった手番の間だけ？で見せる牌
     const masked = new Set(me.maskTiles || []);
+    const els = new Map();
     const make = (t, extraCls) => {
       const e = tileEl(t, { red: game.red, size: 'hand', cls: `${extraCls}${forced.has(t) ? ' is-force' : ''}`, mask: me.masked || masked.has(t) });
       input.decorateHandTile(e, t);
+      const at = fx.enter.get(t);
+      if (at !== undefined) {
+        e.classList.add('is-enter');
+        e.style.animationDelay = `${at - now}ms`;
+      }
+      els.set(t, e);
       return e;
     };
     me.hand.forEach((t) => hand.appendChild(make(t, '')));
-    if (me.drawn !== null && me.drawn !== undefined) hand.appendChild(make(me.drawn, 'is-drawn'));
+    if (drawn !== null) hand.appendChild(make(drawn, 'is-drawn'));
     if (me.heldTiles && me.heldTiles.length) {
       const h = document.createElement('div');
       h.className = 'held-tiles';
       me.heldTiles.forEach((t) => h.appendChild(tileEl(t, { size: 'sm', red: game.red })));
       hand.appendChild(h);
     }
+    // 出ていく牌は、前に描いた要素を前と同じ枚目に置いて消していく（押せない）。前の方から置くので、置いた後の枚目も前と同じ
+    fx.leave.sort((a, b) => a.idx - b.idx);
+    for (const g of fx.leave) {
+      g.el.classList.remove('is-enter', 'is-selected', 'is-riichi-cand');
+      g.el.classList.add('is-leave');
+      g.el.style.animationDelay = `${g.at - now}ms`;
+      g.el.style.setProperty('--lift', `${g.lift}px`);
+      const ref = hand.querySelectorAll(':scope > .tile')[g.idx] || hand.querySelector(':scope > .held-tiles');
+      hand.insertBefore(g.el, ref || null);
+    }
+    fx.ids = ids;
+    fx.els = els;
+    sweepLeaving();
   }
 
   // 二足の草鞋: 今使っていない方の手牌を、普通の手牌の下にいつも出す

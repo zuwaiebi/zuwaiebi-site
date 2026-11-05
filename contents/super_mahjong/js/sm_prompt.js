@@ -511,6 +511,7 @@
       grid.dataset.pid = '';
       $('fp-actions').hidden = true;
       $('fp-filter').hidden = true;
+      $('fp-random-row').hidden = true;
       wait.textContent = names ? `他のプレイヤーの選択を待っています（${names}）` : '対局を準備しています…';
       return;
     }
@@ -530,6 +531,10 @@
     const actions = $('fp-actions');
     actions.innerHTML = '';
     actions.hidden = true;
+    // ドラフトの間（フルパワー・カードのセットを選ぶ）は出さない。チュートリアルでも台本どおりのカードしか選べないので出さない
+    const draft = Boolean(p.source && p.source.name === 'ドラフト');
+    $('fp-random-row').hidden = draft || Boolean(SM.Tutorial && SM.Tutorial.active());
+    $('fp-random').onclick = () => randomPregame(p, pg, room);
     grid.classList.toggle('is-sets', p.items.some((it) => it.cids));
     // ドラフト: 3つの5枚セットから1つ
     if (p.items.some((it) => it.cids)) {
@@ -586,6 +591,23 @@
       grid.appendChild(e);
     });
     if (multi) refresh();
+  }
+
+  /**
+   * 「ランダムに決める」: 並んでいる項目（オールフォーワンで絞り込んでいる時は見えているもの。1つも見えていなければすべて）から
+   * ランダムに選んで決める。2つ以上選ぶ時（文殊の知恵）は、選んでいるものはそのままで残りをランダムに選ぶ
+   */
+  function randomPregame(p, pg, room) {
+    const max = p.max || 1;
+    const picked = max > 1 ? [...pregameSel] : [];
+    const all = p.items.map((_, i) => i).filter((i) => !picked.includes(i));
+    const shown = [...$('fp-grid').children].filter((e) => !e.hidden && e.dataset.idx).map((e) => Number(e.dataset.idx)).filter((i) => !picked.includes(i));
+    // 見えているものから選び、足りなければほかの項目からも
+    const pools = [shown, all.filter((i) => !shown.includes(i))];
+    for (const pool of pools) {
+      while (picked.length < max && pool.length) picked.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
+    }
+    sendPregame(p, picked, pg, room);
   }
 
   /** オールフォーワン: カード名・テキストで並んだカードを絞り込む */

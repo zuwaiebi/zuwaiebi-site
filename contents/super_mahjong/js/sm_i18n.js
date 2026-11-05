@@ -198,6 +198,12 @@
     const core = m[2];
     let v = d.exact.get(core);
     if (v === undefined && /\s/.test(core)) v = d.exact.get(normKey(core));
+    // 《カード名》だけの所（ログの「〜の場に《カード名》」の {…} の所など）はカードの訳にする
+    // （《光の護封剣》の「の」を「{0}の{1}」の型で訳して《光的護封剣》にしないように）
+    if (v === undefined && /^《[^《》]+》$/.test(core)) {
+      const c = cardRefs(core, d);
+      if (c !== core) v = c;
+    }
     if (v === undefined) v = byPattern(core, d);
     if (v === undefined) v = byList(core);
     if (v === undefined) v = bySegments(core);

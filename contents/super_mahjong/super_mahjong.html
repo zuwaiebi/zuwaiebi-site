@@ -25,7 +25,7 @@
     <div class="panel lobby">
       <h1 class="logo">スーパー麻雀</h1>
       <!-- バージョン（データタブの「更新履歴」の一番上と合わせる） -->
-      <p class="version-label">ver 1.02</p>
+      <p class="version-label">ver 1.03</p>
       <!-- 表示の言語（選ぶと開き直す。sm_i18n.js） -->
       <div class="lang-row"><span class="lang-row__icon" aria-hidden="true">🌐</span><select id="lang-select" class="notranslate" translate="no" aria-label="Language"><option value="ja">日本語</option><option value="zh">繁體中文</option></select></div>
       <div class="field">
@@ -156,6 +156,16 @@
         <!-- 更新履歴: 新しい版を上に足す。ロビーの ver 表示も合わせて変える。既定は畳んでおき、見出しの▶を押すと開く -->
         <details class="lobby-box version-history">
           <summary><h2>更新履歴</h2></summary>
+          <h3>ver 1.03</h3>
+          <ul>
+            <li>フルパワー選択とオールフォーワンのカード選びに「ランダムに決める」を足しました（ドラフトの間は出しません）。</li>
+            <li>《光の護封剣》が破壊されるまで・《はめつのねがい》が発動するまでの残りの巡を、場のカードに「あと〇巡」と出すようにしました（カードを押した詳細にも出します）。</li>
+            <li>ミッション「マゾヒズム」を半荘戦にしました。</li>
+            <li>手牌に牌が加わる時は上からフェードインし、手牌から出る時は上へフェードアウトするようにしました。</li>
+            <li>《タイムカプセル》で選んだ赤ドラが、次局の配牌で普通の牌になっていたのを直しました（青ドラも青ドラのままです）。</li>
+            <li>《一点読み》を《便乗》された時に、《一点読み》をプレイした人のツモった牌まで河に置かれ、手牌が1枚だけになっていたのを直しました。</li>
+            <li>繁體中文の表示で、ログなどに出る《光の護封剣》のように名前に「の」が入るカード名が、カードの訳になっていなかったのを直しました。</li>
+          </ul>
           <h3>ver 1.02</h3>
           <ul>
             <li>繁體中文（台湾・香港などの中国語）でも遊べるようにしました。ロビーの上の🌐で切り替えます。中国語の表示でも、カードの効果が数える名前の文字数は日本語の名前の文字数です（カード名の下に日本語の名前と文字数を出します）。</li>
@@ -551,6 +561,8 @@
       <!-- 決まっているフルパワー（のろわれボディの《ネクロノミコン》・デュエリストのデッキのフルパワーなど） -->
       <div id="fp-fixed" class="pregame-fixed" hidden></div>
       <input id="fp-filter" class="pregame-filter" type="text" placeholder="カード名・テキストで絞り込み" autocomplete="off" hidden>
+      <!-- 並んでいる中からランダムに選んで決める（sm_prompt.js の showPregame） -->
+      <div id="fp-random-row" class="button-row button-row--center" hidden><button id="fp-random" type="button" class="sub-button">ランダムに決める</button></div>
       <div id="fp-grid" class="fp-grid"></div>
       <div id="fp-actions" class="button-row button-row--center" hidden></div>
       <!-- ドラフト: 自分のフルパワーと、これまでに選んだカード -->

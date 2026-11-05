@@ -344,6 +344,17 @@ input[type=text], input[type=number], select {
 @media (hover: hover) {
   .my-hand .tile:not(.is-disabled):hover { transform: translateY(-8px); }
 }
+/* 手牌の出入り（sm_table.js の renderHandTiles）: 加わった牌は上から入り、出ていく牌は元の位置で上へ消える。動かすのは opacity と transform だけ。
+   入る演出は終わった後に残さない（backwards。forwards だと選んだ牌の持ち上げが効かなくなる）。上へ動く分は .my-tiles の上の余白（16〜17px）に収める。
+   消える牌は、出た時に持ち上がっていた高さ（--lift。選んだ牌など）から上がる */
+.my-hand .tile.is-enter { animation: handIn 0.26s ease-out backwards; }
+.my-hand .tile.is-leave { animation: handOut 0.26s ease-in both; pointer-events: none; }
+@keyframes handIn { from { opacity: 0; transform: translateY(-16px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes handOut { from { opacity: 1; transform: translateY(var(--lift, 0px)); } to { opacity: 0; transform: translateY(-16px); } }
+@media (prefers-reduced-motion: reduce) {
+  .my-hand .tile.is-enter { animation: none; }
+  .my-hand .tile.is-leave { display: none; }
+}
 .my-melds { display: flex; gap: 4px; align-items: flex-end; }
 /* 鳴いていない時は、空の副露の分の隙間も詰める（スマホで手牌が横にはみ出さないように） */
 .my-melds:empty { display: none; }
