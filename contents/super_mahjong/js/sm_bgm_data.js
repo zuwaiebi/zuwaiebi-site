@@ -107,5 +107,17 @@ window.SM_BGM = [
   {
     "file": "27.Vampire Killer.mp3",
     "title": "Vampire Killer"
+  },
+  {
+    "file": "28.ボス戦.mp3",
+    "title": "ボス戦"
+  },
+  {
+    "file": "29.悪魔のデストロイ号.mp3",
+    "title": "悪魔のデストロイ号"
+  },
+  {
+    "file": "30.Retribution.mp3",
+    "title": "Retribution"
   }
 ];
