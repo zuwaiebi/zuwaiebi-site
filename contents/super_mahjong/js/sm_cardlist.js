@@ -22,8 +22,9 @@
   const norm = (s) => String(s).normalize('NFKC').toLowerCase()
     .replace(/[ぁ-ゖ]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) + 0x60))
     .replace(/[\s･・·]/g, '');
-  const HAY = new Map(CARDS.map((c) => [c.id, norm(`${c.name}\n${c.text}`)]));
-  const LOCKED_HAY = new Map(CARDS.map((c) => [c.id, norm(`${c.name}\n${SM.Cards.LOCKED_TEXT}`)]));
+  // 中国語の表示では、中国語の名前・テキストでも探せる（日本語でも探せる）
+  const HAY = new Map(CARDS.map((c) => [c.id, norm(`${c.name}\n${c.text}\n${SM.I18n.cardSearchText(c)}`)]));
+  const LOCKED_HAY = new Map(CARDS.map((c) => [c.id, norm(`${c.name}\n${SM.I18n.card(c).name}\n${SM.Cards.LOCKED_TEXT}\n${SM.I18n.t(SM.Cards.LOCKED_TEXT)}`)]));
 
   let type = 'all';
   let built = false;

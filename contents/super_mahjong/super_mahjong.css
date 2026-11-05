@@ -774,6 +774,17 @@ input[type=text], input[type=number], select {
 .thinking[hidden] { display: none; }
 @keyframes thinkingFade { 0%, 100% { opacity: 0.25; } 50% { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .thinking { animation: none; } }
+/* 《タイムアタック》などの残り時間（卓の中央の少し上に1行で。押せないので下の操作の邪魔をしない） */
+.time-attack {
+  position: fixed; left: 50%; top: 34%; transform: translate(-50%, -50%); z-index: 46;
+  display: flex; align-items: baseline; gap: 10px;
+  padding: 2px 16px 4px; border-radius: 24px; background: #000b; color: #fff;
+  white-space: nowrap; pointer-events: none; box-shadow: 0 0 0 2px #ffd34d;
+}
+.time-attack[hidden] { display: none; }
+.time-attack__label { font-size: 14px; font-weight: 700; color: #ffd34d; }
+.time-attack__count { font-size: 15px; font-weight: 800; }
+.time-attack__sec { font-size: 26px; font-variant-numeric: tabular-nums; margin-right: 2px; }
 
 /* ---------- デッキ構築戦のデッキ ---------- */
 /* 待機室: 自分のデッキを選ぶ・席ごとのデッキの準備 */
@@ -1179,6 +1190,16 @@ details[open] > summary .rankboard__sub::before { transform: rotate(90deg); }
 .rule-form select:disabled, .rule-form input:disabled, .rule-form label.check:has(input:disabled) { opacity: 0.55; }
 
 /* 対局の初めの選択: 決まっているフルパワー・絞り込み・2つ以上選ぶ時の印・ドラフトのセットと選んだカード */
+/* フルパワー選択などの残り時間。カードの詳細（z-index 55）を開いていても見えるように上に出す */
+.pregame-timer {
+  position: fixed; top: 10px; right: 12px; z-index: 56; pointer-events: none;
+  padding: 4px 14px; border-radius: 18px; background: #000c; color: #fff;
+  font-weight: 800; font-size: 16px; font-variant-numeric: tabular-nums; box-shadow: 0 0 0 2px #ffd34d;
+}
+.pregame-timer[hidden] { display: none; }
+.pregame-timer.is-short { color: #ff8a80; box-shadow: 0 0 0 2px #ff5252; }
+/* 残り時間を出している間は上を空け、一番上で見出しが枠に重ならないようにする */
+.panel.pregame:has(> .pregame-timer:not([hidden])) { padding-top: 46px; }
 .pregame-filter { display: block; width: min(420px, 100%); margin: 0 auto 12px; }
 .pregame-fixed, .draft-picked { margin: 12px auto; text-align: center; }
 .pregame-row__label { font-size: 12px; color: var(--muted); margin-bottom: 4px; }
@@ -1245,3 +1266,28 @@ details[open] > summary .rankboard__sub::before { transform: rotate(90deg); }
 .fx-waka__who { font-family: "Yu Gothic", sans-serif; font-size: 11px; color: #7a6a4a; margin-top: 6px; white-space: nowrap; }
 /* 陰陽師で他家の手番を代わりに行う時: 牌の後のカード・行動は次の行から */
 .prompt__break { flex-basis: 100%; height: 0; }
+
+/* ---------- 表示の言語（js/sm_i18n.js。中国語は html の lang が zh-Hant） ---------- */
+.lang-row { display: flex; justify-content: center; align-items: center; gap: 6px; margin: -8px 0 12px; }
+.lang-row__icon { font-size: 14px; opacity: 0.8; }
+.lang-row select { font-size: 13px; padding: 2px 6px; }
+/* 置き換え終わるまで本文を隠す（日本語が一瞬見えないように。sm_i18n.js の applyStatic で外す） */
+html.i18n-pending body { visibility: hidden; }
+/* 繁體字の字形のフォント（日本語のフォントに無い字が別の字形で混ざらないように） */
+html[lang="zh-Hant"] body { font-family: "Noto Sans TC", "Microsoft JhengHei", "PingFang TC", "Yu Gothic", sans-serif; }
+html[lang="zh-Hant"] .card__name, html[lang="zh-Hant"] .card__badge { font-family: "Noto Sans TC", "Microsoft JhengHei", "PingFang TC", sans-serif; font-weight: 900; }
+/* カードのテキスト: 台湾の標準の字形（手書き風の日本語のフォントや楷書のフォントは旧字形の字が混ざる） */
+html[lang="zh-Hant"] .card__text { font-family: "Noto Sans TC", "Microsoft JhengHei", "PingFang TC", sans-serif; font-weight: 500; }
+html[lang="zh-Hant"] .interlude__text, html[lang="zh-Hant"] .interlude__choice, html[lang="zh-Hant"] .treasure__text { font-family: "Noto Serif TC", "PMingLiU", "MingLiU", "Songti TC", serif; }
+html[lang="zh-Hant"] .seat.is-thinking .seat__name::after { content: " …思考中"; }
+/* 中国語のカード: カード名の下に、日本語の名前と文字数（カードの効果が数えるのは日本語の名前の文字数）を小さく灰色で */
+.card__jname {
+  display: flex; justify-content: center; min-width: 0;
+  font-family: "Yu Gothic", "Hiragino Kaku Gothic ProN", "Meiryo", sans-serif; font-weight: 700;
+  font-size: max(7px, calc(var(--cw) * 0.05)); line-height: 1.15; color: #8a8a8a;
+  white-space: nowrap; margin: calc(var(--cw) * -0.015) 0 calc(var(--cw) * 0.02);
+}
+/* 長い名前は名前だけを「…」で切り、文字数はいつも見せる */
+.card__jname-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.card__jname-n { flex: none; }
+.card--tiny .card__jname { display: none; }

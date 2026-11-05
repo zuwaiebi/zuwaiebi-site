@@ -51,7 +51,7 @@
       const rec = current();
       if (!rec || !rec.proof || rec.ranked || pending[kind]) return;
       const name = myName();
-      if (!window.confirm(`「${name}」の名前で${TITLE[kind]}に登録しますか？\n（名前とアイコンは、ランキングを見た人すべてに表示されます）`)) return;
+      if (!window.confirm(SM.I18n.t(`「${name}」の名前で${TITLE[kind]}に登録しますか？\n（名前とアイコンは、ランキングを見た人すべてに表示されます）`))) return;
       submit(kind, rec.proof, name, (res) => { if (res.ok || res.dup) markRanked(rec.proof); });
       repaint();
     });

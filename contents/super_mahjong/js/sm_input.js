@@ -278,7 +278,7 @@
   // 0.25秒ごとに呼ぶので、文が変わる時だけ書き換える（同じ文を書いても、画面の配置の計算がやり直しになる）
   function tickTimer() {
     const el = $('my-timer');
-    const set = (text) => { if (el.textContent !== text) el.textContent = text; };
+    const set = (text) => { const v = SM.I18n.t(text); if (el.textContent !== v) el.textContent = v; };
     if (deadline === null || sent()) { set(''); return; }
     const sec = Math.max(0, Math.ceil((deadline - performance.now()) / 1000));
     set(`残り ${sec}秒`);

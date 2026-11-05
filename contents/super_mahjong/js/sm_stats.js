@@ -70,7 +70,8 @@
   /** Xの投稿画面を開く（文と、このページのURL。デイリーミッションの記録の共有でも使う） */
   function postToX(text) {
     const url = `${location.origin}${location.pathname}`;
-    const href = `https://x.com/intent/post?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`;
+    // 中国語の表示では投稿の文も訳す
+    const href = `https://x.com/intent/post?text=${encodeURIComponent(SM.I18n.t(text))}&url=${encodeURIComponent(url)}`;
     window.open(href, '_blank', 'noopener');
   }
   const share = (b) => postToX(shareText(b));
@@ -214,6 +215,7 @@
         ] },
         { label: '手札に加えたハプニングの数', value: count('happening') },
       ] },
+      { label: '達成したクエストの数', value: count('quest') },
       { label: '最もプレイしたカード', value: () => (cards.length ? `${cardName(cards[0][0])}（${num(cards[0][1])}回）` : 'なし'), link: true },
       { label: '自分が破壊した他家のパワーの数', value: count(...DESTROY), children: [
         { label: '自分が破壊した他家の単なるパワーの数', value: count('destroy:power') },

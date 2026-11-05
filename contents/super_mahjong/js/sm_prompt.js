@@ -7,6 +7,7 @@
   let answeredId = null;
   let selected = new Set();
   let deadline = null;
+  let pregameDeadline = null;   // フルパワー選択などの残り時間（performance.now() の時刻）
   let peeking = false;     // 手牌・手札を確かめるために一時的に隠している
   let hand = null;         // 自分の手牌から選ぶ問い合わせ（ウィンドウを出さず、画面の手牌を押して選ぶ）
 
@@ -342,13 +343,25 @@
 
   // 0.25秒ごとに呼ぶので、文が変わる時だけ書き換える（同じ文を書いても、画面の配置の計算がやり直しになる）
   function tick() {
-    const text = deadline === null || !current ? '' : `残り ${Math.max(0, Math.ceil((deadline - performance.now()) / 1000))}秒`;
+    tickPregame();
+    const text = SM.I18n.t(deadline === null || !current ? '' : `残り ${Math.max(0, Math.ceil((deadline - performance.now()) / 1000))}秒`);
     const set = (el) => { if (el && el.textContent !== text) el.textContent = text; };
     set($('hand-pick-timer'));
     const el = $('prompt-timer');
     if (!el) return;
     set(el);
     set($('prompt-peek').querySelector('.prompt-peek__timer'));
+  }
+
+  // フルパワー選択・ドラフト・オールフォーワンの残り時間（カードの詳細を開いていても見えるよう、画面の右上に出す）
+  function tickPregame() {
+    const el = $('fp-timer');
+    if (!el) return;
+    const left = pregameDeadline === null ? null : Math.max(0, Math.ceil((pregameDeadline - performance.now()) / 1000));
+    const text = SM.I18n.t(left === null ? '' : `残り ${left}秒`);
+    if (el.textContent !== text) el.textContent = text;
+    if (el.hidden !== (left === null)) el.hidden = left === null;
+    el.classList.toggle('is-short', left !== null && left <= 10);
   }
 
   // ---- 自分の手牌から選ぶ（ウィンドウを出さず、画面の手牌を押して選ぶ） ----
@@ -491,6 +504,8 @@
     const wait = $('fp-wait');
     const p = pg.prompt;
     const names = (pg.waitingFor || []).map((s) => (room.seats[s] ? room.seats[s].name : '?')).join('、');
+    pregameDeadline = p && answeredId !== p.id && pg.timeLeft !== null && pg.timeLeft !== undefined ? performance.now() + pg.timeLeft : null;
+    tickPregame();
     if (!p || answeredId === p.id) {
       grid.innerHTML = '';
       grid.dataset.pid = '';
@@ -588,6 +603,7 @@
     endHandPick();
     $('prompt-box').hidden = true;
     $('fp-grid').dataset.pid = '';
+    pregameDeadline = null;
   }
 
   function init() {

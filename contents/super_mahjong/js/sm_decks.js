@@ -57,7 +57,12 @@
   // 名前を変えたカード（一攫千金）は key が前の名前のままなので、テキストはカード名で書き、読み込みは key でもカード名でもよい
   const norm = (s) => String(s).normalize('NFKC').replace(/[\s･・·]/g, '');
   const textName = (c) => (c.key.includes('#') ? c.key : c.name);
-  const byNorm = (list) => new Map(list.flatMap((c) => [[norm(c.key), c], [norm(textName(c)), c]]));
+  const byNorm = (list) => {
+    const m = new Map(list.flatMap((c) => [[norm(c.key), c], [norm(textName(c)), c]]));
+    // 中国語の表示では中国語の名前でも読み込める（書き出しはどちらの言語でも日本語の名前。どちらでも読み込めるように）
+    for (const c of list) { const k = norm(SM.I18n.card(c).name); if (!m.has(k)) m.set(k, c); }
+    return m;
+  };
   const CARD_BY_NORM = byNorm(EDIT_CARDS);
   const FULL_BY_NORM = byNorm(FULLS);
 
@@ -383,7 +388,7 @@
   }
 
   function remove(d) {
-    if (!window.confirm(`デッキ「${d.name}」を削除しますか？`)) return;
+    if (!window.confirm(SM.I18n.t(`デッキ「${d.name}」を削除しますか？`))) return;
     decks = decks.filter((x) => x !== d);
     persist();
     renderList();
@@ -426,7 +431,7 @@
   }
 
   function cancelEdit() {
-    if (edit && edit.dirty && !window.confirm('変更を保存せずに閉じますか？')) return;
+    if (edit && edit.dirty && !window.confirm(SM.I18n.t('変更を保存せずに閉じますか？'))) return;
     closeEdit();
   }
 
@@ -455,7 +460,8 @@
     const only = $('deck-edit-only').checked;
     for (const c of GRID_CARDS) {
       if (only && !edit.deck.counts[c.id]) continue;
-      if (q && !norm(c.name).includes(q)) continue;
+      // 中国語の表示では中国語の名前でも探せる
+      if (q && !norm(c.name).includes(q) && !norm(SM.I18n.card(c).name).includes(q)) continue;
       // まだ解放していないCカードは出さない（前から入っている分は、減らせるように出す）
       if (isLockedC(c) && !edit.deck.counts[c.id]) continue;
       grid.appendChild(gridItem(c));
@@ -562,10 +568,13 @@
   }
 
   // ---- フルパワーを選ぶ ----
+  // 並びはデッキ編集と同じく、推奨ルールで使用不可のフルパワー（Cフルパワーと《ネクロノミコン》）を最後にまとめる
+  const FP_GRID = [...FULLS.filter((c) => !isBannedFp(c)), ...FULLS.filter((c) => isBannedFp(c))];
+
   function openFp() {
     const grid = $('deck-fp-grid');
     grid.innerHTML = '';
-    for (const c of FULLS) {
+    for (const c of FP_GRID) {
       // まだ解放していないCフルパワーは出さない（今のフルパワーなら出す）
       if (isLockedC(c) && !(edit && edit.deck.fp === c.id)) continue;
       const el = SM.Cards.el(c.id, {
@@ -676,7 +685,8 @@
     $('decks').addEventListener('click', (e) => { if (e.target.id === 'decks') $('decks').hidden = true; });
     // 新しいデッキ・サンプルデッキから作る・読み込む（ロビーの「デッキ構築」とデッキ一覧の画面の両方のボタン）
     const acts = {
-      new: () => openEdit({ id: newId(), name: '新しいデッキ', fp: null, counts: {} }),
+      // 既定の名前は表示の言語で（入力欄の値は画面の置き換えでは訳されない）
+      new: () => openEdit({ id: newId(), name: SM.I18n.t('新しいデッキ'), fp: null, counts: {} }),
       'new-sample': openSamplePicker,
       import: () => openText('import'),
     };
@@ -690,7 +700,7 @@
     $('deck-edit-only').addEventListener('change', renderGrid);
     $('deck-edit-fp').addEventListener('click', openFp);
     $('deck-edit-zero').addEventListener('click', () => {
-      if (!edit || !window.confirm('デッキのカードをすべて0枚にしますか？')) return;
+      if (!edit || !window.confirm(SM.I18n.t('デッキのカードをすべて0枚にしますか？'))) return;
       edit.deck.counts = {};
       edit.dirty = true;
       $('deck-edit-only').checked = false;

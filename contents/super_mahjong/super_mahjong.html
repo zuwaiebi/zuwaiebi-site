@@ -9,6 +9,8 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Yusei+Magic&family=Yuji+Syuku&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
 <link rel="stylesheet" href="super_mahjong.css">
+<!-- 表示の言語（日本語・繁體中文）。中国語の時は辞書・フォントもここで読み込む -->
+<script src="js/sm_i18n.js"></script>
 <link rel="icon" type="image/png" href="data/favicon.png">
 <link rel="apple-touch-icon" href="data/favicon.png">
 </head>
@@ -23,7 +25,9 @@
     <div class="panel lobby">
       <h1 class="logo">スーパー麻雀</h1>
       <!-- バージョン（データタブの「更新履歴」の一番上と合わせる） -->
-      <p class="version-label">ver 1.01</p>
+      <p class="version-label">ver 1.02</p>
+      <!-- 表示の言語（選ぶと開き直す。sm_i18n.js） -->
+      <div class="lang-row"><span class="lang-row__icon" aria-hidden="true">🌐</span><select id="lang-select" class="notranslate" translate="no" aria-label="Language"><option value="ja">日本語</option><option value="zh">繁體中文</option></select></div>
       <div class="field">
         <label for="lobby-name">名前とアイコン</label>
         <div class="profile-row">
@@ -152,6 +156,23 @@
         <!-- 更新履歴: 新しい版を上に足す。ロビーの ver 表示も合わせて変える。既定は畳んでおき、見出しの▶を押すと開く -->
         <details class="lobby-box version-history">
           <summary><h2>更新履歴</h2></summary>
+          <h3>ver 1.02</h3>
+          <ul>
+            <li>繁體中文（台湾・香港などの中国語）でも遊べるようにしました。ロビーの上の🌐で切り替えます。中国語の表示でも、カードの効果が数える名前の文字数は日本語の名前の文字数です（カード名の下に日本語の名前と文字数を出します）。</li>
+            <li>《飛翔の守護者ディス・アル・マーズ》のスペースチャージと《阿寒湖怪獣マリモーン》の贈り物が赤ドラを切った時に起きず、《奇術「エターナルミーク」》が赤ドラを捨てさせなかったのを直しました（青ドラは赤ドラではないので入りません）。</li>
+            <li>フルパワー選択・ドラフト・オールフォーワンのカード選びで、選ぶ残り時間を画面の右上に出すようにしました。</li>
+            <li>画面が切り替わる時に前の画面でスクロールした位置のままになり、フルパワー選択の見出しなどが隠れて始まっていたのを直しました（切り替わった画面は一番上から出します）。</li>
+            <li>データタブの統計に「達成したクエストの数」を足しました（これから達成した分を数えます）。</li>
+            <li>《割目》が何枚もかかっている時に、点数が2倍のままだったのを直しました（1枚ごとに2倍。同じ人に2枚で4倍・3枚で8倍、払う人と受け取る人に1枚ずつでも4倍）。</li>
+            <li>《連鎖旋風》の能力で破壊するパワーに、《連鎖旋風》自身を選べてしまっていたのを直しました。</li>
+            <li>《宮永咲》で同じ手番に何度も抜きドラ・槓をすると、前に嶺上からツモった牌がオールマイティ牌でなくなっていたのを直しました。</li>
+            <li>《タイムアタック》（《ザ・ワールド》《スタープラチナ》の9秒間も）は、ツモるかを毎回聞かずに、残り時間を画面に出して、時間内に切るたびに自動でツモるようにしました。</li>
+            <li>《過大強化咲夜》のテキストを「〜他家全員の持ち点をすべて奪う。」にしました。</li>
+            <li>実績「The Eternally Scarlet Young Moon」の文を「「Phantasm」をクリアする。ここまでプレイしてくれてありがとう！」にしました。</li>
+            <li>ミッションの対戦相手「神尾美鈴？」の名前を「神尾観鈴？」に直しました。</li>
+            <li>デッキ編集でフルパワーを選ぶ一覧も、使用不可のフルパワーを最後に並べるようにしました。</li>
+            <li>カードで同じ牌が5枚以上ある時に、東の刻子4つで大四喜、白の刻子3つで大三元が付いていたのを直しました（小三元・小四喜も同じく、違う牌がそろった時だけ付きます）。</li>
+          </ul>
           <h3>ver 1.01</h3>
           <ul>
             <li>対局中の画面を軽くしました（変わった所だけ描き直す・ドラの光沢の動きを軽くするなど）。スマホでの引っかかりが減ります。</li>
@@ -221,13 +242,13 @@
       <div class="tab-panel" data-panel="ranking" hidden>
         <section class="lobby-box">
           <h2>最高翻数和了ランキング</h2>
-          <p class="note">いちばん翻数の高い和了を競います（5位まで）。翻数が同じなら和了点（本場・供託を除く）が高い方、それも同じなら先に登録した方が上です。データタブの「いちばん翻数の高い和了」から登録でき、1人1枠です（もっと高い和了を登録すると入れ替わります）。押すと和了の形を見られます。</p>
+          <p class="note">データタブの「いちばん翻数の高い和了」から登録できます。押すと和了の形を見られます。</p>
           <ol id="ranking-best" class="rankboard"></ol>
         </section>
         <section class="lobby-box">
           <h2>デイリーランキング <span id="ranking-daily-date" class="ach-count"></span></h2>
           <p id="ranking-daily-rules" class="rankboard__rules" hidden></p>
-          <p class="note">その日のデイリーミッションの、1回目の挑戦の終局時の点数を競います（3位まで。同点なら先に登録した方が上）。ミッションタブの「今日の記録」から登録できます。日本時間の0時にリセットされます。</p>
+          <p class="note">ミッションタブの「今日の記録」から登録できます。日本時間の0時にリセットされます。</p>
           <ol id="ranking-daily" class="rankboard"></ol>
         </section>
       </div>
@@ -524,6 +545,8 @@
       <h1 id="pregame-title" class="logo logo--small">フルパワーを選ぶ</h1>
       <p id="pregame-note" class="note-light">相棒になるカードを1枚選んでください。手札とは別に、対局中に使えます。</p>
       <p id="fp-wait" class="note-light"></p>
+      <!-- 選ぶ残り時間（sm_prompt.js の tickPregame） -->
+      <div id="fp-timer" class="pregame-timer" hidden></div>
       <!-- 決まっているフルパワー（のろわれボディの《ネクロノミコン》・デュエリストのデッキのフルパワーなど） -->
       <div id="fp-fixed" class="pregame-fixed" hidden></div>
       <input id="fp-filter" class="pregame-filter" type="text" placeholder="カード名・テキストで絞り込み" autocomplete="off" hidden>
@@ -539,6 +562,8 @@
   <div id="screen-game" class="screen">
     <!-- 他の人が割り込み・鳴きを考えている間に出す -->
     <div id="thinking" class="thinking" hidden>他プレイヤーが思考中…</div>
+    <!-- 《タイムアタック》などの残り時間（sm_table.js の renderTimeAttack） -->
+    <div id="time-attack" class="time-attack" hidden><div class="time-attack__label"></div><div class="time-attack__count"><span class="time-attack__sec"></span>秒</div></div>
     <div id="table" class="table">
       <div id="seat-top" class="seat seat--top" hidden><div class="seat__head"></div><div class="seat__melds"></div><div class="seat__river"></div></div>
       <div id="seat-left" class="seat seat--left" hidden><div class="seat__head"></div><div class="seat__melds"></div><div class="seat__river"></div></div>
@@ -626,8 +651,9 @@
   <!-- ミッションの次の対局に進むかを聞く暗転した画面（文と選択肢はサーバーから。sm_missions.js の showInterlude） -->
   <div id="screen-interlude" class="screen interlude">
     <div class="interlude__box">
-      <p id="interlude-text" class="interlude__text"></p>
-      <div id="interlude-choices" class="interlude__choices" hidden></div>
+      <!-- 文と選択肢はサーバーがプレイヤーの言語で送る（1文字ずつ足すので画面では訳さない） -->
+      <p id="interlude-text" class="interlude__text notranslate"></p>
+      <div id="interlude-choices" class="interlude__choices notranslate" hidden></div>
     </div>
   </div>
 
@@ -787,6 +813,8 @@
   <script src="js/sm_achievements_data.js"></script>
   <script src="js/sm_missions_data.js"></script>
   <script src="js/sm_sample_decks_data.js"></script>
+  <!-- 中国語の表示: ここまでの静的な HTML を置き換える（ほかのスクリプトが要素を掴む前に） -->
+  <script src="js/sm_i18n_apply.js"></script>
   <script src="js/sm_tiles.js"></script>
   <script src="js/sm_cards.js"></script>
   <script src="js/sm_icons.js"></script>

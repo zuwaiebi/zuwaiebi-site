@@ -26,7 +26,8 @@
     return true;
   };
   // 文字だけの所は、同じ文なら書き換えない（書き換えると配置の計算がやり直しになる）
-  const setText = (el, text) => { if (el.textContent !== text) el.textContent = text; };
+  // 比べるのは表示する言語の文（中国語の表示では訳した文。訳す前の文と比べると毎回書き換えてしまう）
+  const setText = (el, text) => { const v = SM.I18n.t(text); if (el.textContent !== v) el.textContent = v; };
   // 出す・隠すも、変わる時だけ（同じでも hidden を書くと、その中の要素すべての見た目の計算がやり直しになる）
   const setHidden = (el, hidden) => { if (el.hidden !== hidden) el.hidden = hidden; };
 
@@ -124,7 +125,8 @@
     const name = document.createElement('span');
     name.className = 'seat__name';
     const away = seatInfo.left ? ' [退出・CPU代打ち]' : seatInfo.connected === false ? ' [切断・CPU代打ち]' : '';
-    name.textContent = `${seatInfo.name || '?'}${seatInfo.kind === 'cpu' ? '(CPU)' : ''}${away}`;
+    // 名前に足す印は先に訳す（つなげた後の文は辞書に無い）
+    name.textContent = `${seatInfo.name || '?'}${seatInfo.kind === 'cpu' ? '(CPU)' : ''}${SM.I18n.t(away)}`;
     head.appendChild(name);
     const score = document.createElement('span');
     score.className = 'seat__score';
@@ -289,7 +291,8 @@
     for (const e of game.effects) {
       const li = document.createElement('div');
       li.className = 'effect-chip';
-      SM.Cards.linkify(li, `${e.owner !== null && e.owner !== undefined ? `${SM.Main.seatName(e.owner)}: ` : ''}${e.name}${e.desc ? `（${e.desc}）` : ''}`);
+      // 効果の名前と説明は別々に訳す（つなげた後の文は辞書に無い）
+      SM.Cards.linkify(li, `${e.owner !== null && e.owner !== undefined ? `${SM.I18n.t(SM.Main.seatName(e.owner))}: ` : ''}${SM.I18n.t(e.name)}${e.desc ? `（${SM.I18n.t(e.desc)}）` : ''}`);
       eff.appendChild(li);
     }
   }
@@ -398,9 +401,32 @@
     slot.appendChild(T().kindEl(next.kind || 0, { size: 'hand', red: Boolean(next.red), mask: maskAll || Boolean(next.unknown), shine: true }));
   }
 
+  // 《タイムアタック》（ザ・ワールド・スタープラチナも）の残り時間。サーバーの timeAttack.left を受け取った時から数え下げる
+  let taEnd = 0;
+  let taTimer = null;
+  function renderTimeAttack(ta) {
+    const box = $('time-attack');
+    if (!ta) {
+      setHidden(box, true);
+      clearInterval(taTimer);
+      taTimer = null;
+      return;
+    }
+    const end = performance.now() + ta.left;
+    // 情報が届くたびに通信の遅れの分だけずれるので、少しのずれなら前の数え方のまま（数字が戻って見えないように）
+    if (!taTimer || Math.abs(end - taEnd) > 300) taEnd = end;
+    setText(box.querySelector('.time-attack__label'), ta.seat === lastGame.you ? ta.label :`${SM.Main.seatName(ta.seat)}の${ta.label}`);
+    const sec = box.querySelector('.time-attack__sec');
+    const tick = () => setText(sec, (Math.max(0, taEnd - performance.now()) / 1000).toFixed(1));
+    tick();
+    if (!taTimer) taTimer = setInterval(tick, 100);
+    setHidden(box, false);
+  }
+
   function render(game, room) {
     lastGame = game;
     lastRoom = room;
+    renderTimeAttack(game.timeAttack);
     T().setView(game);
     viewKey = JSON.stringify([game.you, game.n, game.dir, game.red, game.cardsEnabled, game.slots, game.maskAll,
       game.tiles, game.reds, game.blues, game.allDora, game.doraKinds, game.doraTiles, game.asKinds]);
@@ -470,7 +496,7 @@
       }
       else if (e.type === 'cardPlay') {
         const who = SM.Main.seatName(e.seat);
-        SM.Cards.showPlayed(e.cid, `${who}${e.reaction ? 'の割り込み' : 'がプレイ'}`, SM.Icons.targetLine(e.seat, e.shown, e.reactTo));
+        SM.Cards.showPlayed(e.cid, `${SM.I18n.t(who)}${SM.I18n.t(e.reaction ? 'の割り込み' : 'がプレイ')}`, SM.Icons.targetLine(e.seat, e.shown, e.reactTo));
       } else if (e.type === 'happening') {
         SM.Cards.showPlayed(e.cid, `${SM.Main.seatName(e.seat)}のハプニング！`);
       } else if (e.type === 'powerTrigger') {

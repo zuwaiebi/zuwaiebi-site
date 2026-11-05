@@ -100,7 +100,8 @@
       // めくった《ヤギ》は選べないので灰色（2回目の選択の時）
       s.slot.classList.toggle('is-disabled', Boolean(m.flipped.includes(i) && picked !== i));
       s.slot.classList.toggle('is-picked', picked === i);
-      s.cap.textContent = it && it.caption ? it.caption : LABELS[i] + (picked === i ? '（選択中）' : '');
+      // つなげる前にそれぞれ訳す（つなげた後の文は辞書に無い）
+      s.cap.textContent = it && it.caption ? it.caption : SM.I18n.t(LABELS[i]) + SM.I18n.t(picked === i ? '（選択中）' : '');
     });
   }
 
@@ -136,7 +137,7 @@
   // 0.25秒ごとに呼ぶので、文が変わる時だけ書き換える
   function tick() {
     if (!timerEl) return;
-    const text = prompt && deadline !== null ? `残り ${Math.max(0, Math.ceil((deadline - performance.now()) / 1000))}秒` : '';
+    const text = SM.I18n.t(prompt && deadline !== null ? `残り ${Math.max(0, Math.ceil((deadline - performance.now()) / 1000))}秒` : '');
     if (timerEl.textContent !== text) timerEl.textContent = text;
   }
 

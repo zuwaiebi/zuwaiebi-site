@@ -7,7 +7,11 @@
   let logGame = null;      // ログに出している対局（部屋コードと、その部屋で何回目の対局か）
 
   function show(id) {
+    const prev = document.querySelector('.screen.active');
     document.querySelectorAll('.screen').forEach((s) => s.classList.toggle('active', s.id === id));
+    // 画面が変わった時は一番上から見せる（前の画面でスクロールした位置のままだと、見出しが隠れて始まる）。
+    // 同じ画面のままの時（待機室・フルパワー選択に部屋情報が届くたび）は、見ている位置を動かさない
+    if (!prev || prev.id !== id) window.scrollTo(0, 0);
     SM.Audio.onScreen(id);
   }
 
@@ -21,7 +25,10 @@
   }
 
   // 点数の表示: カスタムモードの青天井で大きくなった時（1億以上）は、上の2つの単位までで出す（例: 527兆7655億）
-  const UNITS = ['', '万', '億', '兆', '京', '垓', '𥝱', '穣', '溝', '澗', '正', '載', '極', '恒河沙', '阿僧祇', '那由他', '不可思議', '無量大数'];
+  const UNITS = SM.I18n.zh
+    // 中国語（繁體字）の表示では繁體字の単位
+    ? ['', '萬', '億', '兆', '京', '垓', '秭', '穰', '溝', '澗', '正', '載', '極', '恆河沙', '阿僧祇', '那由他', '不可思議', '無量大數']
+    : ['', '万', '億', '兆', '京', '垓', '𥝱', '穣', '溝', '澗', '正', '載', '極', '恒河沙', '阿僧祇', '那由他', '不可思議', '無量大数'];
   function points(n) {
     const v = Number(n);
     if (!Number.isFinite(v) || Math.abs(v) < 1e8) return String(n);
@@ -227,7 +234,8 @@
     SM.Net.on('achievements', (m) => SM.Achievements.apply(m.list));
     SM.Net.on('error', (m) => { toast(m.message); SM.Input.onRejected(); });
     SM.Net.on('kicked', () => { toast('部屋から退出させられました'); show('screen-lobby'); });
-    SM.Net.on('welcome', (m) => { if (!$('lobby-name').value) $('lobby-name').value = m.name; });
+    // サーバーが付けた既定の名前（名無し）は、表示の言語の既定の名前にして見せる（入力欄の値は画面の置き換えでは訳されない）
+    SM.Net.on('welcome', (m) => { if (!$('lobby-name').value) $('lobby-name').value = m.name === '名無し' ? SM.I18n.t(m.name) : m.name; });
     document.addEventListener('visibilitychange', () => { if (!document.hidden) SM.Net.reconnectNow(); });
 
     SM.Net.connect();

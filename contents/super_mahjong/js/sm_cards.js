@@ -18,11 +18,20 @@
   const norm = (s) => String(s).normalize('NFKC').replace(/[\s･・·]/g, '');
   const BY_NAME = new Map();
   for (const c of window.SM_CARDS || []) if (!BY_NAME.has(norm(c.name))) BY_NAME.set(norm(c.name), c.id);
+  // 中国語の表示: 中国語のカード名でも探せるように（中国語のテキスト・ログの《》）
+  for (const c of window.SM_CARDS || []) {
+    const v = SM.I18n.card(c);
+    if (v.name !== c.name && !BY_NAME.has(norm(v.name))) BY_NAME.set(norm(v.name), c.id);
+  }
   const cidOfName = (name) => BY_NAME.get(norm(name)) || null;
   const LINK_RE = /《([^《》]+)》/g;
 
-  /** 文の中の《カード名》を、押せる印を付けた HTML にする（text はエスケープしていない文） */
-  function linkHtml(text) {
+  /**
+   * 文の中の《カード名》を、押せる印を付けた HTML にする（text はエスケープしていない文）。
+   * 中国語の表示では先に文を訳す（raw: もう表示する言語の文（カードの訳のテキスト）なので訳さない）
+   */
+  function linkHtml(text, raw = false) {
+    if (!raw) text = SM.I18n.t(String(text));
     let out = '';
     let last = 0;
     for (const m of String(text).matchAll(LINK_RE)) {
@@ -50,13 +59,13 @@
   const withCount = (text, count) => text.replace(/\{(\d+)\}/g, (m, n) => String(count ?? n));
 
   function formatText(def, count) {
-    const lines = withCount(def.text, count).split('\n').map((line) => {
+    const lines = withCount(SM.I18n.card(def).text, count).split('\n').map((line) => {
       const t = line.trim();
       if (/^\*.*\*$/.test(t)) return `<p class="card__flavor">${esc(t.slice(1, -1))}</p>`;
-      return `<p>${linkHtml(t)}</p>`;
+      return `<p>${linkHtml(t, true)}</p>`;
     });
     // フルパワー＋（《過大強化咲夜》）はプレイしない（変化して出てくる）ので注釈を付けない
-    if (def.typeKey === 'full' && !def.plus) lines.push(`<p class="card__note">${esc(FULL_NOTE)}</p>`);
+    if (def.typeKey === 'full' && !def.plus) lines.push(`<p class="card__note">${esc(SM.I18n.t(FULL_NOTE))}</p>`);
     return lines.join('');
   }
 
@@ -65,9 +74,9 @@
 
   function typeBadge(def) {
     if (def.typeKey === 'happeningPower') {
-      return `<span class="card__badge card__badge--split" style="background:linear-gradient(90deg, ${TYPE_COLOR.happening} 50%, ${TYPE_COLOR.power} 50%)">${esc(def.type)}</span>`;
+      return `<span class="card__badge card__badge--split" style="background:linear-gradient(90deg, ${TYPE_COLOR.happening} 50%, ${TYPE_COLOR.power} 50%)">${esc(SM.I18n.t(def.type))}</span>`;
     }
-    return `<span class="card__badge" style="background:${colorOf(def) || '#555'}">${esc(def.type)}</span>`;
+    return `<span class="card__badge" style="background:${colorOf(def) || '#555'}">${esc(SM.I18n.t(def.type))}</span>`;
   }
 
   /**
@@ -87,14 +96,18 @@
     } else {
       d.dataset.type = def.typeKey;
       d.dataset.cid = cid; // チュートリアルが光らせるカードを探す
-      const nameLen = [...def.name].length;
+      // 名前・テキストは表示する言語で（中国語の時は、名前の下に日本語の名前と、カードの効果が数える日本語の名前の文字数）
+      const v = SM.I18n.card(def);
+      const nameLen = [...v.name].length;
       const nameScale = nameLen <= 6 ? 1 : Math.max(0.38, 6 / nameLen);
       const img = o.locked ? LOCKED_IMG : def.img;
-      d.innerHTML = `<div class="card__name" style="--ns:${nameScale}">${esc(def.name)}</div>`
+      d.innerHTML = `<div class="card__name notranslate" style="--ns:${nameScale}">${esc(v.name)}</div>`
+        // 長い名前は名前だけを「…」で切り、文字数はいつも見せる
+        + (v.jname ? `<div class="card__jname notranslate" lang="ja"><span class="card__jname-name">${esc(v.jname)}</span><span class="card__jname-n">(${v.jlen}字)</span></div>` : '')
         // イラストがまだ無いカード（新カードなど）は仮の絵（NO IMAGE）。画像を data/card_img/ に置いて build-cards を実行すると差し替わる
         + `<div class="card__art${img || def.typeKey === 'random' ? '' : ' card__art--empty'}">${img ? `<img src="${IMG_DIR}${encodeURIComponent(img)}" alt="" loading="lazy" draggable="false">` : ''}</div>`
         + `<div class="card__type">${typeBadge(def)}</div>`
-        + (size === 'full' ? `<div class="card__text">${o.locked ? `<p>${esc(LOCKED_TEXT)}</p>` : formatText(def, o.count)}</div>` : '');
+        + (size === 'full' ? `<div class="card__text notranslate">${o.locked ? `<p>${esc(SM.I18n.t(LOCKED_TEXT))}</p>` : formatText(def, o.count)}</div>` : '');
       // カードごとに変わる数（クエストの残り回数など）は、小さい表示でも右上に出す
       if (o.count !== undefined && o.count !== null && size !== 'full') {
         const badge = document.createElement('span');

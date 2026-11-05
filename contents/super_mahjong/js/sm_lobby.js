@@ -222,6 +222,10 @@
   }
 
   function init() {
+    // 表示の言語（選ぶと開き直す）
+    const langSelect = $('lang-select');
+    langSelect.value = SM.I18n.lang;
+    langSelect.addEventListener('change', () => SM.I18n.setLang(langSelect.value));
     const nameInput = $('lobby-name');
     nameInput.value = SM.Net.getName();
     nameInput.addEventListener('change', () => SM.Net.setName(nameInput.value.trim().slice(0, 12)));
@@ -340,7 +344,7 @@
 
   /** このブラウザに保存した super_mahjong_ のデータをすべて消して、読み込み直す（最初の状態に戻す） */
   function resetSavedData() {
-    if (!confirm('保存しているデータ（名前・アイコン・デッキ・実績・統計・各種設定など）をすべて削除します。元には戻せません。よろしいですか？')) return;
+    if (!confirm(SM.I18n.t('保存しているデータ（名前・アイコン・デッキ・実績・統計・各種設定など）をすべて削除します。元には戻せません。よろしいですか？'))) return;
     try {
       const keys = [];
       for (let i = 0; i < localStorage.length; i++) keys.push(localStorage.key(i));

@@ -194,9 +194,10 @@
   // ---------- 説明の吹き出しと、光らせる枠 ----------
   function renderText(el, text) {
     el.innerHTML = '';
-    for (const para of String(text).split('\n')) {
+    // 中国語の表示では、太字の印（**）と改行を含んだ文のまま先に訳す
+    for (const para of SM.I18n.t(String(text)).split('\n')) {
       const p = document.createElement('p');
-      p.innerHTML = para.split('**').map((seg, i) => (i % 2 ? `<b>${SM.Cards.linkHtml(seg)}</b>` : SM.Cards.linkHtml(seg))).join('');
+      p.innerHTML = para.split('**').map((seg, i) => (i % 2 ? `<b>${SM.Cards.linkHtml(seg, true)}</b>` : SM.Cards.linkHtml(seg, true))).join('');
       el.appendChild(p);
     }
   }
@@ -249,7 +250,8 @@
   function detailButton(label) {
     const box = $('card-detail');
     if (box.hidden) return null;
-    return [...box.querySelectorAll('.card-detail__actions .main-button')].find((b) => b.textContent === label) || null;
+    // ボタンの名前は表示する言語で比べる（中国語の表示では訳した名前）
+    return [...box.querySelectorAll('.card-detail__actions .main-button')].find((b) => b.textContent === SM.I18n.t(label)) || null;
   }
 
   /** 光らせる場所の記述から、画面の要素を探す（見つからない・見えない時は null） */
@@ -259,7 +261,7 @@
     else if (f.card !== undefined) el = document.querySelector(`#my-cards [data-iid="${f.card}"]`);
     else if (f.fp) el = document.querySelector('#my-cards .my-cards__fp .card');
     else if (f.tile !== undefined) el = document.querySelector(`#my-hand [data-tile="${f.tile}"]`);
-    else if (f.btn) el = [...document.querySelectorAll('#call-actions button, #actions button')].find((b) => b.textContent === f.btn) || null;
+    else if (f.btn) el = [...document.querySelectorAll('#call-actions button, #actions button')].find((b) => b.textContent === SM.I18n.t(f.btn)) || null;
     else if (f.promptItem !== undefined) el = $('prompt-body').querySelector('.prompt__items')?.children[f.promptItem] || null;
     else if (f.pregameCard) el = document.querySelector(`#fp-grid [data-cid="${f.pregameCard}"]`);
     else if (f.el) el = document.querySelector(f.el);

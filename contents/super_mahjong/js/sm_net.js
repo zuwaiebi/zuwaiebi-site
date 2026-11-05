@@ -33,7 +33,8 @@
     ws.onopen = () => {
       retry = 0;
       statusCb('open');
-      ws.send(JSON.stringify({ type: 'hello', token: store.get(TOKEN_KEY), name: getName(), icon: SM.Icons ? SM.Icons.mine() : null, pid: store.get(PID_KEY) }));
+      // lang: 表示の言語（サーバーが持つプレイヤーに見せる文（ミッションの2回戦の前の文）をその言語で送る）
+      ws.send(JSON.stringify({ type: 'hello', token: store.get(TOKEN_KEY), name: getName(), icon: SM.Icons ? SM.Icons.mine() : null, pid: store.get(PID_KEY), lang: SM.I18n.lang }));
       const pending = queue;
       queue = [];
       for (const m of pending) ws.send(JSON.stringify(m));
