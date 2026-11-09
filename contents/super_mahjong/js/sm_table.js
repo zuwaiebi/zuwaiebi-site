@@ -124,9 +124,12 @@
     head.appendChild(SM.Icons.el(seatInfo.icon));
     const name = document.createElement('span');
     name.className = 'seat__name';
+    // 人のプレイヤー名は中国語の表示でも訳さない（sm_i18n.js の data-i18n-names）
+    name.dataset.i18nNames = '';
     const away = seatInfo.left ? ' [退出・CPU代打ち]' : seatInfo.connected === false ? ' [切断・CPU代打ち]' : '';
     // 名前に足す印は先に訳す（つなげた後の文は辞書に無い）
-    name.textContent = `${seatInfo.name || '?'}${seatInfo.kind === 'cpu' ? '(CPU)' : ''}${SM.I18n.t(away)}`;
+    // 名前と印は別の文字の塊にする（中国語の表示で、人の名前は訳さない）
+    name.append(seatInfo.name || '?', `${seatInfo.kind === 'cpu' ? '(CPU)' : ''}${SM.I18n.t(away)}`);
     head.appendChild(name);
     const score = document.createElement('span');
     score.className = 'seat__score';
@@ -293,7 +296,7 @@
       const li = document.createElement('div');
       li.className = 'effect-chip';
       // 効果の名前と説明は別々に訳す（つなげた後の文は辞書に無い）
-      SM.Cards.linkify(li, `${e.owner !== null && e.owner !== undefined ? `${SM.I18n.t(SM.Main.seatName(e.owner))}: ` : ''}${SM.I18n.t(e.name)}${e.desc ? `（${SM.I18n.t(e.desc)}）` : ''}`);
+      SM.Cards.linkify(li, `${e.owner !== null && e.owner !== undefined ? `${SM.I18n.name(SM.Main.seatName(e.owner))}: ` : ''}${SM.I18n.t(e.name)}${e.desc ? `（${SM.I18n.t(e.desc)}）` : ''}`);
       eff.appendChild(li);
     }
   }
@@ -569,7 +572,7 @@
       }
       else if (e.type === 'cardPlay') {
         const who = SM.Main.seatName(e.seat);
-        SM.Cards.showPlayed(e.cid, `${SM.I18n.t(who)}${SM.I18n.t(e.reaction ? 'の割り込み' : 'がプレイ')}`, SM.Icons.targetLine(e.seat, e.shown, e.reactTo));
+        SM.Cards.showPlayed(e.cid, `${SM.I18n.name(who)}${SM.I18n.t(e.reaction ? 'の割り込み' : 'がプレイ')}`, SM.Icons.targetLine(e.seat, e.shown, e.reactTo));
       } else if (e.type === 'happening') {
         SM.Cards.showPlayed(e.cid, `${SM.Main.seatName(e.seat)}のハプニング！`);
       } else if (e.type === 'powerTrigger') {

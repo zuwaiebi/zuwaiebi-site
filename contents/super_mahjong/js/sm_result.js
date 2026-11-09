@@ -34,8 +34,9 @@
       tr.innerHTML = `<td>${w}</td><td class="name"></td><td>${pt(info.before[s])}</td>`
         + `<td class="${delta > 0 ? 'plus' : delta < 0 ? 'minus' : ''}">${delta > 0 ? '+' : ''}${delta ? pt(delta) : ''}</td><td>${pt(info.after[s])}</td>`;
       const nm = tr.querySelector('.name');
+      nm.dataset.i18nNames = '';
       nm.appendChild(SM.Icons.el(room.seats[s] && room.seats[s].icon));
-      nm.append(nameOf(room, s) + (s === room.you ? '（あなた）' : ''));
+      nm.append(nameOf(room, s), s === room.you ? '（あなた）' : '');
       table.appendChild(tr);
     }
     return table;
@@ -153,8 +154,9 @@
       const li = document.createElement('li');
       li.innerHTML = `<span class="rank">${r.rank}位</span><span class="name"></span><span class="score">${SM.Main.points(r.score)}</span>`;
       const nm = li.querySelector('.name');
+      nm.dataset.i18nNames = '';
       nm.appendChild(SM.Icons.el(room.seats[r.seat] && room.seats[r.seat].icon));
-      nm.append(nameOf(room, r.seat) + (r.seat === room.you ? '（あなた）' : ''));
+      nm.append(nameOf(room, r.seat), r.seat === room.you ? '（あなた）' : '');
       if (r.seat === room.you) li.classList.add('is-you');
       ol.appendChild(li);
     });

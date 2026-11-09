@@ -67,12 +67,28 @@
     else delete document.body.dataset.theme;
   }
 
+  /**
+   * 中国語の表示でも訳さない名前: 人のプレイヤー名と、その人が選んだデッキの名前（サンプルデッキの名前は辞書で訳す）。
+   * CPU の名前（ミッションのネームドCPUなど）は辞書で訳すので入れない
+   */
+  function protectNames(room) {
+    const samples = new Set(SM.Decks.samples().map((d) => d.name));
+    const list = [];
+    for (const s of room.seats || []) {
+      if (!s || s.kind === 'cpu') continue;
+      list.push(s.name);
+      if (s.deck && !s.deck.cpu && !samples.has(s.deck.name)) list.push(s.deck.name);
+    }
+    SM.I18n.setNames('room', list);
+  }
+
   function onRoom(m) {
     if (performance.now() < leavingUntil) return;
     const room = m.room;
     // ミッション・デイリーミッションの部屋は待機室を通さずにすぐ始まる（作った直後の待機中の知らせは見せない）
     if ((room.mission || room.daily) && room.state === 'waiting') return;
     state.room = room;
+    protectNames(room);
     applyTheme(room);
     document.querySelectorAll('[data-exit]').forEach((b) => b.classList.toggle('is-blink', missionAchieved(room)));
     // ミッション中はミッションの曲を流す（2回戦は部屋情報の mission.bgm）
@@ -235,7 +251,11 @@
     SM.Net.on('error', (m) => { toast(m.message); SM.Input.onRejected(); });
     SM.Net.on('kicked', () => { toast('部屋から退出させられました'); show('screen-lobby'); });
     // サーバーが付けた既定の名前（名無し）は、表示の言語の既定の名前にして見せる（入力欄の値は画面の置き換えでは訳されない）
-    SM.Net.on('welcome', (m) => { if (!$('lobby-name').value) $('lobby-name').value = m.name === '名無し' ? SM.I18n.t(m.name) : m.name; });
+    SM.Net.on('welcome', (m) => {
+      if ($('lobby-name').value) return;
+      $('lobby-name').value = m.name === '名無し' ? SM.I18n.t(m.name) : m.name;
+      if (m.name !== '名無し') SM.I18n.setNames('me', [m.name]);
+    });
     document.addEventListener('visibilitychange', () => { if (!document.hidden) SM.Net.reconnectNow(); });
 
     SM.Net.connect();

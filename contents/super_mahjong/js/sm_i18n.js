@@ -83,15 +83,20 @@
       let src = '^';
       let weight = 0;
       let anchor = '';
+      // 《{1}》のように《》で囲んだ所（カード名が入る所。名前と同じでも、カード名として訳す）
+      const cardSlots = new Set();
       parts.forEach((p, i) => {
         if (i % 2 === 0) {
           src += escRe(p);
           weight += p.length;
           if (p.length > anchor.length) anchor = p;
-        } else src += '([\\s\\S]*?)';
+        } else {
+          src += '([\\s\\S]*?)';
+          if (parts[i - 1].endsWith('《') && (parts[i + 1] || '').startsWith('》')) cardSlots.add((i - 1) / 2);
+        }
       });
       if (!weight) continue;
-      out.push({ re: new RegExp(`${src}$`), zh: zhText, anchor, weight, strict: weight <= 2 });
+      out.push({ re: new RegExp(`${src}$`), zh: zhText, anchor, weight, strict: weight <= 2, cardSlots });
     }
     return out.sort((a, b) => b.weight - a.weight);
   }
@@ -101,6 +106,32 @@
   const missing = new Set();
   let depth = 0;   // 型の {0} の所を訳している深さ（訳せなかった文として覚えるのは、画面に出る文そのものだけ）
 
+  // ---------- 訳さない名前（プレイヤー名・デッキ名） ----------
+  // 人が付けた名前は、辞書の言葉と同じでも訳さない（「スキップ」という名前を「跳過」に、自分のデッキ名を辞書の訳にしない）。
+  // 名前をそのまま出すのは、名前の入る所だけ:
+  //   - つないだ文の中: 型の {0} の所（《{0}》のカード名の所は除く）・「・」などで区切った所・括弧の中が名前と同じ時
+  //   - 名前だけの文字の塊: 名前を出す要素（data-i18n-names を付けたもの。席・結果・ランキングの名前など）の中だけ
+  //     （「スキップ」という名前の人がいても、画面の「スキップ」ボタンは訳す）。
+  //     画面のコードで名前だけを SM.I18n.t に通す所は、代わりに SM.I18n.name を使う
+  // 名前は出どころ（kind: 部屋の席・自分の名前・自分のデッキ・ランキングなど）ごとに setNames で入れ替える。
+  // CPU の名前（ミッションのネームドCPUなど）とサンプルデッキの名前は辞書で訳すので入れない
+  const NAME_BOX = '[data-i18n-names]';
+  let cardSlot = 0;   // 型の《{0}》の所を訳している間（名前と同じでもカード名として訳す）
+  const nameSets = new Map();
+  let names = new Set();
+  function setNames(kind, list) {
+    // サーバーが付ける既定の名前「名無し」は人が付けた名前ではないので、表示の言語に訳す
+    const next = new Set((list || []).map((x) => String(x || '').trim()).filter((x) => CJK.test(x) && x !== '名無し'));
+    const prev = nameSets.get(kind);
+    if (prev ? prev.size === next.size && [...next].every((x) => prev.has(x)) : !next.size) return;
+    nameSets.set(kind, next);
+    names = new Set();
+    for (const set of nameSets.values()) for (const x of set) names.add(x);
+    // 前に訳した結果は、名前が変わると違ってくる（訳した後の文の覚え produced は残す。画面にある訳した文を訳し直さないように）
+    cache.clear();
+  }
+  const isName = (s) => names.size > 0 && names.has(String(s).trim());
+
   function byPattern(s, d) {
     for (const p of d.patterns) {
       if (p.anchor && !s.includes(p.anchor)) continue;
@@ -108,8 +139,14 @@
       if (!m) continue;
       depth++;
       let groups;
-      try { groups = m.slice(1).map((g) => tr(g)); } finally { depth--; }
-      if (p.strict && m.slice(1).some((g, i) => KANA.test(g) && groups[i] === g)) continue;
+      try {
+        groups = m.slice(1).map((g, i) => {
+          if (!p.cardSlots.has(i)) return tr(g);
+          cardSlot++;
+          try { return tr(g); } finally { cardSlot--; }
+        });
+      } finally { depth--; }
+      if (p.strict && m.slice(1).some((g, i) => KANA.test(g) && groups[i] === g && !isName(g))) continue;
       return p.zh.replace(/\{(\d+)\}/g, (all, i) => groups[Number(i)] ?? '');
     }
     return undefined;
@@ -126,7 +163,7 @@
       depth++;
       let out;
       try { out = parts.map((p) => tr(p)); } finally { depth--; }
-      if (out.some((o, i) => o !== parts[i]) && out.every((o, i) => o !== parts[i] || !KANA.test(parts[i]))) return out.join(sep);
+      if (out.some((o, i) => o !== parts[i]) && out.every((o, i) => o !== parts[i] || !KANA.test(parts[i]) || isName(parts[i]))) return out.join(sep);
     }
     return undefined;
   }
@@ -159,7 +196,7 @@
     if (stack.length) return undefined;
     pieces.push(s.slice(from));
     let changed = false;
-    const ok = (orig, v) => { if (v !== orig) changed = true; return v !== orig || !KANA.test(orig); };
+    const ok = (orig, v) => { if (v !== orig) changed = true; return v !== orig || !KANA.test(orig) || isName(orig); };
     depth++;
     try {
       const out = [];
@@ -219,7 +256,8 @@
   /** 画面に出す文を今の言語にする（日本語の時はそのまま） */
   function tr(s) {
     if (!zh || typeof s !== 'string' || !CJK.test(s)) return s;
-    if (produced.has(s) || active.has(s)) return s;
+    // つないだ文の中の名前は訳さない（名前だけの文字の塊は textNode が名前を出す要素の中かで決める）
+    if (produced.has(s) || active.has(s) || (depth && !cardSlot && isName(s))) return s;
     const hit = cache.get(s);
     if (hit !== undefined) {
       if (!depth && hit === s && KANA.test(s) && missing.size < 1000) missing.add(s.trim());
@@ -270,6 +308,8 @@
   function textNode(n) {
     const v = n.nodeValue;
     if (!v || !CJK.test(v)) return;
+    // 名前を出す要素の中の、名前だけの文字の塊は訳さない
+    if (isName(v) && n.parentElement && n.parentElement.closest(NAME_BOX)) return;
     const out = tr(v);
     if (out !== v) n.nodeValue = out;
   }
@@ -383,7 +423,9 @@
   }
 
   SM.I18n = {
-    lang, zh, LANGS, t: tr, card, cardSearchText, applyStatic, observe, collect, setLang,
+    lang, zh, LANGS, t: tr, card, cardSearchText, applyStatic, observe, collect, setLang, setNames,
+    /** プレイヤー名などを表示の言語にする（人が付けた名前はそのまま、CPU の名前などは訳す） */
+    name: (s) => (isName(s) ? s : tr(s)),
     /** 中国語の表示で訳が見つからなかった文（開発用: コンソールで SuperMahjong.I18n.missing() ） */
     missing: () => [...missing],
   };

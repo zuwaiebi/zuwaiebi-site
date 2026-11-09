@@ -245,6 +245,7 @@
       col.appendChild(text);
       const who = document.createElement('span');
       who.className = 'fx-waka__who';
+      who.dataset.i18nNames = '';
       who.textContent = SM.Main.seatName(e.seats[i]);
       col.appendChild(who);
       paper.appendChild(col);

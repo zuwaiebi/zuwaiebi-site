@@ -159,6 +159,7 @@
           <h3>ver 1.05</h3>
           <ul>
             <li>繁體中文の表示で、チュートリアルの説明が日本語のままだったところを中国語にしました。</li>
+            <li>繁體中文の表示で、プレイヤー名やデッキ名が辞書の言葉と同じだと中国語に訳されてしまう不具合を直しました。</li>
           </ul>
           <h3>ver 1.04</h3>
           <ul>
@@ -633,9 +634,9 @@
         <button id="log-toggle" class="small-button log-toggle">ログ</button>
         <button id="btn-mute" class="small-button" title="音を消す">🔊</button>
         <button class="small-button exit-button" data-exit>退出</button>
-        <span id="log-latest" class="log-latest"></span>
+        <span id="log-latest" class="log-latest" data-i18n-names></span>
       </div>
-      <div id="log-panel" class="log-panel" hidden><ul id="log-list"></ul></div>
+      <div id="log-panel" class="log-panel" hidden><ul id="log-list" data-i18n-names></ul></div>
     </div>
 
     <div id="chooser" class="chooser" hidden></div>

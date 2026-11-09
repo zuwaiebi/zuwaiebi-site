@@ -354,11 +354,14 @@
     }
     const ol = document.createElement('ol');
     ol.className = 'ranking daily__ranking';
+    // 自分の名前は中国語の表示でも訳さない（CPU の名前は辞書で訳す）
+    SM.I18n.setNames('daily', rec.ranking.filter((r) => r.you).map((r) => r.name));
     for (const r of rec.ranking) {
       const li = document.createElement('li');
       if (r.you) li.classList.add('is-you');
       const name = span('name', '');
-      name.append(SM.Icons.el(r.icon), `${r.name}${r.you ? '（あなた）' : ''}`);
+      name.dataset.i18nNames = '';
+      name.append(SM.Icons.el(r.icon), r.name, r.you ? '（あなた）' : '');
       li.append(span('rank', `${r.rank}位`), name, span('score', SM.Main.points(r.score)));
       ol.appendChild(li);
     }

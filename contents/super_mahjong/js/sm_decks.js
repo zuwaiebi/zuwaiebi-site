@@ -100,10 +100,15 @@
       const raw = JSON.parse(SM.Net.store.get(STORE_KEY) || '[]');
       decks = Array.isArray(raw) ? raw.map(fromStore).filter(Boolean) : [];
     } catch { decks = []; }
+    protectNames();
   }
+
+  /** 自分のデッキの名前は中国語の表示でも訳さない（サンプルデッキの名前は辞書で訳す） */
+  function protectNames() { SM.I18n.setNames('decks', decks.map((d) => d.name)); }
 
   function persist() {
     SM.Net.store.set(STORE_KEY, JSON.stringify(decks.map(toStore)));
+    protectNames();
     for (const f of listeners) f();
   }
 
@@ -357,6 +362,8 @@
       info.className = 'deck-row__info';
       const name = document.createElement('div');
       name.className = 'deck-row__name';
+      // 自分のデッキの名前は中国語の表示でも訳さない（サンプルデッキの名前は訳す。sm_i18n.js の data-i18n-names）
+      name.dataset.i18nNames = '';
       name.textContent = d.name;
       const sub = document.createElement('div');
       sub.className = 'deck-row__sub';

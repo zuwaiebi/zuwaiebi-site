@@ -113,7 +113,10 @@
 
   function whoEl(e) {
     const who = span('rankboard__name', '');
-    who.append(SM.Icons.el(e.icon), `${e.name}${e.mine ? '（あなた）' : ''}`);
+    // 人のプレイヤー名は中国語の表示でも訳さない（sm_i18n.js の data-i18n-names）
+    who.dataset.i18nNames = '';
+    // 名前と「（あなた）」は別の文字の塊にする（中国語の表示で、名前は訳さずに「（あなた）」だけ訳す）
+    who.append(SM.Icons.el(e.icon), e.name, e.mine ? '（あなた）' : '');
     return who;
   }
 
@@ -126,6 +129,8 @@
     ol.innerHTML = '';
     if (!data) { ol.appendChild(emptyRow('サーバーからランキングを読み込んでいます…')); return; }
     if (!data.best.length) { ol.appendChild(emptyRow('まだ登録がありません。データタブの「いちばん翻数の高い和了」から登録できます。')); return; }
+    // 登録した人の名前は中国語の表示でも訳さない（和了を開いた時の名前も）
+    SM.I18n.setNames('rankBest', data.best.map((e) => e.name));
     for (const e of data.best) ol.appendChild(bestItem(e));
   }
 
@@ -165,6 +170,7 @@
     rules.textContent = info && info.date === date ? info.label : '';
     if (!data) { ol.appendChild(emptyRow('サーバーからランキングを読み込んでいます…')); return; }
     if (!data.daily.entries.length) { ol.appendChild(emptyRow('今日はまだ登録がありません。ミッションタブの「今日の記録」から登録できます。')); return; }
+    SM.I18n.setNames('rankDaily', data.daily.entries.map((e) => e.name));
     for (const e of data.daily.entries) {
       const li = document.createElement('li');
       li.className = `rankboard__item${e.mine ? ' is-you' : ''}`;

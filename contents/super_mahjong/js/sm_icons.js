@@ -107,6 +107,8 @@
     wrap.className = 'name-tag';
     wrap.appendChild(el(SM.Main.seatIcon(seat)));
     const n = document.createElement('span');
+    // 人のプレイヤー名は中国語の表示でも訳さない（sm_i18n.js の data-i18n-names）
+    n.dataset.i18nNames = '';
     n.textContent = SM.Main.seatName(seat);
     wrap.appendChild(n);
     return wrap;

@@ -228,7 +228,10 @@
     langSelect.addEventListener('change', () => SM.I18n.setLang(langSelect.value));
     const nameInput = $('lobby-name');
     nameInput.value = SM.Net.getName();
-    nameInput.addEventListener('change', () => SM.Net.setName(nameInput.value.trim().slice(0, 12)));
+    // 自分の名前は中国語の表示でも訳さない（統計・デイリーミッションの記録などに出る）
+    const protectMine = () => SM.I18n.setNames('me', [nameInput.value.trim().slice(0, 12)]);
+    protectMine();
+    nameInput.addEventListener('change', () => { SM.Net.setName(nameInput.value.trim().slice(0, 12)); protectMine(); });
     // アイコン: カードのイラストから選ぶ（初めての時はランダム）
     const iconBtn = $('lobby-icon');
     const showIcon = () => { iconBtn.innerHTML = ''; iconBtn.appendChild(SM.Icons.el(SM.Icons.mine())); };
@@ -380,6 +383,7 @@
     const el = document.createElement('span');
     el.className = 'seat-row__deck';
     const d = s.deck;
+    // 中国語の表示では「デッキ: {0}（{1}枚）{2}」の型で訳す。人が付けたデッキの名前（{0}）は訳さない（sm_main.js の protectNames）
     if (s.kind === 'cpu') el.textContent = `デッキ: ${d ? `${d.name}（${d.total}枚）` : '既定の山札'}`;
     else if (!d) {
       el.textContent = 'デッキ未選択';
@@ -475,10 +479,13 @@
       li.className = 'seat-row';
       const label = document.createElement('span');
       label.className = 'seat-row__name';
+      // 人のプレイヤー名は中国語の表示でも訳さない（sm_i18n.js の data-i18n-names）
+      label.dataset.i18nNames = '';
       if (!s) label.textContent = '（空席）';
       else {
         label.appendChild(SM.Icons.el(s.icon));
-        label.append(`${s.name}${s.kind === 'cpu' ? '（CPU）' : ''}${s.host ? ' 👑' : ''}${i === room.you ? '（あなた）' : ''}${s.connected ? '' : ' ※切断中'}`);
+        // 名前と後ろの印は別の文字の塊にする（中国語の表示で、人の名前は訳さずに印だけ訳す）
+        label.append(s.name, `${s.kind === 'cpu' ? '（CPU）' : ''}${s.host ? ' 👑' : ''}${i === room.you ? '（あなた）' : ''}${s.connected ? '' : ' ※切断中'}`);
       }
       const main = document.createElement('div');
       main.className = 'seat-row__main';

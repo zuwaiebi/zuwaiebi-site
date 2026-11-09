@@ -131,7 +131,8 @@
 
   // ---------- 記録を流す ----------
   function roomMsg() {
-    const name = ($('lobby-name').value || '').trim().slice(0, 12) || SM.Net.getName() || data.room.seats[0].name;
+    // 名前が無い時の「あなた」は表示の言語にする（席の名前は訳さないので、先に訳しておく）
+    const name = ($('lobby-name').value || '').trim().slice(0, 12) || SM.Net.getName() || SM.I18n.t(data.room.seats[0].name);
     const seats = data.room.seats.map((s, i) => (i === 0 ? { ...s, name, icon: SM.Icons.mine() } : { ...s }));
     return { ...data.room, seats, state: stateName };
   }

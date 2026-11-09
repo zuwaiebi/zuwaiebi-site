@@ -118,6 +118,8 @@
   function drawWin(box, b, winnerName) {
     const names = (b.names || []).slice();
     if (winnerName !== undefined) names[b.result.winner] = winnerName;
+    // 統計の自分の和了では、和了した人（自分）の名前を中国語の表示でも訳さない（ランキングの名前は sm_ranking.js が入れる）
+    else SM.I18n.setNames('statsWin', [names[b.result.winner]]);
     const room = { seats: names.map((name) => ({ name })) };
     SM.Tiles.setView({ tiles: {}, reds: [], allDora: b.allDora, doraKinds: b.doraKinds || [], doraTiles: [], asKinds: {} });
     SM.Tiles.withKnown(b.result, () => SM.Result.agariBlock(box, room, b.result, b.red !== false, b.label));

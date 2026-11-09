@@ -145,6 +145,7 @@
     // プレイヤーを選ぶ時は名前の横にアイコン
     if (it.seat !== undefined) {
       e.classList.add('prompt-item--player');
+      e.dataset.i18nNames = '';
       e.appendChild(SM.Icons.el(SM.Main.seatIcon(it.seat)));
     }
     e.append(it.label);
@@ -290,6 +291,7 @@
     (p.owners || []).forEach((seat, i) => {
       const li = document.createElement('li');
       if (mine.has(i)) li.classList.add('is-mine');
+      li.dataset.i18nNames = '';
       li.append(`${WAKA_LINES[i] || ''}: `, SM.Main.seatName(seat));
       order.appendChild(li);
     });
