@@ -499,9 +499,28 @@
     setHidden(box, false);
   }
 
-  function render(game, room) {
-    lastGame = game;
+  /**
+   * 切ったけれどサーバーの返事がまだの牌（sm_input の outTile）を、手牌から除いて自分の河の最後に置いた卓の情報にする。
+   * 返事が届けば同じ形になるので、手牌から出る演出は押した時に始まり、届いた時には何も変わらない（返事を待たずに動いて見える）
+   */
+  function withOut(game) {
+    const o = SM.Input.outTile();
+    const me = o && game.players[game.you];
+    if (!me || !Array.isArray(me.hand) || !(me.hand.includes(o.tile) || me.drawn === o.tile)) return game;
+    const mine = {
+      ...me,
+      hand: me.hand.filter((t) => t !== o.tile),
+      drawn: me.drawn === o.tile ? null : me.drawn,
+      discards: [...me.discards, o.entry],
+    };
+    return { ...game, players: game.players.map((p) => (p === me ? mine : p)), lastDiscard: { seat: game.you, tile: o.tile } };
+  }
+
+  function render(serverGame, room) {
+    // 覚えておくのは届いた情報のまま（描き直す時に、その時の切った牌でもう一度作る）
+    lastGame = serverGame;
     lastRoom = room;
+    const game = withOut(serverGame);
     renderTimeAttack(game.timeAttack);
     T().setView(game);
     viewKey = JSON.stringify([game.you, game.n, game.dir, game.red, game.cardsEnabled, game.slots, game.maskAll,
@@ -596,7 +615,8 @@
       if (e.type === 'end' && e.result && e.result.type === 'agari') SM.Audio.holdBgm(true);
       else if (e.type === 'deal') SM.Audio.holdBgm(false);
       if (text && seat !== undefined) shout(game, seat, text);
-      const snd = soundOf(e);
+      // 自分の打牌の音は押した時に鳴らしている（sm_input）ので、届いた時には鳴らさない
+      const snd = e.type === 'discard' && e.seat === game.you && SM.Input.takeOutSound() ? null : soundOf(e);
       if (snd) sounds.add(snd);
       SM.Log.add(game, e);
     }

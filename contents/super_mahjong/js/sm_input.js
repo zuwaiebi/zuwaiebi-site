@@ -15,6 +15,11 @@
   let selected = null;
   let sentId = null;       // 同じ問い合わせに二重送信しない
   let deadline = null;
+  // 切ったけれど、まだサーバーの返事（次の卓の情報）が届いていない牌 { promptId, tile, entry: 河に置く形 }。
+  // 卓はこの牌を手牌から出して河の最後に置いて描く（sm_table の withOut）。本番はサーバーまでの往復が数百msかかるので、
+  // 返事を待ってから動かすと押してから牌が動くまで遅れる。問い合わせが変わった（サーバーが受け付けた）・拒否された時に消す
+  let out = null;
+  let outSoundAt = 0;      // 打牌の音を押した時に鳴らした時刻（サーバーから届く自分の打牌の音は鳴らさない）
 
   const sent = () => !prompt || prompt.id === sentId;
 
@@ -31,9 +36,18 @@
     // 接続が切れていて送れなかった時は送っていない扱いにする（つながり直すと同じ問い合わせが届くので、押し直せる）
     if (!SM.Net.send({ type: 'answer', promptId: prompt.id, answer: action })) return;
     sentId = prompt.id;
-    // 選んで切った牌は、次の卓の情報が届いて手牌から出ていくまで持ち上げたままにする（手牌から出る演出をその高さから始める。
-    // 選んでいたのは update で問い合わせが変わった時に消す）
-    if (!((action.type === 'discard' || action.type === 'riichi') && action.tile === selected)) select(null);
+    // 切った牌は返事を待たずに手牌から出し、河に置き、音を鳴らす（手牌から出る演出は、選んで持ち上げていた高さから始まる）
+    if ((action.type === 'discard' || action.type === 'riichi') && Number.isInteger(action.tile)) {
+      const me = game.players[game.you];
+      out = {
+        promptId: prompt.id,
+        tile: action.tile,
+        entry: { tile: action.tile, tsumogiri: action.tile === me.drawn, riichi: action.type === 'riichi', called: false, faceDown: Boolean(action.faceDown) },
+      };
+      outSoundAt = performance.now();
+      SM.Audio.se('打牌');
+    }
+    select(null);
     riichiMode = false;
     closeChooser();
     SM.Cards.hideDetail();
@@ -47,6 +61,9 @@
     game = g;
     const p = g.prompt && (g.prompt.kind === 'turn' || g.prompt.kind === 'call') ? g.prompt : null;
     if (!p || !prompt || p.id !== prompt.id) { riichiMode = false; faceDown = false; select(null); }
+    // 切った牌の返事が届いた（問い合わせが変わった）ら、ここからは届いた卓の情報のとおりに描く
+    // （時間切れで別の牌が切られた・カードの効果で切る牌が変わった時も、届いた情報で直る）
+    if (out && (!p || p.id !== out.promptId)) out = null;
     prompt = p;
     actions = p ? p.actions : [];
     const d = actions.find((a) => a.type === 'discard');
@@ -301,15 +318,28 @@
   function onRejected() {
     if (!game) return;
     sentId = null;
+    // 先に手牌から出した牌は手牌に戻す
+    out = null;
+    outSoundAt = 0;
     renderButtons();
     SM.Table.rerender();
   }
 
   /** 新しい対局が始まった時: 前の対局で送った問い合わせの覚えを消す */
-  function reset() { sentId = null; prompt = null; myCardsKey = ''; }
+  function reset() { sentId = null; prompt = null; myCardsKey = ''; out = null; outSoundAt = 0; }
 
   /** 手牌の飾りに使う状態（卓の手牌を作り直すかの目印。sm_table） */
-  const handState = () => [sent(), riichiMode, selected, [...discardSet], [...riichiSet]];
+  const handState = () => [sent(), riichiMode, selected, [...discardSet], [...riichiSet], out && out.tile];
 
-  SM.Input = { init, update, reset, decorateHandTile, handState, onRejected, oneClick };
+  /** 切ったけれど返事がまだの牌（無ければ null。sm_table が手牌から出して河に置いて描く） */
+  const outTile = () => out;
+
+  /** サーバーから届いた自分の打牌の音を鳴らさないか（押した時に鳴らしていれば true。1回だけ） */
+  function takeOutSound() {
+    const played = outSoundAt && performance.now() - outSoundAt < 5000;
+    outSoundAt = 0;
+    return Boolean(played);
+  }
+
+  SM.Input = { init, update, reset, decorateHandTile, handState, onRejected, oneClick, outTile, takeOutSound };
 })();

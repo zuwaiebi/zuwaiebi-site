@@ -25,7 +25,7 @@
     <div class="panel lobby">
       <h1 class="logo">スーパー麻雀</h1>
       <!-- バージョン（データタブの「更新履歴」の一番上と合わせる） -->
-      <p class="version-label">ver 1.05</p>
+      <p class="version-label">ver 1.06</p>
       <!-- 表示の言語（選ぶと開き直す。sm_i18n.js） -->
       <div class="lang-row"><span class="lang-row__icon" aria-hidden="true">🌐</span><select id="lang-select" class="notranslate" translate="no" aria-label="Language"><option value="ja">日本語</option><option value="zh">繁體中文</option></select></div>
       <div class="field">
@@ -156,6 +156,10 @@
         <!-- 更新履歴: 新しい版を上に足す。ロビーの ver 表示も合わせて変える。既定は畳んでおき、見出しの▶を押すと開く -->
         <details class="lobby-box version-history">
           <summary><h2>更新履歴</h2></summary>
+          <h3>ver 1.06</h3>
+          <ul>
+            <li>牌を切った時、サーバーの返事を待たずに、すぐ手牌から河へ動かすようにしました（通信に時間がかかっても、押してから牌が動くまで待たされません）。</li>
+          </ul>
           <h3>ver 1.05</h3>
           <ul>
             <li>繁體中文の表示で、チュートリアルの説明が日本語のままだったところを中国語にしました。</li>
